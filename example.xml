@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<SpecTool version="1.0">
+<CompositeSpectrum id="test"><Spectrum spec="test" spectype="ascii1"/>
+<ContinuumPoint x="3224.971792960488" y="2.623527171635778E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="3224.971792960488" y="2.623527171635778E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="3224.971792960488" y="2.623527171635778E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="3656.6693639361138" y="4.087119342814447E-14" xError="0.0" yError="0.0" xLocked="false" yLocked="false" id="null"/>
+<ContinuumPoint x="3675.08091582769" y="4.7949330295501105E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4139.239223141728" y="6.483873159172637E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4247.290061880265" y="7.081105429411847E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4259.716959517436" y="6.73675643473405E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4270.497821309202" y="7.111391038959129E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4292.198921084139" y="9.146785965286909E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4319.531762562556" y="6.707305281526408E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4337.280428357866" y="8.398479007078166E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4358.53408277662" y="6.856966673168157E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4371.9411364885045" y="8.428411285406516E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4416.659267222214" y="5.090962251795524E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4559.980101021631" y="7.605273631376898E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4699.095911541275" y="5.62974326170582E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4743.46866233365" y="7.305950848093403E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4809.2972790706735" y="6.034832904490446E-14" xError="0.0" yError="0.0" xLocked="false" yLocked="false" id="null"/>
+<ContinuumPoint x="4833.479244895631" y="6.001662968150393E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4854.372893042454" y="5.6309042356899926E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4865.065526133668" y="5.82036780582965E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4888.514103032518" y="6.193391113187152E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4930.553878588952" y="6.123880137251993E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4974.20192418967" y="7.2787613859039E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="4993.7253000961755" y="7.077912473094872E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5000.203814759258" y="8.383430406353552E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5007.302251356534" y="7.630246983319699E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5040.144060023508" y="8.233851476272242E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5074.146749291965" y="9.670600836033025E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5114.935622157608" y="1.0393029837102004E-13" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5142.775219265125" y="1.2828456199673917E-13" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5157.093470663023" y="1.175089417985333E-13" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="5212.276269290986" y="1.024824625643795E-13" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="6167.939837309023" y="5.766689611421642E-14" xError="0.0" yError="0.0" xLocked="false" yLocked="false" id="null"/>
+<ContinuumPoint x="6188.936095091031" y="4.517723999575264E-14" xError="0.0" yError="0.0" xLocked="false" yLocked="false" id="null"/>
+<ContinuumPoint x="6334.769870588206" y="4.4554291861402106E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="6334.769870588206" y="4.4554291861402106E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<ContinuumPoint x="6334.769870588206" y="4.4554291861402106E-14" xError="0.0" yError="0.0" xLocked="true" yLocked="true" id="null"/>
+<Absorber ionName="M1" N="12.996452762862262" b="24.57590390285298" z="2.0342717821303484" NError="0.0" bError="0.0" zError="0.0" NLocked="false" bLocked="false" zLocked="false" id="mot"/>
+<Absorber ionName="M1" N="12.09661199704682" b="6.637522233234118" z="2.0347855349999637" NError="0.0" bError="0.0" zError="0.0" NLocked="false" bLocked="false" zLocked="false" id="hai"/>
+<Absorber ionName="M1" N="14.2679247" b="24.999985109645" z="2.031038915377586" NError="0.0" bError="0.0" zError="0.0" NLocked="false" bLocked="false" zLocked="false" id="ba"/>
+<Absorber ionName="M1" N="13.220596558433018" b="20.43132019400626" z="2.0305943831558753" NError="0.0" bError="0.0" zError="0.0" NLocked="false" bLocked="false" zLocked="false" id="bon"/>
+<Absorber ionName="M1" N="13.4180172" b="49.285781802370856" z="2.027074837492461" NError="0.0" bError="0.0" zError="0.0" NLocked="true" bLocked="true" zLocked="true" id="nam"/>
+<Absorber ionName="M1" N="12.6984464" b="33.51092763857918" z="2.027940917358283" NError="0.0" bError="0.0" zError="0.0" NLocked="true" bLocked="true" zLocked="true" id="sau"/>
+<Absorber ionName="M1" N="12.403232" b="10.638556392091534" z="2.0220342940643588" NError="0.0" bError="0.0" zError="0.0" NLocked="true" bLocked="true" zLocked="true" id="bay"/>
+</CompositeSpectrum>
+</SpecTool>
