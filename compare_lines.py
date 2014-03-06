@@ -1,5 +1,6 @@
 import dude_xmlutils
 import astronomy_utils as astro
+import xml.etree.ElementTree as et
 
 """
 compare velocity shifts between absorption lines.
