@@ -41,15 +41,13 @@ def parser(arg_list):
   return action, xml_file, datalst, chisq
 
 action, xml_file, datalst, chisq = parser(sys.argv[1:])
-tree = et.parse(xml_file) #parse xml file
-root = tree.getroot()
 
 for i in range(1,len(datalst)):
   setattr(datalst[i],'vel',astro.get_vel_shift(datalst[0].z,datalst[i].z)[0])
   
 if action=='get': 
   for item in datalst:
-    item.getData(root)
+    item.getData()
   output_string = ''
   for item in datalst:
     output_string+=str(item)
@@ -60,7 +58,7 @@ if action=='get':
 
 elif action=='write':
   for item in datalst:
-    item.writeData(root)
+    item.writeData()
   tree.write(xml_file)
 
 else:

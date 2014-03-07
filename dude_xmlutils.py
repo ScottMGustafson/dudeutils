@@ -1,9 +1,15 @@
+import xml.etree.ElementTree as et
+
 
 class Data(object):
   def __init__(self,**kwargs):
     for key, val in kwargs.iteritems():
       setattr(self,key,val)
-    #self.tag = 'ContinuumPoint' if 'x' in kwargs.keys() else 'Absorber'
+    self.tag  = kwargs.get('tag','Absorber')
+    self.iden = kwargs.get('iden','')
+    self.xmlfile = kwargs.get('xmlfile',None)
+    self.tree = et.parse(self.xmlfile)
+    self.root = self.tree.getroot()
 
   def __str__(self):
     if self.tag=='ContinuumPoint':
@@ -13,10 +19,10 @@ class Data(object):
     else:
       raise Exception('undefined tag: '+self.tag)
 
-  def getData(self,root):
+  def getData(self):
     attribute_list = ['N','b','z'] if self.tag=='Absorber' else ['x','y']
     flag = False
-    for tag in root.findall('CompositeSpectrum'):
+    for tag in self.root.findall('CompositeSpectrum'):
       for item in tag.findall(self.tag):
         if item.get('id')==self.iden:
           flag = True
@@ -25,11 +31,11 @@ class Data(object):
     if flag==False:
       raise Exception('id '+self.iden+' not found')
 
-  def writeData(self,root,attribute_list):
+  def writeData(self,attribute_list):
     #attribute_list = ['N','b','z'] if self.tag=='Absorber' else ['x','y']
     
     flag = False
-    for tag in root.findall('CompositeSpectrum'):
+    for tag in self.root.findall('CompositeSpectrum'):
       for item in tag.findall(self.tag):
         if item.get('id')==self.iden:
           flag = True
@@ -37,6 +43,7 @@ class Data(object):
             self.attr=item.get(attr)
     if flag==False:
       raise Exception('id '+self.iden+' not found')
+    self.tree.write(self.xmlfile)
 
 
 
