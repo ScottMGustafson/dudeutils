@@ -56,6 +56,8 @@ class Data(object):
     self.iden = kwargs.get('iden',None)
     if not self.iden:
       raise Exception('no id specified')
+    if kwargs.get('populate',True) is True:
+      self.getData()
 
   def __str__(self):
     if self.tag=='ContinuumPoint':
