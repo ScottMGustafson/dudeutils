@@ -10,7 +10,6 @@ compare velocity shifts between absorption lines.
 
 reference='refspec.xml'
 
-
 def get_files(path=os.getcwd(),ext='.xml')
   tmp = os.listdir(path)
   f = []
@@ -35,8 +34,7 @@ ref_dict = {}
 for item in datalst[0]:
   ref_dict[item.iden]=float(item.z)
 
-velshifts = [ref_dict]
-for i in range(1,len(datalst):
+for i in range(1,len(datalst)):
   vel_dict = {}
   for ab in datalst[i]:
     vel_dict[ab.iden] = astro.get_vel_shift(ref_dict[ab.iden],ab.z)
