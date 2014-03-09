@@ -34,12 +34,14 @@ ref_dict = {}
 for item in datalst[0]:
   ref_dict[item.iden]=float(item.z)
 
+velshift = []
 for i in range(1,len(datalst)):
   vel_dict = {}
   for ab in datalst[i]:
-    vel_dict[ab.iden] = astro.get_vel_shift(ref_dict[ab.iden],ab.z)
+    vel_dict[ab.iden] = astro.get_vel_shift(ref_dict[ab.iden],float(ab.z))
   velshift.append(vel_dict)
 
+print velshift
 
 
 

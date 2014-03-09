@@ -26,7 +26,7 @@ class _XMLFile(object):
       for item in thetag.findall(tag):
         if item.get('id')==iden:
           return [item.get(attr) for attr in attribute_list ]            
-    raise Exception('id '+iden+' not found')
+    raise Exception('id '+iden+' not found in '+self.name)
 
   def writeData(self,iden,tag='Absorber',**kwargs):
     flag=False
