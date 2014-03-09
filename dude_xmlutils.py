@@ -9,30 +9,29 @@ class _XMLFile(object):
     self.root = self.tree.getroot()
     if assign_ids:
       self.assign_ids()
+
   def assign_ids(self,tag='Absorber'):
     "assigns an id for each absorber where id not present"
-    attribute_list = ['id','ionName','z']
+    attribute_list = ['id','ionName']
     counter=0
-    for tag in self.root.findall('CompositeSpectrum'):
-      for item in tag.findall(tag):
+    for thetag in self.root.findall('CompositeSpectrum'):
+      for item in thetag.findall(tag):
         if item.get('id')=="" or item.get('id')=="null":
-          ionName = item.get('ionName')
-          for attr in attribute_list:
-            item.set('id',ionName+'%d'%counter)
-            counter+=1
-    self.tree.write(self.xmlfile)
+          item.set('id',item.get('ionName')+'%d'%counter)
+          counter+=1
+    self.tree.write(self.name)
 
-  def getData(self,iden,attribute_list,tag=None):
-    for tag in self.root.findall('CompositeSpectrum'):
-      for item in tag.findall(tag):
+  def getData(self,iden,tag, attribute_list):
+    for thetag in self.root.findall('CompositeSpectrum'):
+      for item in thetag.findall(tag):
         if item.get('id')==iden:
           return [item.get(attr) for attr in attribute_list ]            
     raise Exception('id '+iden+' not found')
 
-  def writeData(self,iden,tag=None,**kwargs):
+  def writeData(self,iden,tag='Absorber',**kwargs):
     flag=False
-    for tag in self.root.findall('CompositeSpectrum'):
-      for item in tag.findall(tag):
+    for thetag in self.root.findall('CompositeSpectrum'):
+      for item in thetag.findall(tag):
         if item.get('id')==iden:
           flag = True
           for key, val in kwargs.iteritems():
@@ -51,7 +50,7 @@ class Data(object):
     assign_ids = kwargs.get('assign_ids',False)
     self.tag  = kwargs.get('tag','Absorber')
     self.xmlfile = _XMLFile(kwargs.get('xmlfile',None),assign_ids)     
-    self.tree = et.parse(xmlfile)
+    self.tree = et.parse(self.xmlfile.name)
     self.root = self.tree.getroot()
     self.iden = kwargs.get('iden',None)
     if not self.iden:
@@ -62,14 +61,14 @@ class Data(object):
   def __str__(self):
     if self.tag=='ContinuumPoint':
       return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y) 
-    elif: self.tag=='Absorber'
+    elif self.tag=='Absorber':
       return "%s %9.6lf %9.6lf %10.8lf %8.4lf"%(self.iden,self.N,self.b,self.z,self.vel)
     else:
       raise Exception('undefined tag: '+self.tag)
 
   def getData(self):
     lst = ['N','b','z'] if self.tag=='Absorber' else ['x','y']
-    output = zip(lst, self.xmlfile.getData(self.iden, lst, self.tag))
+    output = zip(lst, self.xmlfile.getData(self.iden, self.tag, lst))
     for item in output:
       setattr(self,item[0],item[1])
     

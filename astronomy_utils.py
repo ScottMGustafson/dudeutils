@@ -59,10 +59,11 @@ def get_lines(fname='atom.dat'):
     linelst.append({'ion':ion,'wave':wave,'f':f})
   return linelst
 
-def get_series(lst=get_lines(),ion=theIon):
+def get_series(lst=get_lines(),**kwargs):
   """
   parse out all data for a particular series of transitions for ion 'ion' 
   """
+  ion = kwargs.get('ion','HI')
   retlst = []
   for item in lst:
     if item['ion']==ion:
