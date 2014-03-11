@@ -36,10 +36,10 @@ def get_vel_shift(z1,z2,delz2=None,delz1=None):
     warnings.warn('warning: redshift is 0.')
   vel = c*(z1-z2)/(1.+z1)
   if delz1==None and delz2==None:
-    return [vel]
+    return vel
   else:
     vel_unc = (c/(1.+z1))*sqrt(delz2**2.+(delz1**2.)*((1.-z2)/(1.+z2))**2.)
-    return [vel,vel_unc]
+    return vel, vel_unc
     
 def vel_limit(vel,ident,delta=None):
   if delta is None:
