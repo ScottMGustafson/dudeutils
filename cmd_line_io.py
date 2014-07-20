@@ -3,7 +3,8 @@ import xml.etree.ElementTree as et
 import dude_xmlutils
 import astronomy_utils as astro
 
-""" command line script to write new values to xml or to dump current vals into 
+""" 
+    command line script to write new values to xml or to dump current vals into 
     text file.
     a typical command will be like:
       `> python cmd_line_io.py get file.xml id=foobar id2=foo id3=bar`

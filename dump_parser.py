@@ -20,5 +20,7 @@ class FitData(object):
             if start < self.waves[i] < end:
                 ind.append(i)
         return self.waves[ind], self.flux[ind], self.error[ind], self.cont[ind], self.abs[ind]
+
+    def get_cont_points
         
 

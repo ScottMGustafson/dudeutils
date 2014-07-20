@@ -61,6 +61,11 @@ class _XMLFile(object):
 
 class Data(object):
     def __init__(self,**kwargs):
+        """
+        mandatory args:  
+
+        xmlfile
+        """
         for key, val in list(kwargs.items()):
             setattr(self,key,val)
         assign_ids  = kwargs.get('assign_ids',False)
@@ -108,10 +113,28 @@ class Absorber(Data):
         super(Absorber, self).__init__(tag="Absorber",**kwargs)
         if kwargs.get('populate',True) is True:
             self.getData()
+        self.get_lines()
     def __str__(self):
         return "%s %9.6lf %9.6lf %10.8lf %8.4lf"%(self.iden,self.N,self.b,self.z,self.vel)
     def getData(self):
-        super(Absorber, self).getData(['N','b','z'])
+        super(Absorber, self).getData(['N','b','z','ionName'])
+        self.ionName = self.ionName.replace(' ','')
+    def get_lines(self, filename='atom.dat'):
+        """
+        get all data for atom.dat and put into a list of dicts
+        """
+        linelst = []
+        fname=open(filename,'r')
+        for line in fname:
+            line=line.split()
+            ion, wave, f = line[0], float(line[1]), float(line[2])
+            if ion==self.ionName:
+                linelst.append({'ion':ion,'wave':wave,'f':f})
+        fname.close()
+        linelst.sort(key=lambda item:item['wave'] ,reverse=True)
+        self.wave = [ item['wave'] for item in linelst ]
+        self.f = [ item['f'] for item in linelst ]
+        self.obs_wave = [ (1.+self.z)*item['wave'] for item in linelst ]
 
 class VelocityView(Data):
     def __init__(self,**kwargs):
