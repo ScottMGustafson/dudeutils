@@ -1,18 +1,19 @@
 import numpy as np
-from cloudy.cloudy_utils import calc_local_jnu
+import dude_xmlutils as xml
 
 Ryd  = 13.60569253  #(eV)
 hc   =  0.000123984193  # eV Angstroms
 pi = 3.141592654
 
 class FitData(object): 
-    def __init__(self,dumpfile):
+    def __init__(self,dumpfile,xmlfile):
         out = np.loadtxt(dumpfile,unpack=True)
         self.waves = out[1]
         self.flux  = out[2]
         self.error = out[3]
         self.cont  = out[4]
         self.abs   = out[5]
+        self.contPoints = dude.ContinuumPoints(xmlfile)
 
     def get_cut(self,start,end):
         ind = []
@@ -21,6 +22,6 @@ class FitData(object):
                 ind.append(i)
         return self.waves[ind], self.flux[ind], self.error[ind], self.cont[ind], self.abs[ind]
 
-    def get_cont_points
+        
         
 

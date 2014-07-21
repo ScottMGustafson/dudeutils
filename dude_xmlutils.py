@@ -26,9 +26,15 @@ class _XMLFile(object):
             for item in thetag.findall(tag):
                 if item.get('id')==iden:
                     if attribute_list is None:
-                        attribute_list= [dict(it.attrib).keys()]
+                        attribute_list= list(dict(item.attrib).keys())
                     return list(zip(attribute_list, [item.get(attr) for attr in attribute_list ]))
-        raise Exception('id '+iden+' not found in '+self.name)
+
+    def getDataList(self,tag):
+        root = self.root.findall('CompositeSpectrum')
+        for child in root:
+            if child.tag==tag:
+                data = child.findall(tag)
+                return [dict(item.attrib) for item in data]
 
     def getViewData(self,iden,tag,attribute_list=None):
         """needs separate get function"""
@@ -73,22 +79,16 @@ class Data(object):
         self.xmlfile = _XMLFile(kwargs.get('xmlfile',None),assign_ids)         
         self.tree = et.parse(self.xmlfile.name)
         self.root = self.tree.getroot()
-        self.iden = kwargs.get('iden',None).strip()
+        self.iden = kwargs.get('iden',None)
+        if type(self.iden) is str:
+            self.iden = self.iden.strip()
         self.vel=0.
-        if not self.iden:
-            raise Exception('no id specified')
 
-    def getData(self,lst=None,function='getData',*args):
+    def getData(self,lst=None,function='getData',**kwargs):
+        if function=='getDataList':
+            return self.xmlfile.getDataList(self.tag,**kwargs)
         func   = getattr(self.xmlfile,function)
         output = func(self.iden, self.tag, lst)
-        for item in output:
-            try:
-                setattr(self,str(item[0]),float(item[1]))
-            except:
-                setattr(self,str(item[0]),str(item[1]))
-
-    def getViewData(self,lst=None,*args):
-        output = self.xmlfile.getViewData(self.iden, self.tag, lst)
         for item in output:
             try:
                 setattr(self,str(item[0]),float(item[1]))
@@ -101,12 +101,14 @@ class Data(object):
 class ContinuumPoint(Data):
     def __init__(self,**kwargs):
         super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
-        if kwargs.get('populate',True) is True:
+        if not self.iden is None:
             self.getData()
     def __str__(self):
         return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y)
     def getData(self):
         super(ContinuumPoint, self).getData(['x','y']) 
+    def getList(self):
+        return super(ContinuumPoint, self).getData(function='getDataList')
 
 class Absorber(Data):
     def __init__(self,**kwargs):
