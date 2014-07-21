@@ -30,11 +30,10 @@ class _XMLFile(object):
                     return list(zip(attribute_list, [item.get(attr) for attr in attribute_list ]))
 
     def getDataList(self,tag):
-        root = self.root.findall('CompositeSpectrum')
-        for child in root:
-            if child.tag==tag:
-                data = child.findall(tag)
-                return [dict(item.attrib) for item in data]
+        """return a list of all instances of tag"""
+        temproot = self.root.findall('CompositeSpectrum')[0]
+        lst = temproot.findall(tag)
+        return [it for it in lst]
 
     def getViewData(self,iden,tag,attribute_list=None):
         """needs separate get function"""
@@ -100,15 +99,17 @@ class Data(object):
 
 class ContinuumPoint(Data):
     def __init__(self,**kwargs):
-        super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
-        if not self.iden is None:
+        node = kwargs.get('xmlnode',None)
+        if not node is None:
+            for key, val in dict(node.attrib).items():
+                setattr(self,key,val)
+        else:
+            super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
             self.getData()
     def __str__(self):
         return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y)
     def getData(self):
         super(ContinuumPoint, self).getData(['x','y']) 
-    def getList(self):
-        return super(ContinuumPoint, self).getData(function='getDataList')
 
 class Absorber(Data):
     def __init__(self,**kwargs):
@@ -156,9 +157,16 @@ class SingleView(Data):
 
 class Region(Data):
     def __init__(self,**kwargs):
-        super(Region, self).__init__(tag="Region",**kwargs)
+        super(Region, self).__init__(tag="Region",**kwrgs)
         if kwargs.get('populate',True) is True:
             self.getData()
     def getData(self):
         super(Region, self).getData(function='getViewData')
+
+def getContinuumPoints(xmlfile):
+    xml = _XMLFile(xmlfile)
+    conts = xml.getDataList('ContinuumPoint')
+    return [ ContinuumPoint(xmlnode=item) for item in conts ]
+    
+    
 
