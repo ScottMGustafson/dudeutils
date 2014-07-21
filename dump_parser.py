@@ -1,5 +1,5 @@
 import numpy as np
-import dude_xmlutils as xml
+import dude_xmlutils as dude
 
 Ryd  = 13.60569253  #(eV)
 hc   =  0.000123984193  # eV Angstroms
@@ -13,7 +13,7 @@ class FitData(object):
         self.error = out[3]
         self.cont  = out[4]
         self.abs   = out[5]
-        self.contPoints = dude.ContinuumPoints(xmlfile)
+        self.contPoints = dude.getContinuumPoints(xmlfile)
 
     def get_cut(self,start,end):
         ind = []

@@ -22,12 +22,25 @@ class _XMLFile(object):
         self.tree.write(self.name)
 
     def getData(self,iden,tag,attribute_list=None):
+        node = self.findNode(iden,tag)
+        if attribute_list is None:
+            attribute_list= list(dict(node.attrib).keys())
+        return list(zip(attribute_list, [node.get(attr) for attr in attribute_list ]))
+
+    def findNode(self,iden,tag):
+        if iden is None:
+            raise Exception('need to define an iden')
         for thetag in self.root.findall('CompositeSpectrum'):
             for item in thetag.findall(tag):
                 if item.get('id')==iden:
-                    if attribute_list is None:
-                        attribute_list= list(dict(item.attrib).keys())
-                    return list(zip(attribute_list, [item.get(attr) for attr in attribute_list ]))
+                    return item
+        raise Exception('id '+iden+' not found')
+        
+    def setVal(self,node,key,newval):
+        node.set(key,newval)
+
+    def writeOut(self):
+        self.tree.write(self.name)
 
     def getDataList(self,tag):
         """return a list of all instances of tag"""
@@ -50,19 +63,11 @@ class _XMLFile(object):
         raise Exception('id '+iden+' not found in '+self.name)
 
     def writeData(self,iden,tag,**kwargs):
-        flag=False
-        for thetag in self.root.findall('CompositeSpectrum'):
-            for item in thetag.findall(tag):
-                if item.get('id')==iden:
-                    flag = True
-                    for key, val in kwargs.items():
-                        try:
-                            item.set(key,val)
-                        except:
-                            print(("item "+key+" not found...skipping\n"))
-        if flag==False:
-            raise Exception('id '+iden+' not found')
+        node = self.findNode(iden,tag)
+        for key, val in dict(kwargs).items():
+            node.set(key,val)
         self.tree.write(self.name)
+        
 
 class Data(object):
     def __init__(self,**kwargs):
@@ -76,11 +81,10 @@ class Data(object):
         assign_ids  = kwargs.get('assign_ids',False)
         self.tag    = kwargs.get('tag','Absorber')
         self.xmlfile = _XMLFile(kwargs.get('xmlfile',None),assign_ids)         
-        self.tree = et.parse(self.xmlfile.name)
-        self.root = self.tree.getroot()
         self.iden = kwargs.get('iden',None)
+        self.node = None
         if type(self.iden) is str:
-            self.iden = self.iden.strip()
+            self.node = self.xmlfile.findNode(self.iden,self.tag)
         self.vel=0.
 
     def getData(self,lst=None,function='getData',**kwargs):
@@ -96,12 +100,23 @@ class Data(object):
         
     def writeData(self,**kwargs):
         self.xmlfile.writeData(self.iden,self.tag,**kwargs)
+    def writeOut(self):
+        self.tree.write()
+    def writeData(self, **kwargs):
+        if not self.node is None:
+            for key,val in dict(kwargs).items():
+                setattr(self,key,val)
+                self.node.set(key,val)
+        else:
+            #behavior to add new child node
+            pass
+        self.xmlfile.writeOut()
 
 class ContinuumPoint(Data):
     def __init__(self,**kwargs):
-        node = kwargs.get('xmlnode',None)
-        if not node is None:
-            for key, val in dict(node.attrib).items():
+        self.node = kwargs.get('xmlnode',None)
+        if not self.node is None:
+            for key, val in dict(self.node.attrib).items():
                 setattr(self,key,val)
         else:
             super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
@@ -110,6 +125,9 @@ class ContinuumPoint(Data):
         return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y)
     def getData(self):
         super(ContinuumPoint, self).getData(['x','y']) 
+    def write(self, **kwargs):
+        super(ContinuumPoint, self).writeData(kwargs) 
+        
 
 class Absorber(Data):
     def __init__(self,**kwargs):
@@ -138,6 +156,9 @@ class Absorber(Data):
         self.wave = [ item['wave'] for item in linelst ]
         self.f = [ item['f'] for item in linelst ]
         self.obs_wave = [ (1.+self.z)*item['wave'] for item in linelst ]
+    def write(self, **kwargs):
+        super(Absorber, self).writeData(kwargs) 
+        
 
 class VelocityView(Data):
     def __init__(self,**kwargs):
