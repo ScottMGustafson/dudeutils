@@ -1,7 +1,7 @@
 import dude_xmlutils as dude
 
-xmlfiles = []
-red_abs  = []
+xmlfiles = []  #the first element will be the reference spectrum
+red_abs  = []  #absorber ids to be used for the red, blue and green CCDs respectively
 blu_abs  = []
 grn_abs  = []
 
@@ -15,7 +15,6 @@ class CCD(object):
     def shift(self,ref)
         all_shifts = [self.absorbers[i].getShift(ref.absorbers[i]) for i in range(len(self.absorbers))]
         return np.mean(all_shifts), np.stddev(all_shifts)
-
 
 red_ref = CCD(xmlfiles[0],red_abs)
 blu_ref = CCD(xmlfiles[0],blu_abs)
