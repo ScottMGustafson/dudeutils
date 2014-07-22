@@ -72,14 +72,15 @@ class _XMLFile(object):
 class Data(object):
     def __init__(self,**kwargs):
         """
-        mandatory args:  
-
-        xmlfile
+        mandatory kwargs:  
+        ---------------
+        xmlfile : (str) name of xmlfile
+        tag:  (str) name of child class
         """
         for key, val in list(kwargs.items()):
             setattr(self,key,val)
         assign_ids  = kwargs.get('assign_ids',False)
-        self.tag    = kwargs.get('tag','Absorber')
+        self.tag    = kwargs.get('tag')
         self.xmlfile = _XMLFile(kwargs.get('xmlfile',None),assign_ids)         
         self.iden = kwargs.get('iden',None)
         self.node = None
@@ -158,8 +159,22 @@ class Absorber(Data):
         self.obs_wave = [ (1.+self.z)*item['wave'] for item in linelst ]
     def write(self, **kwargs):
         super(Absorber, self).writeData(kwargs) 
-        
+    def getShift(self, ref):
+        """ 
+        get velocity shift in km/s
+         Inputs:
+        --------
+        ref: a reference Absorber instance
 
+        returns:
+        --------
+        velocity (in km/s)
+        """
+        c=299792.458
+        self.vel = (self.z-ref.z)*c/(1.+ref.z)
+        return self.vel
+
+        
 class VelocityView(Data):
     def __init__(self,**kwargs):
         super(VelocityView, self).__init__(tag="VelocityView",**kwargs)
@@ -167,6 +182,8 @@ class VelocityView(Data):
             self.getData()
     def getData(self):
         super(VelocityView, self).getData(function='getViewData')
+    def write(self, **kwargs):
+        super(Absorber, self).writeData(kwargs) 
 
 class SingleView(Data):
     def __init__(self,**kwargs):
@@ -175,6 +192,8 @@ class SingleView(Data):
             self.getData()
     def getData(self):
         super(SingleView, self).getData(function='getViewData')
+    def write(self, **kwargs):
+        super(Absorber, self).writeData(kwargs) 
 
 class Region(Data):
     def __init__(self,**kwargs):
@@ -183,6 +202,8 @@ class Region(Data):
             self.getData()
     def getData(self):
         super(Region, self).getData(function='getViewData')
+    def write(self, **kwargs):
+        super(Absorber, self).writeData(kwargs) 
 
 def getContinuumPoints(xmlfile):
     xml = _XMLFile(xmlfile)
