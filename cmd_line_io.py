@@ -24,12 +24,11 @@ class Model(object):
         -------
         absorbers: list(dude_xmlutils.Absorber)  is a list of absorber references 
         """
-        self.iden = kwargs.get(iden,None)
+        self.iden = kwargs.get('iden',None)
         self.ref = absorbers[0]
         self.absorbers = absorbers
-        self.chisq = kwargs.get('chisq',0.)
+        self.chisq = float(kwargs.get('chisq',0.))
         self.pixels= kwargs.get('pixels',0.)
-        self.size = pixels
         self.locked = {}
 
     def constrain(self, constraints):
@@ -45,14 +44,17 @@ class Model(object):
 
         >>>ab=dude_xmlutils.Absorber(N=12.2,b=10.,z=0.)
         >>>model=Model([ab])
-        >>>model.constrain({N:(12,13), b:(9,11), z:(-1,1)})
+        >>>model.constrain({ID:{N:(12,13), b:(9,11), z:(-1,1)}})
             True
 
         """
         for item in self.absorbers:
-            for key, val in constraints[item.iden].items():
-                if getattr(item,key)<val[0] or getattr(item,key)>val[1]
-                    return False
+            try:
+                for key, val in constraints[item.iden].items():
+                    if getattr(item,key)<val[0] or getattr(item,key)>val[1]:
+                        return False
+            except KeyError:
+                pass
         return True
 
     def __str__(self):
@@ -74,8 +76,9 @@ class Model(object):
                 if getattr(item,param):
                     locked[item.iden] = param
         string+="locked="
-        for key, val in locked.items:
-            string+=key+":"+val+" "
+        for key, val in locked.items():
+            if val:
+                string+=key+":"+val+" "
         string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chisq),float(self.pixels))
         return string
     def write(self):
@@ -136,19 +139,24 @@ class ModelDB(object):
 
         """
         lst = self.best_fit(param=param_name+'Locked')
-        chisqmin=lst[0].chisq
-        1sig = [getattr(item.getabs(iden),param_name) for item in lst if item.chisq<chisqmin+1.]
-        return getattr(lst[0].getabs(iden),param_name) ,max(1sig), min(1sig)
+        chisqmin = float(lst[0].chisq)
+        onesig=[]
+        for item in lst:
+            if item.chisq<chisqmin+1.:
+                onesig.append(getattr(item.getabs(iden),param_name))
+        return getattr(lst[0].getabs(iden),param_name) ,max(onesig), min(onesig)
         
 
-    def append(self, model, name=self.name):
+    def append(self, model):
         self.lst.append(self.model)
-        f = open(name,'a')
+        f = open(self.filename,'a')
         f.write(str(model))
         f.close()
 
-    def write_to_db(self, name=self.name, clobber=False):
+    def write_to_db(self, clobber=False, name=None):
         import os.path
+        if name is None:
+            name=self.name
         if os.path.isfile(name) and not clobber:
             answer = input('ok to clobber? '+name+' y/n')
             if answer=='n':
@@ -180,7 +188,7 @@ def read_in(name='model_database.txt',return_db=False):
     models = []
     iden=0
     inp = f.readlines()
-    for i in range(len(inp))
+    for i in range(len(inp)):
         temp = []
         while inp[i] != '\n':
             temp.append(inp[i])
@@ -262,7 +270,7 @@ def parser(arg_list):
     db = ModelDB()
     i=0
     
-    while i<len(arg_list)
+    while i<len(arg_list):
         item=arg_list[i]
         if item in ['write','get','get_best','get_err']:
             action = item
@@ -274,7 +282,7 @@ def parser(arg_list):
             iden=item.split('=')[1].strip()
             if action=='get':  #write current model into database
                 ablst.append(dude_xmlutils.Absorber(iden=ion, xmlfile=datfile))
-            elif action=='write' #write commandline args into xml file
+            elif action=='write': #write commandline args into xml file
                 absorber=dude_xmlutils.Absorber(iden=iden, xmlfile=datfile, populate=True)
                 i+=1
                 vals = {}
