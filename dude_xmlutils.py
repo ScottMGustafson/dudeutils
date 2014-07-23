@@ -85,7 +85,7 @@ class Data(object):
             setattr(self,key,val)
         assign_ids  = kwargs.get('assign_ids',False)
         self.tag    = kwargs.get('tag')
-        self.xmlfile = _XMLFile(kwargs.get('xmlfile',None),assign_ids)         
+        self.xmlfile = _XMLFile(kwargs.get('xmlfile',None))         
         self.iden = kwargs.get('iden',None)
         self.node = None
         if type(self.iden) is str:
@@ -141,7 +141,7 @@ class Absorber(Data):
             self.getData()
         self.get_lines()
     def __str__(self):
-        return "%s %9.6lf %9.6lf %10.8lf %8.4lf"%(self.iden,self.N,self.b,self.z,self.vel)
+        return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.iden,self.N,self.b,self.z)
     def getData(self):
         super(Absorber, self).getData()
         self.ionName = self.ionName.replace(' ','')
