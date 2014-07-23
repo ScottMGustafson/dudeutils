@@ -1,3 +1,7 @@
+"""
+some tools to interface with the standard dude xml input/output
+"""
+
 import xml.etree.ElementTree as et
 
 class _XMLFile(object):
@@ -139,8 +143,9 @@ class Absorber(Data):
     def __str__(self):
         return "%s %9.6lf %9.6lf %10.8lf %8.4lf"%(self.iden,self.N,self.b,self.z,self.vel)
     def getData(self):
-        super(Absorber, self).getData(['N','b','z','ionName'])
+        super(Absorber, self).getData()
         self.ionName = self.ionName.replace(' ','')
+
     def get_lines(self, filename='atom.dat'):
         """
         get all data for atom.dat and put into a list of dicts
@@ -173,7 +178,6 @@ class Absorber(Data):
         c=299792.458
         self.vel = (self.z-ref.z)*c/(1.+ref.z)
         return self.vel
-
         
 class VelocityView(Data):
     def __init__(self,**kwargs):
