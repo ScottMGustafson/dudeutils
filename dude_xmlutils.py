@@ -80,17 +80,21 @@ class Data(object):
         ---------------
         xmlfile : (str) name of xmlfile
         tag:  (str) name of child class
+        xmlnode: a node that xml.etree parsed from an xmlfile
         """
         for key, val in list(kwargs.items()):
             setattr(self,key,val)
+        self.node = kwargs.get('xmlnode',None)  #to explicitly instantiate one node
+        if not self.node is None:
+            for key, val in dict(self.node.attrib).items():
+                setattr(self,key,val)
         assign_ids  = kwargs.get('assign_ids',False)
         self.tag    = kwargs.get('tag')
         self.xmlfile = _XMLFile(kwargs.get('xmlfile',None))         
         self.iden = kwargs.get('iden',None)
-        self.node = None
+
         if type(self.iden) is str:
             self.node = self.xmlfile.findNode(self.iden,self.tag)
-        self.vel=0.
 
     def getData(self,lst=None,function='getData',**kwargs):
         if function=='getDataList':
@@ -119,13 +123,8 @@ class Data(object):
 
 class ContinuumPoint(Data):
     def __init__(self,**kwargs):
-        self.node = kwargs.get('xmlnode',None)
-        if not self.node is None:
-            for key, val in dict(self.node.attrib).items():
-                setattr(self,key,val)
-        else:
-            super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
-            self.getData()
+        super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
+        self.getData()
     def __str__(self):
         return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y)
     def getData(self):
@@ -205,6 +204,7 @@ class Region(Data):
         if kwargs.get('populate',True) is True:
             self.getData()
     def getData(self):
+        """ gets and returns list of Region instances from xml src file"""
         super(Region, self).getData(function='getViewData')
     def write(self, **kwargs):
         super(Absorber, self).writeData(kwargs) 
@@ -213,6 +213,10 @@ def getContinuumPoints(xmlfile):
     xml = _XMLFile(xmlfile)
     conts = xml.getDataList('ContinuumPoint')
     return [ ContinuumPoint(xmlnode=item) for item in conts ]
+
+def getList(xmlfile,classname):
+    """ more general than the above.  """
+    return _XMLFile(xmlfile).getDataList(name)
     
     
 
