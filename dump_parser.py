@@ -20,8 +20,6 @@ class FitData(object):
             temp.append(np.where(self.allwaves in [item.start, item.end])[0])
         #convert to single np array.
         
-
-
     def get_highlighted_regions(self,xmlfile)
         regions = [ dude.Region(xmlnode=it) for it in dude.getList(xmlfile,"Regions") ]
         regions.sort(key=lambda x: x.start)
