@@ -16,6 +16,7 @@ import sys
 import xml.etree.ElementTree as et
 import dude_xmlutils
 import astronomy_utils as astro
+import warnings
 
 class Model(object):
     def __init__(self,absorbers, **kwargs):
@@ -156,7 +157,7 @@ class ModelDB(object):
     def write_to_db(self, clobber=False, name=None):
         import os.path
         if name is None:
-            name=self.name
+            name=self.filename
         if os.path.isfile(name) and not clobber:
             answer = input('ok to clobber? '+name+' y/n')
             if answer=='n':
@@ -188,39 +189,32 @@ def read_in(name='model_database.txt',return_db=False):
     models = []
     iden=0
     inp = f.readlines()
-    for i in range(len(inp)):
+    xmlfile = str(inp[0].strip())
+    for i in range(1,len(inp)):
         temp = []
         while inp[i] != '\n':
             temp.append(inp[i])
             i+=1  
-        models.append(parse_line(temp, iden=str(iden))) 
+        models.append(parse_line(xmlfile,temp, iden=str(iden))) 
         iden+=1
     if return_db:
         return ModelDB(models) 
     else:
         return models 
 
-def parse_abs(data):
+def parse_abs(xml_file,data):
     """
     parse an individual absorber, either from a list of arguments or a raw string with single absorber
-
-
-    example:
-    >>>ab = parse_abs("iden=HI    N=17.12345 b=12.345678 z=1.234567890")
-    >>>print(str(ab))
-        iden=HI    N=17.12345 b=12.345678 z=1.234567890
-    >>>ab = parse_abs( ["iden=HI", "N=17.12345", "b=12.345678", "z=1.234567890"] )
-    >>>print(str(ab))
-        iden=HI    N=17.12345 b=12.345678 z=1.234567890
 
     """
 
     if type(data) is str:
         data = [item.strip() for item in data.split()]
     data=dict([item.split('=') for item in data])
+    data["xmlfile"] = xml_file
     return dude_xmlutils.Absorber(**data)
 
-def parse_line(lines, iden=None):   
+def parse_line(xml_file,lines, iden=None):   
     """parse a string representation of a single model.
 
     an example model is:
@@ -244,7 +238,7 @@ def parse_line(lines, iden=None):
     absorbers = []
     for line in lines:
         if line[0:2]=='iden':
-            absorbers.append(parse_abs(line))
+            absorbers.append(parse_abs(xml_file,line))
         if line[0:4]=='lock':
             line=(line.split('=')[1]).split()
             line = dict([item.split(':') for item in line])
@@ -258,6 +252,29 @@ def parse_line(lines, iden=None):
             return Model(absorbers, iden=iden, **kw)
     raise Exception("Input error for model database")
            
+def parse_old_format(input_file, xmlfile):
+    """ used only for translating an old database.  should have 16 columns and really should only be run once ever by me"""
+    f = open(input_file)
+    count=0
+    mods = []
+    for line in f:
+        try:
+            assert(len(line.split())==16)
+        except:
+            if '.xml' in line:
+                pass
+            else:
+                warnings.warn("this model is not the same as the rest: %d"%(count))
+            continue
+        id1,N1,b1,z1,id2,N2,b2,z2,v2,id3,N3,b3,z3,v3,_,chi2 = tuple(line.split())
+        abs1 = dude_xmlutils.Absorber(iden=id1,N=N1,b=b1,z=z1,xmlfile=xmlfile)
+        abs2 = dude_xmlutils.Absorber(iden=id2,N=N2,b=b2,z=z2,xmlfile=xmlfile)
+        abs3 = dude_xmlutils.Absorber(iden=id3,N=N3,b=b3,z=z3,xmlfile=xmlfile)
+        mods.append(Model([abs1,abs2,abs3], chisq=chi2,iden=str(count)))
+        count+=1
+    return ModelDB(mods,name=input_file+".new")
+    
+        
 
 def parser(arg_list):
     """
