@@ -138,13 +138,29 @@ class Absorber(Data):
         super(Absorber, self).__init__(tag="Absorber",**kwargs)
         if kwargs.get('populate',True) is True:
             self.getData()
+
+        
         self.get_lines()
     def __str__(self):
         return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.iden,self.N,self.b,self.z)
+    
     def getData(self):
         super(Absorber, self).getData()
+        
         self.ionName = self.ionName.replace(' ','')
 
+    def locked(self,param):
+        param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
+        tf_lst = ['true', 'True', 'TRUE']
+        try:
+            ans = getattr(self,param_lock[param])
+            if str(ans) not in tf_lst:
+                return False
+            else:
+                return True
+        except KeyError:
+            raise Exception("no param named %s"%{param})
+            
     def get_lines(self, filename='atom.dat'):
         """
         get all data for atom.dat and put into a list of dicts
