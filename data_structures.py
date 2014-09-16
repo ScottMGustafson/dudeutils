@@ -134,6 +134,16 @@ class ModelDB(object):
             return self.get_locked(iden, param)
 
     def best_fit(self,iden,param,order,xmin,xmax, locked=True, plot=True):
+        """
+        get a best fit of data with respect to `param'
+
+        iden: id of absorber
+        param:  parameter name (N,b,z)
+        order:  order of polynomial to fit
+        xmax, xmin: range of values to consider
+        locked:  get only locked parameters?
+        plot:   plot the data?  otherwise return the minimum of the function of best fit
+        """
         x = []
         y = []
         for item in self.lst:
