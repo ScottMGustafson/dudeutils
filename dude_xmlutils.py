@@ -192,7 +192,7 @@ class Absorber(Data):
 
     def __eq__(self,other):
         for item in ['N','b','z','iden','xmlfile']:
-            if getattr(self,item)!=getattr(other,item)
+            if getattr(self,item)!=getattr(other,item):
                 return False
         return True
 

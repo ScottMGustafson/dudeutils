@@ -31,15 +31,17 @@ class Data(object):
     def __init__(self, modeldb, **kwargs):
         self.best=False
 
+        self.modeldb = modeldb
         for key,val in kwargs.items():
             setattr(self,key,val)
-
-
-        self._filter()
 
         self.dh = np.array([item.getabs(iden='D').N-item.getabs(iden='H').N for item in self.modeldb.lst ])
         self.d_vel = np.array([self.get_vel(item,'D','H') for item in self.modeldb.lst])
         self.vel = np.array([self.get_vel(item,'D','H') for item in self.modeldb.lst])
+
+        self._filter()
+
+
         
         
         
@@ -53,20 +55,21 @@ class Data(object):
         ind = []    # what to delete from arrays
         for i in range(self.vel.shape[0]):
             if np.fabs(self.d_vel[i])>unc and \
-                     np.fabs(self.nd[i]-self.nh[i]-dh_accepted)>dh_unc and \
+                     np.fabs(self.dh-dh_accepted)>dh_unc and \
                      self.chi2[i] > self.chi2lim:    
                 ind.append(i)
 
-        np.delete(self.nh,ind)
-        np.delete(self.nd,ind)
-        np.delete(self.vel,ind)
-        np.delete(self.d_vel,ind)
-        np.delete(self.chi2,ind)
+        for item in ind:
+            self.modeldb.pop(item)
 
         #get min chi square for a given set of models
         near_min = np.where(np.fabs(self.vel-vel_guess)<vel_tol)[0].tolist()
-        self.chi2 = np.array([item.chi2 for item in modeldb.lst])
+        self.chi2 = np.array([item.chi2 for item in self.modeldb.lst])
         self.chi2min = np.amin(self.chi2[near_min])
+
+        self.dh = np.array([item.getabs(iden='D').N-item.getabs(iden='H').N for item in self.modeldb.lst ])
+        self.d_vel = np.array([self.get_vel(item,'D','H') for item in self.modeldb.lst])
+        self.vel = np.array([self.get_vel(item,'D','H') for item in self.modeldb.lst])
         #self.onesig, self.modeldb = get_onesig(modeldb,np.amin(chi2))
 
         """

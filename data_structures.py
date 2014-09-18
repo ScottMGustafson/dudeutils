@@ -141,6 +141,9 @@ class ModelDB(object):
         else:
             return self.get_locked(iden, param)
 
+    def get_min_chi2(self):
+        return np.amin(np.array([item.chi2 for item in self.lst]))
+
     def best_fit(self,iden,param,order,xmin,xmax, locked=True, plot=True):
         """
         get a best fit of data with respect to `param'
