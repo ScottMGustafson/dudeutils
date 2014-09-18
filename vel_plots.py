@@ -14,7 +14,7 @@ plt.rc('font', family='serif')
 plt.grid(False)
 c = 299792.458
 
-class Data(object):
+class Data(data_structures.ModelDB):
     """
     Parameters:
     --------------------
@@ -28,7 +28,8 @@ class Data(object):
     datapts: #of datapoints
     chi2lim: max chi2 to include in plot
     """
-    def __init__(self, modeldb, **kwargs):
+    def __init__(self, **kwargs):
+        super(Data,self).__init__(**kwargs)
         self.best=False
 
         self.modeldb = modeldb
@@ -40,16 +41,6 @@ class Data(object):
         self.vel = np.array([self.get_vel(item,'D','H') for item in self.modeldb.lst])
 
         self._filter()
-
-
-        
-        
-        
-    @staticmethod
-    def get_vel(mod,iden1,iden2):
-        z1 = mod.getabs(iden=iden1).z
-        z2 = mod.getabs(iden=iden2).z
-        return (z1-z2)*c/(1.+z1)
 
     def _filter(self):
         ind = []    # what to delete from arrays
@@ -88,17 +79,16 @@ class Data(object):
         np.delete(self.vel,onesig)
         np.delete(self.d_vel,onesig)
         np.delete(self.chi2,onesig)
-        return Data(nh=ret['nh'], nd=ret['nd'], d_vel=ret['d_vel'], vel=ret['vel'],\
+        return data_structures.ModelDB(nh=ret['nh'], nd=ret['nd'], d_vel=ret['d_vel'], vel=ret['vel'],\
                                 chi2=ret['chi2'],datapts=ret['datapts'],params=ret['params'])
 
         """
 def get_onesig(modeldb,chi2min):
     onesig = []
     for i in range(len(modeldb.lst)):
-        if modeldb.lst[i].chi2 < chi2min+1.:
+        if modeldb.lst[i].chi2 < chi2min+1. and np.fabs(modeldb.lst[i].get_vel('H2','H')-62.)<10.:
             onesig.append(modeldb.pop(i))
-
-    onesigdb = data_structures.ModelDB(onesig)
+    onesigdb = data_structures.ModelDB(name=str(modeldb.name), models=onesig)
     return onesigdb, modeldb
     
 
@@ -132,28 +122,48 @@ def plot_one_pair(data,ax1,ax2):
     plot_dh(    ax2, data.vel, data.nd-data.nh, data.onesig.vel, data.onesig.nd-data.onesig.nh) 
     return
 
+
+def get_data(cls):
+    DH = np.array( [item.get('D','N')-item.get('H','N') for item in cls.lst] )
+    dvel = cls.get_vel_shift('D','H')
+    vel  = cls.get_vel_shift('H2','H')
+    chi2 = np.array( [float(item.chi2) for item in cls.lst] )
+    return {"DH":DH, "dvel":dvel, "vel":vel, "chi2":chi2}
+    
+
 if __name__ == "__main__":
-    # instantiate three instances of Data()
+    # instantiate three instances of data_structures.ModelDB()
+
+    
+
+    data = {}  
 
 
-    #TODO this needs to be cleaned up
-    hi = Data(data_structures.read_in("chi2_hi_database.txt.new"), params=11, datapts=957, chi2lim=2000.)
-    hi_onesigdb, hidb = get_onesig(hi.modeldb,hi.chi2min)    
-    hi = Data(hidb, params=11, datapts=957, chi2lim=2000.)
-    hi_onesig = Data(hi_onesigdb, params=11, datapts=957, chi2lim=2000.)
 
-    best = Data(data_structures.read_in("test_database.txt.new"), params=8, datapts=957, chi2lim=1825., best=True)
-    best_onesigdb, bestdb = get_onesig(best.modeldb,best.chi2min) 
-    best = Data(bestdb, params=8, datapts=957, chi2lim=1825., best=True)
-    best_onesig = Data(best_onesigdb, params=8, datapts=957, chi2lim=1825., best=True)
- 
-    lo = Data(data_structures.read_in("chi2_lo_database.txt.new"), params=11, datapts=957, chi2lim=2000.)
-    lo_onesigdb, lodb = get_onesig(lo.modeldb,lo.chi2min)  
-    lo = Data(lodb, params=11, datapts=957, chi2lim=2000.)
-    lo_onesig = Data(lo_onesigdb, params=11, datapts=957, chi2lim=2000.)
+    hi = data_structures.ModelDB(name="chi2_hi_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
+    hi_onesigdb, hidb = get_onesig(hi,hi.chi2min)   
+    data["hi"] = get_data(hidb)
+    data["hionesig"] = get_data(hi_onesigdb)
+
+    best = data_structures.ModelDB(name="test_database.txt.new", params=8, datapts=957, chi2lim=1825., chi2min=1801., best=True)
+    before_clip = get_data(best)
+    best_onesigdb, bestdb = get_onesig(best,best.chi2min) 
+    data["best"] = get_data(bestdb)
+    data["bestonesig"] = get_data(best_onesigdb) 
+
+    lo = data_structures.ModelDB(name="chi2_lo_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
+    lo_onesigdb, lodb = get_onesig(lo,lo.chi2min)  
+    data["lo"] = get_data(lodb)
+    data["loonesig"] = get_data(lo_onesigdb) 
+
+
+
+#now set up the plots
 
     f = plt.figure(figsize=(4.1,9.3))
 
+
+#hi
     gs1 = GridSpec(2,1)
     gs1.update(left=0.2, right=0.9, top=0.95, bottom=0.68, hspace=0.1)
     ax1 = plt.subplot(gs1[:-1, 0])
@@ -161,8 +171,12 @@ if __name__ == "__main__":
     ax1.set_ylim([1980.,2000.])
     ax2.set_ylim([-5.0,-4.4])
     plt.setp( ax2.get_xticklabels(), visible=False)
-    plot_one_pair(hi,ax1,ax2)
 
+    plot_chi2(ax1, data["hi"]["vel"], data["hi"]["chi2"], data["hionesig"]["vel"], data["hionesig"]["chi2"])
+    plot_dh(ax2, data["hi"]["vel"], data["hi"]["DH"], data["hionesig"]["vel"], data["hionesig"]["DH"]) 
+
+
+#best
     gs2 = GridSpec(2,1)
     gs2.update(left=0.2, right=0.9, top=0.64, bottom=0.36, hspace=0.1)
     ax3 = plt.subplot(gs2[:-1, 0])
@@ -171,20 +185,26 @@ if __name__ == "__main__":
     ax3.set_ylim([1795.,1825.])
     ax4.set_ylim([-5.0,-4.4])
     plt.setp( ax4.get_xticklabels(), visible=False)
-    plot_one_pair(best,ax3,ax4)
+    plot_chi2(ax3, data["best"]["vel"], data["best"]["chi2"], data["bestonesig"]["vel"], data["bestonesig"]["chi2"])
+    plot_dh(ax4, data["best"]["vel"], data["best"]["DH"], data["bestonesig"]["vel"], data["bestonesig"]["DH"]) 
 
+#lo
     gs3 = GridSpec(2,1)
     gs3.update(left=0.2, right=0.9, top=0.32, bottom=0.05, hspace=0.1)
     ax5 = plt.subplot(gs3[:-1, 0])
     ax6 = plt.subplot(gs3[-1, 0])
     ax5.set_ylim([1980.,2000.])
     ax6.set_ylim([-5.0,-4.4])
-    plot_one_pair(lo,ax5,ax6)
+    plot_chi2(ax5, data["lo"]["vel"], data["lo"]["chi2"], data["loonesig"]["vel"], data["loonesig"]["chi2"])
+    plot_dh(ax6, data["lo"]["vel"], data["lo"]["DH"], data["loonesig"]["vel"], data["loonesig"]["DH"]) 
+
+
 
     ax6.set_xlabel(r"velocity from {\textrm{H}\,\textsc{i}~} (km s$^{-1}$)")
 
-    plt.savefig('~/Desktop/hi_best_lo.png',dpi=600)
+    plt.savefig('/home/scott/Desktop/hi_best_lo.png',dpi=600)
     plt.clf()
+
 
     #best
     ######################################################################
@@ -207,18 +227,25 @@ if __name__ == "__main__":
     #plt.setp( dh_ax.get_xticklabels(), visible=True)
 
 
-    chi2_ax.plot(best.vel,best.chi2,     'ko')
-    chi2_ax.plot(best.onesig.vel, best.onesig.chi2,     'co')
+    x = before_clip["vel"]
+    y = before_clip["chi2"]
+    f = np.poly1d(np.polyfit(np.array(x),np.array(y),5))
+    xx = np.arange(10,70,600.)
 
-    dh_ax.plot(best.vel,best.nd-best.nh,     'ko')
-    dh_ax.plot(best.onesig.vel, best.onesig.nd-best.onesig.nh,     'co')
+    chi2_ax.plot(data["best"]["vel"],data["best"]["chi2"],     'ko')
+    chi2_ax.plot(data["bestonesig"]["vel"], data["bestonesig"]["chi2"],     'co')
+    chi2_ax.plot(xx,f(xx),'r-')
+
+    dh_ax.plot(data["best"]["vel"],data["best"]["DH"],     'ko')
+    dh_ax.plot(data["bestonesig"]["vel"], data["bestonesig"]["DH"],     'co')
     plt.gcf().tight_layout()
-    plt.savefig("onesig_best.png")
+    plt.savefig("/home/scott/Desktop/onesig_best.png")
 
 
  #lo
     ######################################################3
 
+    """
     plt.clf()
     f, (chi2_ax, dh_ax) = plt.subplots(2, sharex=True, figsize=[3.5,4])
     chi2_ax.get_yaxis().get_major_formatter().set_useOffset(False)
@@ -276,4 +303,4 @@ if __name__ == "__main__":
     dh_ax.plot(hi.onesig.vel, hi.onesig.nd-hi.onesig.nh,     'co')
     plt.gcf().tight_layout()
     plt.savefig("onesig_hi.png")
-
+    """
