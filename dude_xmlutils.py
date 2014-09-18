@@ -132,21 +132,17 @@ class ContinuumPoint(Data):
     def write(self, **kwargs):
         super(ContinuumPoint, self).writeData(kwargs) 
         
-
 class Absorber(Data):
     def __init__(self,**kwargs):
         super(Absorber, self).__init__(tag="Absorber",**kwargs)
         if kwargs.get('populate',True) is True:
             self.getData()
-
-        
         self.get_lines()
     def __str__(self):
         return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.iden,self.N,self.b,self.z)
     
     def getData(self):
         super(Absorber, self).getData()
-        
         self.ionName = self.ionName.replace(' ','')
 
     def locked(self,param):
@@ -193,6 +189,15 @@ class Absorber(Data):
         c=299792.458
         self.vel = (self.z-ref.z)*c/(1.+ref.z)
         return self.vel
+
+    def __eq__(self,other):
+        for item in ['N','b','z','iden','xmlfile']:
+            if getattr(self,item)!=getattr(other,item)
+                return False
+        return True
+
+    def __neq__(self,other):
+        return not self.__eq__(other)
         
 class VelocityView(Data):
     def __init__(self,**kwargs):

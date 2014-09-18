@@ -17,55 +17,7 @@ import dude_xmlutils
 from data_structures import Model, ModelDB
 import warnings
 
-def parse_abs(xml_file,data):
-    """
-    parse an individual absorber, either from a list of arguments or a raw string with single absorber
 
-    """
-
-    if type(data) is str:
-        data = [item.strip() for item in data.split()]
-    data=dict([item.split('=') for item in data])
-    data["xmlfile"] = xml_file
-    return dude_xmlutils.Absorber(**data)
-
-def parse_line(xml_file,lines, iden=None):   
-    """parse a string representation of a single model.
-
-    an example model is:
-    iden=HI    N=17.12345 b=12.345678 z=1.234567890
-    iden=SiI   N=11.12345 b=12.345678 z=1.234567890
-    iden=OI    N=11.12345 b=12.345678 z=1.234567890
-    locked=OI:bLocked HI:zLocked
-    chi2=123.4 pixels=154
-
-    different models are differentiated by empty lines.
-
-    Inputs:
-    -------
-    lines:  a list of a few lines of text
-
-    returns:
-    --------
-    Model instance
-    """
-
-    absorbers = []
-    for line in lines:
-        if line[0:2]=='iden':
-            absorbers.append(parse_abs(xml_file,line))
-        if line[0:4]=='lock':
-            line=(line.split('=')[1]).split()
-            line = dict([item.split(':') for item in line])
-            for key, val in line.items():
-                for item in absorbers:
-                    if item.iden==key.strip():
-                        setattr(item,val.strip(),True)
-        if line[0:4]=='chi2':  #this should always be the last line
-            line=line.split()
-            kw=dict([(item.strip()).split('=') for item in line])
-            return Model(absorbers, iden=iden, **kw)
-    raise Exception("Input error for model database")
            
 def parse_old_format(input_file, xmlfile):
     """ used only for translating an old database.  should have 16 columns and really should only be run once ever by me"""
