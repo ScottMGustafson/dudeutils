@@ -20,11 +20,12 @@ import warnings
 
            
 def parse_old_format(input_file, xmlfile):
-    """ used only for translating an old database.  should have 16 columns and really should only be run once ever by me"""
+    """ used only for translating an old database.  should have 16 columns and really should only be run once ever by me.  old format was one line per model"""
     f = open(input_file)
+    lines = f.readlines()
     count=0
     mods = []
-    for line in f:
+    for line in lines:
         try:
             assert(len(line.split())==16)
         except:
@@ -33,13 +34,15 @@ def parse_old_format(input_file, xmlfile):
             else:
                 warnings.warn("this model is not the same as the rest: %d"%(count))
             continue
+
         id1,N1,b1,z1,id2,N2,b2,z2,v2,id3,N3,b3,z3,v3,_,chi2 = tuple(line.split())
         abs1 = dude_xmlutils.Absorber(iden=id1,N=N1,b=b1,z=z1,xmlfile=xmlfile)
         abs2 = dude_xmlutils.Absorber(iden=id2,N=N2,b=b2,z=z2,xmlfile=xmlfile)
         abs3 = dude_xmlutils.Absorber(iden=id3,N=N3,b=b3,z=z3,xmlfile=xmlfile)
         mods.append(Model([abs1,abs2,abs3], chisq=chi2,iden=str(count)))
         count+=1
-    return ModelDB(mods,name=input_file+".new")
+    assert(mods[0]!=mods[1])
+    return ModelDB(name=input_file+".new",models=mods)
     
         
 

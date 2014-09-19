@@ -18,6 +18,7 @@ import warnings
 import numpy as np
 import matplotlib as plt
 import re
+import astronomy_utils as astro
 
 c = 299792.458
 
@@ -30,7 +31,7 @@ class Model(object):
         """
         self.iden = kwargs.get('iden',None)
         self.absorbers = absorbers
-        self.xmlfile=absorbers[0].xmlfile
+        self.xmlfile=self.xmlfile()
         self.chi2 = float(kwargs.get('chi2',0.))
         self.pixels= kwargs.get('pixels',0.)
         self.locked = {}
@@ -59,7 +60,7 @@ class Model(object):
         string = ""
         locked = {}
         for item in self.absorbers:
-            string+="iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf\n"%(item.iden,item.N,item.b,item.z)
+            string+="iden=%6s N=%8.5lf b=%8.5lf z=%lf\n"%(item.iden,item.N,item.b,item.z)
             for param in ['NLocked','bLocked','zLocked']:
                 if getattr(item,param):
                     locked[item.iden] = param
@@ -69,6 +70,9 @@ class Model(object):
                 string+=key+":"+val+" "
         string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chi2),float(self.pixels))
         return string
+
+    def xmlfile(self):
+        return self.absorbers[0].xmlfile.name
 
     def get(self,iden,param):
         try:
@@ -112,9 +116,9 @@ class Model(object):
                 return item
 
     def get_vel(self,iden1,iden2):
-        z1 = self.getabs(iden=iden1).z
-        z2 = self.getabs(iden=iden2).z
-        return (z1-z2)*c/(1.+z1)
+        z1 = float(self.getabs(iden=iden1).z)
+        z2 = float(self.getabs(iden=iden2).z)
+        return astro.get_vel_shift(z1,z2)
        
 
 class ModelDB(object):
@@ -137,12 +141,11 @@ class ModelDB(object):
         if models:
             self.lst = models
         else:   
-            self.lst = read_in(str(name), return_db=False)
+            self.lst = read_in(name=str(name), return_db=False)
 
         if constraints:
             self.lst = [item for item in self.lst if item.constrain(constraints)]
 
-        self.filename=name
         self.xmlfile = kwargs.get('xmlfile',self.lst[0].xmlfile)
 
     def get_locked(self, iden, param):
@@ -212,14 +215,14 @@ class ModelDB(object):
 
     def append(self, model):
         self.lst.append(self.model)
-        f = open(self.filename,'a')
+        f = open(self.name,'a')
         f.write(str(model))
         f.close()
 
     def write_to_db(self, clobber=False, name=None):
         import os.path
         if name is None:
-            name=self.filename
+            name=self.name
         if os.path.isfile(name) and not clobber:
             answer = input('ok to clobber? '+name+' y/n')
             if answer=='n':
@@ -237,7 +240,7 @@ class ModelDB(object):
                 return item
 
     def get_vel_shift(self,iden1,iden2):
-        return np.array([item.get_vel(iden1,iden2) for item in self.lst])
+        return [item.get_vel(iden1,iden2) for item in self.lst]
 
     def pop(self,i):
         return self.lst.pop(i)
@@ -267,7 +270,9 @@ def read_in(name='model_database.txt',return_db=True):
     assert(len(inp)>1)
     xmlfile = str(inp[0].strip())
     if ".xml" not in xmlfile:
-        raise Exception("relevant dude .xml file must be notated as line 1 of %s"%(name))
+        msg = "relevant dude .xml file must be notated as line 1 of %s\ngot %s instead"%(name,xmlfile)
+        print(msg)
+        xmlfile = input("enter relevant file:  ")
     i=1
     while i<len(inp):
         temp = []
@@ -281,8 +286,11 @@ def read_in(name='model_database.txt',return_db=True):
                     i+=1
         if i>=len(inp):
             break
-        models.append(parse_single_model(xmlfile, temp, iden=str(iden))) 
+        newmod = parse_single_model(xmlfile, temp, iden=str(iden))
+        print(str(newmod))
+        models.append(newmod) 
         iden+=1
+        i+=1
     if return_db:
         return ModelDB(models) 
     else:
@@ -317,6 +325,11 @@ def parse_single_model(xmlfile, lines, iden=None):
     --------
     Model instance
     """
+
+    try:
+        str(xmlfile)
+    except:
+        xmlfile = str(xmlfile.name)
 
     absorbers = []
     for line in lines:
