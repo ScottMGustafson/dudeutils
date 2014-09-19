@@ -13,7 +13,7 @@ will right the fitting parameters back into the xml
 """
 
 import sys
-import dude_xmlutils
+import xmlutils
 import warnings
 import numpy as np
 import matplotlib as plt
@@ -27,11 +27,15 @@ class Model(object):
         """
         inputs:
         -------
-        absorbers: list(dude_xmlutils.Absorber)  is a list of absorber references 
+        absorbers: list(xmlutils.Absorber)  is a list of absorber references 
         """
         self.iden = kwargs.get('iden',None)
         self.absorbers = absorbers
-        self.xmlfile=self.xmlfile()
+        self.continuum_points = kwargs.get("continuum_points",None)
+        self.regions = kwargs.get("regions",None)
+
+        self.xmlfile = kwargs.get("xmlfile",self.xmlfile())
+        self.xml = self.xml()        #xmlutils._XMLFile instance
         self.chi2 = float(kwargs.get('chi2',0.))
         self.pixels= kwargs.get('pixels',0.)
         self.locked = {}
@@ -72,7 +76,19 @@ class Model(object):
         return string
 
     def xmlfile(self):
-        return self.absorbers[0].xmlfile.name
+        try:
+            return self.absorbers[0].xmlfile.name
+        except:
+            raise Exception ("need an associated xml fit file for model")
+
+    def xml(self):
+        try:
+            return self.absorbers[0].xmlfile
+        except:
+            xml = xmlutils._XMLFile(self.xmlfile)
+            for item in self.absorbers:
+                item.xmlfile = xml
+            return xml
 
     def get(self,iden,param):
         try:
@@ -91,7 +107,7 @@ class Model(object):
 
         example:
 
-        >>>ab=dude_xmlutils.Absorber(N=12.2,b=10.,z=0.)
+        >>>ab=xmlutils.Absorber(N=12.2,b=10.,z=0.)
         >>>model=Model([ab])
         >>>model.constrain({ID:{N:(12,13), b:(9,11), z:(-1,1)}})
             True
@@ -122,7 +138,7 @@ class Model(object):
        
 
 class ModelDB(object):
-    def __init__(self, name='model_database.txt',models=None, constraints=None,**kwargs): 
+    def __init__(self, name, models=None, constraints=None,**kwargs): 
         """
         Model Database
 
@@ -141,7 +157,7 @@ class ModelDB(object):
         if models:
             self.lst = models
         else:   
-            self.lst = read_in(name=str(name), return_db=False)
+            self.lst = read_in(str(name), return_db=False)
 
         if constraints:
             self.lst = [item for item in self.lst if item.constrain(constraints)]
@@ -247,7 +263,7 @@ class ModelDB(object):
             
         
 
-def read_in(name='model_database.txt',return_db=True):
+def read_in(name,return_db=True):
     """
     read in a model database from text file
     Inputs:
@@ -292,7 +308,7 @@ def read_in(name='model_database.txt',return_db=True):
         iden+=1
         i+=1
     if return_db:
-        return ModelDB(models) 
+        return ModelDB(name, models=models) 
     else:
         return models 
 
@@ -303,7 +319,7 @@ def parse_abs(xmlfile,data):
     data = re.sub('=\s+','=', data.strip()).split()
     dct=dict([item.split('=') for item in data])
     dct["xmlfile"] = xmlfile
-    return dude_xmlutils.Absorber(**dct)
+    return xmlutils.Absorber(**dct)
 
 def parse_single_model(xmlfile, lines, iden=None):   
     """parse a string representation of a single model.

@@ -1,6 +1,6 @@
 from math import sqrt
 import warnings
-import dude_xmlutils
+import xmlutils
 c = 299792.458 # speed of light in km/s
 
 def get_vel_shift(z1,z2,delz2=None,delz1=None):

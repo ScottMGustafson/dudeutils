@@ -1,4 +1,4 @@
-import dude_xmlutils as dude
+import xmlutils as dude
 import numpy as np
 from scipy.interpolate import splrep,splprep, splev
 import dump_parser as dump
@@ -15,7 +15,7 @@ def init_absorber(iden,lockedParam,N_range,b_range,z_range,identity):
     
     input params:
     -------------
-    iden:  (str) iden for dude_xmlutils.Absorber class
+    iden:  (str) iden for xmlutils.Absorber class
     lockedParam:  (str) name of param to lock. (str)
     *_range: range of allowed values for given params
 

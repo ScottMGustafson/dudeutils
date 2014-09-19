@@ -1,4 +1,4 @@
-import dude_xmlutils as dude
+import xmlutils as dude
 import numpy as np
 
 b_max = 18.  #max allowed line width in km/s

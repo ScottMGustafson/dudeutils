@@ -1,4 +1,4 @@
-import dude_xmlutils
+import xmlutils
 import astronomy_utils as astro
 import xml.etree.ElementTree as et
 #import numpy.stats as stats
@@ -28,7 +28,7 @@ ids = ['M1'+str(i) for i in range(49)]
 
 datalst = []
 for item in filelst:
-  datalst.append([dude_xmlutils.Data(iden=ident, xmlfile=item, tag='Absorber', assign_ids=True) for ident in ids])
+  datalst.append([xmlutils.Data(iden=ident, xmlfile=item, tag='Absorber', assign_ids=True) for ident in ids])
 
 #get vel shifts wrt reference.xml 
 
