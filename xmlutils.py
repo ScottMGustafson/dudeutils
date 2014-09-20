@@ -6,6 +6,70 @@ import datetime
 from data_structures import ModelDB, read_in
 from xml.dom import minidom
 
+class XML_db(object):
+    def __init__(self, db=None, filename=None):
+        now = str(datetime.datetime.now())
+
+        if filename is None:
+            self.filename=now[0:9]+".xml"
+        else:
+            self.filename = filename
+        self.db = db
+
+        if db != None:
+            self.root = self.load_from_db(self.db)
+        else:
+            self.root = None
+
+
+    def load_from_db(self,db):
+        filename = self.filename
+        
+        now = str(datetime.datetime.now())
+        root = et.Element('modeldb')
+
+        #set up header data
+        head = et.SubElement(root, 'head')
+        title = et.SubElement(head, 'title')
+        title.text = 'Fitting Models'
+        created = et.SubElement(head, 'dateCreated')
+        created.text = now
+        modified = et.SubElement(head, 'dateModified')
+        modified.text = now
+
+        models = et.SubElement(root, 'models')
+
+        #load the model db
+        for item in db.lst:
+            current_group = None
+            group_name = item.iden 
+            if current_group is None or group_name != current_group.text:
+                current_group = et.SubElement(root, 'model', {'id':group_name})
+
+            children = []
+            if item.absorbers!=None:
+                children += get_children(item.absorbers) 
+            if item.continuum_points!=None:
+                children += get_children(item.continuum_points) 
+            if item.regions!=None:
+                children += get_children(item.regions)  
+
+            if len(children)==0:
+                raise Exception("no children are present")
+            current_group.extend(children)
+        return root
+
+    def write(self):
+        f = open(self.filename,'w')
+        f.write(prettify(self.root))
+        f.close()
+        return
+
+    def read(self):
+        """read from xml, return ModelDB instance"""
+        pass
+        
+
 class _XMLFile(object):
     def __init__(self,name,assign_ids=False):
         self.name = name
@@ -141,8 +205,6 @@ class Data(object):
 
     def get_keys(self):
         return self.xmlfile.get_keys(self.tag)
-        
-
 
 class ContinuumPoint(Data):
     def __init__(self,**kwargs):
@@ -289,44 +351,6 @@ def get_children(lst):
     return elist
 
 
-def write_new_xml(name,db)
-    f = open(name,'w')
 
-    now = str(datetime.datetime.now())
-
-    # Configure one attribute with set()
-    root = et.Element('modeldb')
-    head = et.SubElement(root, 'head')
-    title = et.SubElement(head, 'title')
-    title.text = 'Fitting Models'
-    created = et.SubElement(head, 'dateCreated')
-    created.text = now
-    modified = et.SubElement(head, 'dateModified')
-    modified.text = now
-
-    models = et.SubElement(root, 'models')
-
-    for item in db.lst:
-        current_group = None
-        group_name = item.iden 
-        if current_group is None or group_name != current_group.text:
-            current_group = et.SubElement(root, 'model', {'id':group_name})
-
-        children = []
-        if item.absorbers!=None:
-            children += get_children(item.absorbers) 
-        if item.continuum_points!=None:
-            children += get_children(item.continuum_points) 
-        if item.regions!=None:
-            children += get_children(item.regions)  
-
-        if len(children)==0:
-            raise Exception("no children are present")
-        current_group.extend(children)
-
-    f.write(prettify(root))
-    f.close()
-    return
-        
     
 
