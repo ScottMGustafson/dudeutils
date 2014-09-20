@@ -56,7 +56,7 @@ def parser(arg_list):
         else:
             raise Exception('unrecognized argument '+item)
 
-    model = Model(abslst,chisq=chisq,pixels=pixels)
+    model = Model(absorbers=abslst,chisq=chisq,pixels=pixels)
 
     if action=='write':
         model.write()    

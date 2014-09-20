@@ -6,7 +6,20 @@ import datetime
 from data_structures import ModelDB, read_in
 from xml.dom import minidom
 
+"""
+the end goal here is that I want a tool that can with one command grab all 
+current vals from a dude xml file.  
+
+
+while running dude:
+    fit and save
+    grab and append to db
+
+"""
+
+
 class XML_db(object):
+    """xml format for storing model data"""
     def __init__(self, db=None, filename=None):
         now = str(datetime.datetime.now())
 
@@ -14,15 +27,19 @@ class XML_db(object):
             self.filename=now[0:9]+".xml"
         else:
             self.filename = filename
+
         self.db = db
 
         if db != None:
-            self.root = self.load_from_db(self.db)
+            self.root = self.create_xml(self.db)
+        elif db is None and filename != None:
+            #read in from filename
+            db = self.read(self.filename)
         else:
             self.root = None
 
 
-    def load_from_db(self,db):
+    def create_xml(self,db):
         filename = self.filename
         
         now = str(datetime.datetime.now())
@@ -65,12 +82,41 @@ class XML_db(object):
         f.close()
         return
 
-    def read(self):
-        """read from xml, return ModelDB instance"""
-        pass
+    def read(self,filename):
+        """read from xml, return inputs for Model"""
+        tree = et.parse(filename)
+        root = self.tree.getroot()
+        models = self.root.findall('model')
+        if len(models)==0:
+            raise Exception("no models saved")
+        lst = []
+        for model in models:
+            absorbers = [Absorber(xmlnode=item) for item in model.findall('Absorber')]
+            conts = [ContinuumPoint(xmlnode=item) for item in model.findall('ContinuumPoint')
+            regions = [Region(xmlnode=item) for item in model.findall('Region')]
+            kwargs = {}
+            if len(absorbers)>0:
+                kwargs['absorbers'] = absorbers
+            if len(conts)>0:
+                kwargs['continuum_points'] = conts
+            if len(regions)>0:
+                kwargs['regions'] = regions
+
+            lst.append(Model(**kwargs))
+
+        return ModelDB("temp.txt",models=lst)
+            
+
+
+        
+                
+            
         
 
 class _XMLFile(object):
+    """
+    the standard dude xml fit file
+    """
     def __init__(self,name,assign_ids=False):
         self.name = name
         if name is None:
@@ -79,6 +125,9 @@ class _XMLFile(object):
         self.root = self.tree.getroot()
         if assign_ids:
             self.assign_ids()
+
+    def get_spectrum(self):
+        return self.root.findall('CompositeSpectrum')[0]
 
     def assign_ids(self,tag='Absorber'):
         "assigns an id for each absorber where id not present"
@@ -124,8 +173,7 @@ class _XMLFile(object):
     def getDataList(self,tag):
         """return a list of all instances of tag"""
         temproot = self.root.findall('CompositeSpectrum')[0]
-        lst = temproot.findall(tag)
-        return [it for it in lst]
+        return temproot.findall(tag)
 
     def getViewData(self,iden,tag,attribute_list=None):
         """needs separate get function"""
@@ -153,7 +201,6 @@ class _XMLFile(object):
         if children==[]:
             raise Exception(str(children)+"does not contain "+str(tag))
         return list(dict(children[0].attrib).keys())
-        
 
 class Data(object):
     def __init__(self,**kwargs):
@@ -177,6 +224,18 @@ class Data(object):
 
         if type(self.iden) is str:
             self.node = self.xmlfile.findNode(self.iden,self.tag)
+        elif self.iden is None and not self.node is None:
+            print("parsing the provided node")
+            self.parseNode(self.node)
+
+    def parseNode(self,node):
+        keys = node.attrib
+        for key in keys:
+            try:
+                setattr(self, str(key), float(node.get(key)))
+            except:
+                setattr(self, str(key), str(node.get(key)))
+        
 
     def getData(self,lst=None,function='getData',**kwargs):
         if function=='getDataList':
@@ -193,15 +252,21 @@ class Data(object):
         self.xmlfile.writeData(self.iden,self.tag,**kwargs)
     def writeOut(self):
         self.tree.write()
+
     def writeData(self, **kwargs):
+        self.writeNode()
+        self.xmlfile.writeOut()
+
+    def writeNode(self)
         if not self.node is None:
             for key,val in dict(kwargs).items():
                 setattr(self,key,val)
                 self.node.set(key,val)
         else:
-            #behavior to add new child node
-            pass
-        self.xmlfile.writeOut()
+            keys = self.xmlfile.get_keys(self.tag)  #get relevant keys to write
+            vals = [getattr(self,key) for key in keys] #get this instances vals for them
+            data = dict(zip(keys, vals))
+            et.extend(self.xmlfile.get_spectrum(), self.tag, data)
 
     def get_keys(self):
         return self.xmlfile.get_keys(self.tag)
@@ -220,7 +285,7 @@ class ContinuumPoint(Data):
 class Absorber(Data):
     def __init__(self,**kwargs):
         super(Absorber, self).__init__(tag="Absorber",**kwargs)
-        if not self.xmlfile:
+        if not self.xmlfile and not self.node:
             raise Exception("no xml fit file associated with this absorber: %s"%(self.iden))
         if kwargs.get('populate',True) is True:
             self.getData()
@@ -231,7 +296,7 @@ class Absorber(Data):
     
     def getData(self):
         super(Absorber, self).getData()
-        self.ionName = self.ionName.replace(' ','')
+        #self.ionName = self.ionName.replace(' ','')
 
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
@@ -279,7 +344,7 @@ class Absorber(Data):
         return self.vel
 
     def __eq__(self,other):
-        for item in ['N','b','z','iden','xmlfile']:
+        for item in ['N','b','z','iden']:
             if getattr(self,item)!=getattr(other,item):
                 return False
         return True

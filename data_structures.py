@@ -23,14 +23,14 @@ import astronomy_utils as astro
 c = 299792.458
 
 class Model(object):
-    def __init__(self,absorbers, **kwargs):
+    def __init__(self, **kwargs):
         """
         inputs:
         -------
         absorbers: list(xmlutils.Absorber)  is a list of absorber references 
         """
         self.iden = kwargs.get('iden',None)
-        self.absorbers = absorbers
+        self.absorbers = kwargs.get("absorbers")
         self.continuum_points = kwargs.get("continuum_points",None)
         self.regions = kwargs.get("regions",None)
 
@@ -100,9 +100,9 @@ class Model(object):
         """
         Inputs:
         -------
-        constraints: a dict of constraints using Absorber attirbutes.  Each key-value pair is a string-tuple of floats.
+        constraints: a dict of constraints using Absorber attirbutes.  
+        Each key-value pair is a string-tuple of floats.
         
-
         returns: boolean
 
         example:
@@ -162,7 +162,12 @@ class ModelDB(object):
         if constraints:
             self.lst = [item for item in self.lst if item.constrain(constraints)]
 
-        self.xmlfile = kwargs.get('xmlfile',self.lst[0].xmlfile)
+        self.xmlfile = kwargs.get('xmlfile',self.lst[0].xmlfile())  #get filename
+        self.get_xml()
+
+
+    def get_xml(self):
+        self.xml = xmlutils._XMLFile(self.xmlfile)
 
     def get_locked(self, iden, param):
         tmp = []
@@ -228,12 +233,8 @@ class ModelDB(object):
                 onesig.append(getattr(item.getabs(iden),param_name))
         return getattr(lst[0].getabs(iden),param_name) ,max(onesig), min(onesig)
         
-
     def append(self, model):
         self.lst.append(self.model)
-        f = open(self.name,'a')
-        f.write(str(model))
-        f.close()
 
     def write_to_db(self, clobber=False, name=None):
         import os.path
@@ -249,6 +250,7 @@ class ModelDB(object):
         for item in self.lst:
             f.write(str(item)+'\n')
         f.close()
+        xmlutils.XML_db(db=self)  #should create xmldb in __init__
 
     def get_model(self, iden):
         for item in self.lst:
@@ -260,8 +262,17 @@ class ModelDB(object):
 
     def pop(self,i):
         return self.lst.pop(i)
-            
-        
+
+    def grab(self):
+        """grab from xml file"""
+        #need to reinstantiate xml file
+        self.get_xml()
+        absorbers = [xmlutils.Absorber(xmlnode=item) for item in self.xml.getDataList("Absorber")]
+        conts = [xmlutils.ContinuumPoint(xmlnode=item) for item in self.xml.getDataList("ContinuumPoint")]
+        #regions = [xmlutils.Region(xmlnode=item) for item in self.xml.getDataList("Region")]
+        self.append(Model(absorbers=absorbers,continuum_points=conts,xmlfile=self.xmlfile))
+        self.write_to_db()  #plain text database and xml_db
+
 
 def read_in(name,return_db=True):
     """
@@ -362,8 +373,12 @@ def parse_single_model(xmlfile, lines, iden=None):
         elif 'chi2' in line:  #this should always be the last line
             lst=line.split()
             kw=dict([(item.strip()).split('=') for item in lst])
-            return Model(absorbers, iden=iden, **kw)
+            return Model(absorbers=absorbers, iden=iden, **kw)
         else: 
             pass
     raise Exception("Input error for model database")
+
+
+def get_db_from_xml(filename):
+    
 
