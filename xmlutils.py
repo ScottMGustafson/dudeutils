@@ -1,10 +1,11 @@
 """
 some tools to interface with the standard dude xml input/output
 """
+import abc
 import xml.etree.ElementTree as et
 import datetime
-from data_structures import ModelDB, read_in
 from xml.dom import minidom
+import os.path
 
 """
 the end goal here is that I want a tool that can with one command grab all 
@@ -17,31 +18,79 @@ while running dude:
 
 """
 
+class Basexml(object):
+    __metaclass__ = abc.ABCMeta
+    @staticmethod
+    def get_root(filename):
+        if not os.path.exists(filename):
+            return None
+        tree = et.parse(filename)
+        return tree.getroot()
 
-class XML_db(object):
-    """xml format for storing model data"""
-    def __init__(self, db=None, filename=None):
-        now = str(datetime.datetime.now())
+    @staticmethod
+    def read(filename):
+        tree = et.parse(filename)
+        return tree.getroot()
+       
+    @abc.abstractmethod
+    def write(self):
+        """write the current data"""
+        return
 
-        if filename is None:
-            self.filename=now[0:9]+".xml"
-        else:
-            self.filename = filename
+    @staticmethod
+    def get_children(parent,child_tag):
+        return parent.findall(child_tag)
 
-        self.db = db
+    @staticmethod
+    def get_node_data(node,attribute_list=None):
+        if attribute_list is None:
+            attribute_list= list(dict(node.attrib).keys())
+        return dict(zip(attribute_list, [node.get(attr) for attr in attribute_list ]))
+            
+    @staticmethod
+    def get_node(parent,tag,iden):
+        for item in parent.findall(tag):
+            if item.get('id')==iden:
+                return item
+        raise Exception('id '+iden+' not found')
 
-        if db != None:
-            self.root = self.create_xml(self.db)
-        elif db is None and filename != None:
-            #read in from filename
-            db = self.read(self.filename)
-        else:
-            self.root = None
+    @staticmethod
+    def get_node_list(parent,tag):
+        return parent.findall(tag)
 
+    @staticmethod
+    def get_children(lst):
+        elist = []
+        for item in lst:
+            attribs = item.get_keys()
+            vals = [ str(getattr(item,it)) for it in attribs ]
+            
+            data= dict(zip(attribs, vals))
 
-    def create_xml(self,db):
-        filename = self.filename
+            elist.append( Element(item.tag, attrib=data) )
+        return elist
         
+
+class Model_xml(Basexml):
+    """xml format for storing model data"""
+    def __init__(self, db=None, **kwargs):
+        """ 
+        optional keywords:
+        filename
+        db
+        """
+
+        self.filename = kwargs.get("filename", Model_xml.default_filename() ) 
+        self.db = kwargs.get("db", None)
+
+    @classmethod
+    def default_filename(cls):
+        now = str(datetime.datetime.now())
+        return now[0:10]+"model.xml"
+        
+    @staticmethod
+    def create(filename,db):
+        """create an xml file file structure.  returns root"""
         now = str(datetime.datetime.now())
         root = et.Element('modeldb')
 
@@ -65,55 +114,27 @@ class XML_db(object):
 
             children = []
             if item.absorbers!=None:
-                children += get_children(item.absorbers) 
+                children += self.get_children(item.absorbers) 
             if item.continuum_points!=None:
-                children += get_children(item.continuum_points) 
+                children += self.get_children(item.continuum_points) 
             if item.regions!=None:
-                children += get_children(item.regions)  
+                children += self.get_children(item.regions)  
 
             if len(children)==0:
                 raise Exception("no children are present")
             current_group.extend(children)
         return root
 
-    def write(self):
-        f = open(self.filename,'w')
-        f.write(prettify(self.root))
+    @staticmethod
+    def write(filename, root):
+        f = open(filename,'w')
+        f.write(prettify(root))
         f.close()
         return
 
-    def read(self,filename):
-        """read from xml, return inputs for Model"""
-        tree = et.parse(filename)
-        root = self.tree.getroot()
-        models = self.root.findall('model')
-        if len(models)==0:
-            raise Exception("no models saved")
-        lst = []
-        for model in models:
-            absorbers = [Absorber(xmlnode=item) for item in model.findall('Absorber')]
-            conts = [ContinuumPoint(xmlnode=item) for item in model.findall('ContinuumPoint')
-            regions = [Region(xmlnode=item) for item in model.findall('Region')]
-            kwargs = {}
-            if len(absorbers)>0:
-                kwargs['absorbers'] = absorbers
-            if len(conts)>0:
-                kwargs['continuum_points'] = conts
-            if len(regions)>0:
-                kwargs['regions'] = regions
-
-            lst.append(Model(**kwargs))
-
-        return ModelDB("temp.txt",models=lst)
-            
 
 
-        
-                
-            
-        
-
-class _XMLFile(object):
+class Dudexml(Basexml):
     """
     the standard dude xml fit file
     """
@@ -121,8 +142,7 @@ class _XMLFile(object):
         self.name = name
         if name is None:
             raise Exception('no xml file specified')
-        self.tree = et.parse(self.name)
-        self.root = self.tree.getroot()
+        self.root = super(Dudexml,self).get_root(name)
         if assign_ids:
             self.assign_ids()
 
@@ -140,59 +160,41 @@ class _XMLFile(object):
                     counter+=1
         self.tree.write(self.name)
 
-    def getData(self,iden,tag,attribute_list=None):
-        node = self.findNode(iden,tag)
-        if attribute_list is None:
-            attribute_list= list(dict(node.attrib).keys())
-        return list(zip(attribute_list, [node.get(attr) for attr in attribute_list ]))
+    def get_node_data(self,**kwargs):
+        """returns dict of data for node.  
+        input:
+        ------
+        iden:  id to look for
+        tag:   tag of xml node
+        node:  if iden and tag not specified, may specify node instead.
+        attribute_list:  list of attributes to return.  by default, returns all
 
-    def findNode(self,iden,tag):
+        """
+        iden=kwargs.get("iden",None)
+        tag=kwargs.get("tag",None)
+        node=kwargs.get("node",None)
+        attribute_list=kwargs.get("attribute_list",None)
+
+        if node is None:
+            node = self.get_node(iden,tag)
+        return super(Dudexml,self).get_node_data(node, attribute_list)
+  
+    def get_node(self,iden,tag):
         if iden is None:
             raise Exception('need to define an iden')
-        for thetag in self.root.findall('CompositeSpectrum'):
-            for item in thetag.findall(tag):
-                if item.get('id')==iden:
-                    return item
-        raise Exception('id '+iden+' not found')
+        return super(Dudexml,self).get_node(self.root.findall('CompositeSpectrum'),tag,iden)
 
-    def getNodeList(self,tag):
+    def get_node_list(self,tag,parent=None):
         if tag is None:
             raise Exception("tag must be defined")
-        if tag=="Region":
-            return list(self.root.findall(tag))
+        if tag in ["ContinuumPoint","Absorber"]:
+            return super(Dudexml,self).get_node_list(self.root.findall("CompositeSpectrum")[0],tag)
+        elif parent:
+            return super(Dudexml,self).get_node_list(parent,tag)
         else:
-            thetag = self.root.findall('CompositeSpectrum')
-            return [item for item in thetag.findall(tag)]
-        
-    def setVal(self,node,key,newval):
-        node.set(key,newval)
+            return super(Dudexml,self).get_node_list(self.root,tag)
 
-    def writeOut(self):
-        self.tree.write(self.name)
-
-    def getDataList(self,tag):
-        """return a list of all instances of tag"""
-        temproot = self.root.findall('CompositeSpectrum')[0]
-        return temproot.findall(tag)
-
-    def getViewData(self,iden,tag,attribute_list=None):
-        """needs separate get function"""
-        if tag == 'Region':
-            identityTag='start'
-        else:
-            identityTag='id'
-
-        for thetag in self.root.findall(tag):
-            if thetag.get(identityTag)==iden:
-                if attribute_list is None:
-                    attribute_list= list(dict(thetag.attrib).keys())
-                return list(zip(attribute_list, [thetag.get(attr) for attr in attribute_list ]))
-        raise Exception('id '+iden+' not found in '+self.name)
-
-    def writeData(self,iden,tag,**kwargs):
-        node = self.findNode(iden,tag)
-        for key, val in dict(kwargs).items():
-            node.set(key,val)
+    def write(self,**kwargs):
         self.tree.write(self.name)
 
     def get_keys(self, tag):
@@ -201,6 +203,7 @@ class _XMLFile(object):
         if children==[]:
             raise Exception(str(children)+"does not contain "+str(tag))
         return list(dict(children[0].attrib).keys())
+
 
 class Data(object):
     def __init__(self,**kwargs):
@@ -211,19 +214,21 @@ class Data(object):
         tag:  (str) name of child class
         xmlnode: a node that xml.etree parsed from an xmlfile
         """
+        __metaclass__ = abc.__metaclass__
+
         for key, val in list(kwargs.items()):
             setattr(self,key,val)
         self.node = kwargs.get('xmlnode',None)  #to explicitly instantiate one node
-        if not self.node is None:
+        if self.node != None:
             for key, val in dict(self.node.attrib).items():
                 setattr(self,key,val)
         assign_ids  = kwargs.get('assign_ids',False)
         self.tag    = kwargs.get('tag')
-        self.xmlfile = _XMLFile(kwargs.get('xmlfile'))       
+        self.xmlfile = Dudexml(kwargs.get('xmlfile'))       
         self.iden = kwargs.get('iden',None)
 
         if type(self.iden) is str:
-            self.node = self.xmlfile.findNode(self.iden,self.tag)
+            self.node = self.xmlfile.get_node(self.iden,self.tag)
         elif self.iden is None and not self.node is None:
             print("parsing the provided node")
             self.parseNode(self.node)
@@ -236,29 +241,25 @@ class Data(object):
             except:
                 setattr(self, str(key), str(node.get(key)))
         
-
-    def getData(self,lst=None,function='getData',**kwargs):
-        if function=='getDataList':
-            return self.xmlfile.getDataList(self.tag,**kwargs)
-        func   = getattr(self.xmlfile,function)
-        output = func(self.iden, self.tag, lst)
-        for item in output:
+    def getData(self,**kwargs):
+        if self.node!=None:
+            dat=self.xmlfile.getData(node=self.node)
+        else:
+            tag=kwargs.get("tag",self.tag)
+            iden=kwargs.get("iden",self.iden)
+            dat = self.xmlfile.get_node_data(iden=iden, tag=tag)
+        for key, val in dat.items():
             try:
-                setattr(self,str(item[0]),float(item[1]))
+                setattr(self,str(key),float(val))
             except:
-                setattr(self,str(item[0]),str(item[1]))
-        
-    def writeData(self,**kwargs):
-        self.xmlfile.writeData(self.iden,self.tag,**kwargs)
-    def writeOut(self):
-        self.tree.write()
+                setattr(self,str(key),str(val))
 
-    def writeData(self, **kwargs):
+    def write(self):
         self.writeNode()
-        self.xmlfile.writeOut()
+        self.xmlfile.write()
 
-    def writeNode(self)
-        if not self.node is None:
+    def writeNode(self):
+        if self.node != None:
             for key,val in dict(kwargs).items():
                 setattr(self,key,val)
                 self.node.set(key,val)
@@ -277,15 +278,11 @@ class ContinuumPoint(Data):
         self.getData()
     def __str__(self):
         return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y)
-    def getData(self):
-        super(ContinuumPoint, self).getData(['x','y']) 
-    def write(self, **kwargs):
-        super(ContinuumPoint, self).writeData(kwargs) 
         
 class Absorber(Data):
     def __init__(self,**kwargs):
         super(Absorber, self).__init__(tag="Absorber",**kwargs)
-        if not self.xmlfile and not self.node:
+        if self.xmlfile is None and self.node is None:
             raise Exception("no xml fit file associated with this absorber: %s"%(self.iden))
         if kwargs.get('populate',True) is True:
             self.getData()
@@ -293,10 +290,6 @@ class Absorber(Data):
 
     def __str__(self):
         return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.iden,self.N,self.b,self.z)
-    
-    def getData(self):
-        super(Absorber, self).getData()
-        #self.ionName = self.ionName.replace(' ','')
 
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
@@ -326,8 +319,7 @@ class Absorber(Data):
         self.wave = [ item['wave'] for item in linelst ]
         self.f = [ item['f'] for item in linelst ]
         self.obs_wave = [ (1.+self.z)*item['wave'] for item in linelst ]
-    def write(self, **kwargs):
-        super(Absorber, self).writeData(kwargs) 
+
     def getShift(self, ref):
         """ 
         get velocity shift in km/s
@@ -357,65 +349,25 @@ class VelocityView(Data):
         super(VelocityView, self).__init__(tag="VelocityView",**kwargs)
         if kwargs.get('populate',True) is True:
             self.getData()
-    def getData(self):
-        super(VelocityView, self).getData(function='getViewData')
-    def write(self, **kwargs):
-        super(Absorber, self).writeData(kwargs) 
 
 class SingleView(Data):
     def __init__(self,**kwargs):
         super(SingleView, self).__init__(tag="SingleView",**kwargs)
         if kwargs.get('populate',True) is True:
             self.getData()
-    def getData(self):
-        super(SingleView, self).getData(function='getViewData')
-    def write(self, **kwargs):
-        super(Absorber, self).writeData(kwargs) 
 
 class Region(Data):
     def __init__(self,**kwargs):
         super(Region, self).__init__(tag="Region",**kwrgs)
         if kwargs.get('populate',True) is True:
             self.getData()
-    def getData(self):
-        """ gets and returns list of Region instances from xml src file"""
-        super(Region, self).getData(function='getViewData')
-    def write(self, **kwargs):
-        super(Absorber, self).writeData(kwargs) 
-
-def getContinuumPoints(xmlfile):
-    xml = _XMLFile(xmlfile)
-    conts = xml.getDataList('ContinuumPoint')
-    return [ ContinuumPoint(xmlnode=item) for item in conts ]
-
-def getList(xmlfile,classname):
-    """ more general than the above.  """
-    return _XMLFile(xmlfile).getDataList(name)
-    
 
 def consolidate_regions(lst):
     pass
     #TODO
 
-
-
 def prettify(elem):
     reparsed = minidom.parseString(et.tostring(elem, 'utf-8'))
     return reparsed.toprettyxml(indent="  ")
 
-
-def get_children(lst):
-    elist = []
-    for item in lst:
-        attribs = item.get_keys()
-        vals = [ str(getattr(item,it)) for it in attribs ]
-        
-        data= dict(zip(attribs, vals))
-
-        elist.append( Element(item.tag, attrib=data) )
-    return elist
-
-
-
-    
 
