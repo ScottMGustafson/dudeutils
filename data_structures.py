@@ -30,12 +30,20 @@ class Model(object):
         absorbers: list(xmlutils.Absorber)  is a list of absorber references 
         """
         self.iden = kwargs.get('iden',None)
-        self.absorbers = kwargs.get("absorbers")
+        self.absorbers = kwargs.get("absorbers",None)
         self.continuum_points = kwargs.get("continuum_points",None)
         self.regions = kwargs.get("regions",None)
+        self.xmlfile = kwargs.get("xmlfile",None)
+        if self.absorbers==None and self.continuum_points==None and \
+                            self.regions==None:
+            if self.xmlfile != None:
+                self.get_model(self.xmlfile)
+            else:
+                raise Exception("need to define at least one argument")
+        if self.xmlfile==None:
+            self.xmlfile=self.absorbers[0].xmlfile.name
 
-        self.xmlfile = kwargs.get("xmlfile",self.xmlfile())
-        self.xml = self.xml()        #xmlutils._XMLFile instance
+        self.xml = self.xml()        #xmlutils.Dudexml instance
         self.chi2 = float(kwargs.get('chi2',0.))
         self.pixels= kwargs.get('pixels',0.)
         self.locked = {}
@@ -75,6 +83,16 @@ class Model(object):
         string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chi2),float(self.pixels))
         return string
 
+    def get_model(self,xmlfile):
+        xml = xmlutils.Dudexml(xmlfile)
+        ab = xml.get_node_list("Absorbers")
+        conts = xml.get_node_list("ContinuumPoint")
+        regions=xml.get_node_list("Region")
+
+        self.absorbers = [ xmlutils.Absorber(**xml.get_node_data(item)) for item in ab ]
+        self.continuum_points = [ xmlutils.ContinuumPoint(**xml.get_node_data(item)) for item in conts ]
+        self.regions = [ xmlutils.Region(**xml.get_node_data(item)) for item in regions ]
+
     def xmlfile(self):
         try:
             return self.absorbers[0].xmlfile.name
@@ -85,7 +103,7 @@ class Model(object):
         try:
             return self.absorbers[0].xmlfile
         except:
-            xml = xmlutils._XMLFile(self.xmlfile)
+            xml = xmlutils.Dudexml(self.xmlfile)
             for item in self.absorbers:
                 item.xmlfile = xml
             return xml
@@ -136,6 +154,11 @@ class Model(object):
         z2 = float(self.getabs(iden=iden2).z)
         return astro.get_vel_shift(z1,z2)
        
+    def parse_node(self,node):
+        dat = self.xml.get_node_data(node=node)
+
+
+
 
 class ModelDB(object):
     def __init__(self, name, models=None, constraints=None,**kwargs): 
@@ -162,12 +185,12 @@ class ModelDB(object):
         if constraints:
             self.lst = [item for item in self.lst if item.constrain(constraints)]
 
-        self.xmlfile = kwargs.get('xmlfile',self.lst[0].xmlfile())  #get filename
-        self.get_xml()
+        self.dbxml=xmlutils.Model_xml()
+        self.name = self.dbxml.filename
 
 
     def get_xml(self):
-        self.xml = xmlutils._XMLFile(self.xmlfile)
+        self.xml = xmlutils.Dudexml(self.xmlfile)
 
     def get_locked(self, iden, param):
         tmp = []
@@ -250,7 +273,7 @@ class ModelDB(object):
         for item in self.lst:
             f.write(str(item)+'\n')
         f.close()
-        xmlutils.XML_db(db=self)  #should create xmldb in __init__
+        self.dbxml.write(db)  #should create xmldb in __init__
 
     def get_model(self, iden):
         for item in self.lst:
@@ -262,6 +285,35 @@ class ModelDB(object):
 
     def pop(self,i):
         return self.lst.pop(i)
+    
+    def read(self,filename):
+        """read from xml, return inputs for Model"""
+        root=.get_root(filename)
+        models = root.findall('model')
+        if len(models)==0:
+            raise Exception("no models saved")
+        lst = []
+        for model in models:
+            absorbers = [Absorber(xmlnode=item) for item in model.findall('Absorber')]
+            conts = [ContinuumPoint(xmlnode=item) for item in model.findall('ContinuumPoint')
+            regions = [Region(xmlnode=item) for item in model.findall('Region')]
+            kwargs = {}
+            if len(absorbers)>0:
+                kwargs['absorbers'] = absorbers
+            if len(conts)>0:
+                kwargs['continuum_points'] = conts
+            if len(regions)>0:
+                kwargs['regions'] = regions
+
+            lst.append(kwargs)
+        return lst
+
+
+    @staticmethod
+    def read_models(filename):
+        lst=xmlutils.Model_xml().read(filename)
+        models = [Model(**item) for item in lst]
+        return ModelDB(filename,models=models)
 
     def grab(self):
         """grab from xml file"""
@@ -379,6 +431,6 @@ def parse_single_model(xmlfile, lines, iden=None):
     raise Exception("Input error for model database")
 
 
-def get_db_from_xml(filename):
-    
+
+
 
