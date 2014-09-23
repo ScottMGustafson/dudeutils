@@ -34,14 +34,14 @@ for item in filelst:
 
 ref_dict = {}
 for item in datalst[0]:
-  ref_dict[item.iden]=float(item.z)
+  ref_dict[item.id]=float(item.z)
 
 velshift = []
 for i in range(len(datalst)):
   vel_dict = {}
   vel_dict['aname'] = filelst[i]
   for ab in datalst[i]:
-    vel_dict[ab.iden] = astro.get_vel_shift(ref_dict[ab.iden],float(ab.z))
+    vel_dict[ab.id] = astro.get_vel_shift(ref_dict[ab.id],float(ab.z))
   velshift.append(vel_dict)
 
 count = 0.

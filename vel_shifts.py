@@ -30,17 +30,17 @@ blu_ref = CCD(xmlfiles[0],blu_abs)
 grn_ref = CCD(xmlfiles[0],grn_abs)
 
 #take out absorbers with an inappropriately large width
-exclude_red = [item.iden for item in red_ref.absorbers if float(item.b) > b_max]
-exclude_blu = [item.iden for item in blu_ref.absorbers if float(item.b) > b_max]
-exclude_grn = [item.iden for item in grn_ref.absorbers if float(item.b) > b_max]
+exclude_red = [item.id for item in red_ref.absorbers if float(item.b) > b_max]
+exclude_blu = [item.id for item in blu_ref.absorbers if float(item.b) > b_max]
+exclude_grn = [item.id for item in grn_ref.absorbers if float(item.b) > b_max]
 
-red_ref.absorbers = [ item for item in red_ref.absorbers if item.iden not in exclude_red ]
-blu_ref.absorbers = [ item for item in blu_ref.absorbers if item.iden not in exclude_blu ]
-grn_ref.absorbers = [ item for item in grn_ref.absorbers if item.iden not in exclude_grn ]
+red_ref.absorbers = [ item for item in red_ref.absorbers if item.id not in exclude_red ]
+blu_ref.absorbers = [ item for item in blu_ref.absorbers if item.id not in exclude_blu ]
+grn_ref.absorbers = [ item for item in grn_ref.absorbers if item.id not in exclude_grn ]
 
-red_abs = [ item.iden for item in red_ref.absorbers]
-blu_abs = [ item.iden for item in blu_ref.absorbers]
-grn_abs = [ item.iden for item in grn_ref.absorbers]
+red_abs = [ item.id for item in red_ref.absorbers]
+blu_abs = [ item.id for item in blu_ref.absorbers]
+grn_abs = [ item.id for item in grn_ref.absorbers]
  
 
 #take out absorbers with an inappropriately large width

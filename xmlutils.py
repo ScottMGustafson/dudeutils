@@ -1,7 +1,7 @@
 """
 some tools to interface with the standard dude xml input/output
 """
-import abc
+#import abc
 import xml.etree.ElementTree as et
 import datetime
 from xml.dom import minidom
@@ -19,7 +19,7 @@ while running dude:
 """
 
 class Basexml(object):
-    __metaclass__ = abc.ABCMeta
+    #__metaclass__ = abc.ABCMeta
     @staticmethod
     def get_root(filename):
         if not os.path.exists(filename):
@@ -32,7 +32,7 @@ class Basexml(object):
         tree = et.parse(filename)
         return tree.getroot()
        
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def write(self):
         """write the current data"""
         return
@@ -108,7 +108,7 @@ class Model_xml(Basexml):
         #load the model db
         for item in db.lst:
             current_group = None
-            group_name = item.iden 
+            group_name = item.id 
             if current_group is None or group_name != current_group.text:
                 current_group = et.SubElement(root, 'model', {'id':group_name})
 
@@ -175,9 +175,14 @@ class Dudexml(Basexml):
         node=kwargs.get("node",None)
         attribute_list=kwargs.get("attribute_list",None)
 
-        if node is None:
-            node = self.get_node(iden,tag)
-        return super(Dudexml,self).get_node_data(node, attribute_list)
+        if node == None:
+            node = self.get_node(iden,tag)  
+
+        if attribute_list!=None:
+            args = [node, attribute_list] 
+        else:
+            args = [node]
+        return super(Dudexml,self).get_node_data(*args)
   
     def get_node(self,iden,tag):
         if iden is None:
@@ -214,39 +219,44 @@ class Data(object):
         tag:  (str) name of child class
         xmlnode: a node that xml.etree parsed from an xmlfile
         """
-        __metaclass__ = abc.__metaclass__
 
+
+        self.node = kwargs.get('xmlnode',None)  #to explicitly instantiate one node
         for key, val in list(kwargs.items()):
             setattr(self,key,val)
-        self.node = kwargs.get('xmlnode',None)  #to explicitly instantiate one node
+        
         if self.node != None:
             for key, val in dict(self.node.attrib).items():
                 setattr(self,key,val)
         assign_ids  = kwargs.get('assign_ids',False)
         self.tag    = kwargs.get('tag')
         self.xmlfile = Dudexml(kwargs.get('xmlfile'))       
-        self.iden = kwargs.get('iden',None)
+        self.id = kwargs.get('iden',None)
 
-        if type(self.iden) is str:
-            self.node = self.xmlfile.get_node(self.iden,self.tag)
-        elif self.iden is None and not self.node is None:
-            print("parsing the provided node")
+        if type(self.id) is str:
+            self.node = self.xmlfile.get_node(self.id,self.tag)
+        elif self.id is None and not self.node is None:
             self.parseNode(self.node)
 
+
+#is there going to be an issue with id versus iden?
     def parseNode(self,node):
-        keys = node.attrib
-        for key in keys:
+        data = node.attrib
+        print(data)
+        for key, val in data.items():
             try:
-                setattr(self, str(key), float(node.get(key)))
+                setattr(self, str(key), float(val))
             except:
-                setattr(self, str(key), str(node.get(key)))
+                setattr(self, str(key), str(val))
         
     def getData(self,**kwargs):
+        if self.node==None:
+            self.node=kwargs.get("node",None)
         if self.node!=None:
-            dat=self.xmlfile.getData(node=self.node)
+            dat=self.xmlfile.get_node_data(node=self.node)
         else:
             tag=kwargs.get("tag",self.tag)
-            iden=kwargs.get("iden",self.iden)
+            iden=kwargs.get("iden",self.id)
             dat = self.xmlfile.get_node_data(iden=iden, tag=tag)
         for key, val in dat.items():
             try:
@@ -277,19 +287,19 @@ class ContinuumPoint(Data):
         super(ContinuumPoint, self).__init__(tag="ContinuumPoint",**kwargs)
         self.getData()
     def __str__(self):
-        return "%s %12.7lf %12.8E"%(self.iden,self.x,self.y)
+        return "%s %12.7lf %12.8E"%(self.id,self.x,self.y)
         
 class Absorber(Data):
     def __init__(self,**kwargs):
         super(Absorber, self).__init__(tag="Absorber",**kwargs)
         if self.xmlfile is None and self.node is None:
-            raise Exception("no xml fit file associated with this absorber: %s"%(self.iden))
+            raise Exception("no xml fit file associated with this absorber: %s"%(self.id))
         if kwargs.get('populate',True) is True:
             self.getData()
         self.get_lines()
 
     def __str__(self):
-        return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.iden,self.N,self.b,self.z)
+        return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.id,self.N,self.b,self.z)
 
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
@@ -358,7 +368,7 @@ class SingleView(Data):
 
 class Region(Data):
     def __init__(self,**kwargs):
-        super(Region, self).__init__(tag="Region",**kwrgs)
+        super(Region, self).__init__(tag="Region",**kwargs)
         if kwargs.get('populate',True) is True:
             self.getData()
 

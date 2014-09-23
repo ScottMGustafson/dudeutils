@@ -29,7 +29,7 @@ class Model(object):
         -------
         absorbers: list(xmlutils.Absorber)  is a list of absorber references 
         """
-        self.iden = kwargs.get('iden',None)
+        self.id = kwargs.get('iden',None)
         self.absorbers = kwargs.get("absorbers",None)
         self.continuum_points = kwargs.get("continuum_points",None)
         self.regions = kwargs.get("regions",None)
@@ -46,6 +46,9 @@ class Model(object):
         self.xml = self.xml()        #xmlutils.Dudexml instance
         self.chi2 = float(kwargs.get('chi2',0.))
         self.pixels= kwargs.get('pixels',0.)
+
+        if self.chi2==0. or self.pixels==0.:
+            warnings.warn("chi2 and or pixels are 0.")
         self.locked = {}
 
     def __eq__(self,other):
@@ -72,26 +75,26 @@ class Model(object):
         string = ""
         locked = {}
         for item in self.absorbers:
-            string+="iden=%6s N=%8.5lf b=%8.5lf z=%lf\n"%(item.iden,item.N,item.b,item.z)
+            string+="iden=%6s N=%8.5lf b=%8.5lf z=%lf\n"%(item.id,item.N,item.b,item.z)
             for param in ['NLocked','bLocked','zLocked']:
                 if getattr(item,param):
-                    locked[item.iden] = param
+                    locked[item.id] = param
         string+="locked="
         for key, val in locked.items():
             if val:
-                string+=key+":"+val+" "
+                string+=str(key)+":"+str(val)+" "
         string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chi2),float(self.pixels))
         return string
 
     def get_model(self,xmlfile):
         xml = xmlutils.Dudexml(xmlfile)
-        ab = xml.get_node_list("Absorbers")
+        ab = xml.get_node_list("Absorber")
         conts = xml.get_node_list("ContinuumPoint")
         regions=xml.get_node_list("Region")
 
-        self.absorbers = [ xmlutils.Absorber(**xml.get_node_data(item)) for item in ab ]
-        self.continuum_points = [ xmlutils.ContinuumPoint(**xml.get_node_data(item)) for item in conts ]
-        self.regions = [ xmlutils.Region(**xml.get_node_data(item)) for item in regions ]
+        self.absorbers = [ xmlutils.Absorber(xmlfile=xmlfile,node=item) for item in ab ]
+        self.continuum_points = [ xmlutils.ContinuumPoint(xmlfile=xmlfile,node=item) for item in conts ]
+        self.regions = [ xmlutils.Region(xmlfile=xmlfile,node=item) for item in regions ]
 
     def xmlfile(self):
         try:
@@ -133,7 +136,7 @@ class Model(object):
         """
         for item in self.absorbers:
             try:
-                for key, val in constraints[item.iden].items():
+                for key, val in constraints[item.id].items():
                     if getattr(item,key)<val[0] or getattr(item,key)>val[1]:
                         return False
             except KeyError:
@@ -146,7 +149,7 @@ class Model(object):
 
     def getabs(self, iden):
         for item in self.absorbers:
-            if iden==item.iden:
+            if iden==item.id:
                 return item
 
     def get_vel(self,iden1,iden2):
@@ -161,7 +164,7 @@ class Model(object):
 
 
 class ModelDB(object):
-    def __init__(self, name, models=None, constraints=None,**kwargs): 
+    def __init__(self, name=None, models=None, constraints=None,**kwargs): 
         """
         Model Database
 
@@ -169,13 +172,12 @@ class ModelDB(object):
         -------
         models:  list of Model instances
         constraints: dict of dicts of tuples of floats.  (see Model.constrain) 
+        name: name of the xml models file.  (not the fit file)
         """
 
 
         for key, val in dict(kwargs).items():
             setattr(self,key,val)
-
-        self.name = name
 
         if models:
             self.lst = models
@@ -186,7 +188,7 @@ class ModelDB(object):
             self.lst = [item for item in self.lst if item.constrain(constraints)]
 
         self.dbxml=xmlutils.Model_xml()
-        self.name = self.dbxml.filename
+        self.name = self.dbxml.filename if name==None else name
 
 
     def get_xml(self):
@@ -277,7 +279,7 @@ class ModelDB(object):
 
     def get_model(self, iden):
         for item in self.lst:
-            if item.iden==iden: 
+            if item.id==iden: 
                 return item
 
     def get_vel_shift(self,iden1,iden2):
@@ -288,15 +290,15 @@ class ModelDB(object):
     
     def read(self,filename):
         """read from xml, return inputs for Model"""
-        root=.get_root(filename)
+        root=self.xmlfile.get_root(filename)
         models = root.findall('model')
         if len(models)==0:
             raise Exception("no models saved")
         lst = []
         for model in models:
             absorbers = [Absorber(xmlnode=item) for item in model.findall('Absorber')]
-            conts = [ContinuumPoint(xmlnode=item) for item in model.findall('ContinuumPoint')
-            regions = [Region(xmlnode=item) for item in model.findall('Region')]
+            conts = [ContinuumPoint(xmlnode=item) for item in model.findall('ContinuumPoint')]
+            regions = [ Region(xmlnode=item) for item in model.findall('Region') ]
             kwargs = {}
             if len(absorbers)>0:
                 kwargs['absorbers'] = absorbers
@@ -420,7 +422,7 @@ def parse_single_model(xmlfile, lines, iden=None):
             dic = dict([item.split(':') for item in lst])
             for key, val in dic.items():
                 for item in absorbers:
-                    if item.iden==key.strip():
+                    if item.id==key.strip():
                         setattr(item,val.strip(),True)
         elif 'chi2' in line:  #this should always be the last line
             lst=line.split()
