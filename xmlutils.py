@@ -86,7 +86,7 @@ class Model_xml(Basexml):
         """
 
         self.filename = kwargs.get("filename", Model_xml.default_filename() ) 
-        self.db = kwargs.get("db", None)
+        self.db = kwargs.get("db")
 
     @classmethod
     def default_filename(cls):

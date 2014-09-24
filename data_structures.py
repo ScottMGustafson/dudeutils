@@ -222,7 +222,7 @@ class Model(object):
         
 
 class ModelDB(object):
-    def __init__(self, name=None, models=None, constraints=None,**kwargs): 
+    def __init__(self, name=None, models=[], constraints=None,**kwargs): 
         """
         Model Database
 
@@ -236,28 +236,57 @@ class ModelDB(object):
         for key, val in dict(kwargs).items():
             setattr(self,key,val)
 
-        if models:
+        self.name=name
+        self.dbxml=xmlutils.Model_xml(filename=name)
+        if len(models)>0:
             self.lst = models
             self.root=self.create(str(name))
-        else:   
+        elif name:   
             self.lst = read_in(str(name), return_db=False)
-            self.root=self.dbxml.read(filename)
+            self.root=self.dbxml.read(name)
+            
+        else:
+            self.lst = []
 
         if constraints:
             self.lst = [item for item in self.lst if item.constrain(constraints)]
 
-        self.dbxml=xmlutils.Model_xml()
-        self.name = self.dbxml.filename if name==None else name
+    def pop(self,key):
+        if type(key) == str:
+            return self._pop_by_id(key)
+        elif type(key) == int:
+            return self._pop_by_index(key)
+        else:
+            for i in len(self.lst):
+                if self.lst[i]==key:
+                    return self.lst.pop(i)
+        raise Exception("item not found: %s"%(str(key)))
+
+    def _pop_by_id(self,key):
+        for i in range(len(self.lst)):
+            if self.lst[i].id==key:
+                return self.lst.pop(i)
+
+    def _pop_by_index(self,i,tag):
+        return self.lst.pop(i)
+
+    def set(self,id,**kwargs):
+        """set the values of a given data element"""
+        new = self.lst.pop(id)
+        new.set(**kwargs)
+        self.lst.append(new)
 
     def get_locked(self, iden, tag, param):
         tmp = []
        
         for mod in self.lst:
             try:
-                tmp.append(getattr(mod.get(iden,tag,param)))
+                if to_bool(mod.get(iden,tag,param+"Locked")):
+                    tmp.append(mod)
             except:
                 pass
-        return sorted(tmp, key=lambda x: x.chi2)
+        tmp =  sorted(tmp, key=lambda x: x.chi2)
+        return [(mod.get(iden,tag,param), mod.chi2) for mod in tmp]
 
     def get_best_lst(self, iden=None, param=None):
         """
@@ -268,9 +297,9 @@ class ModelDB(object):
         """
         if not param is None:
             self.lst=sorted(self.lst, key=lambda x: x.chi2)
-            return self.lst
+            return [mod, mod.chi2 for mod in self.lst]
         else:
-            return self.get_locked(iden, param)
+            return self.get_locked(iden, param)  #already sorted
 
     def get_min_chi2(self):
         return np.amin(np.array([item.chi2 for item in self.lst]))
@@ -308,8 +337,10 @@ class ModelDB(object):
         param_name is in [N,b,z]
 
         """
-        lst = self.get_best_lst(param=param_name+'Locked')
-        chi2min = float(lst[0].chi2)
+        tmp = self.get_best_lst(param=param_name+'Locked')
+        lst = [item[0] for item in tmp]
+        chi2 = [item[1] for item in tmp]
+        chi2min = float(chi2[0])
         onesig=[]
         for item in lst:
             if item.chi2<chi2min+1.:
@@ -324,6 +355,9 @@ class ModelDB(object):
             filename=self.name
         root = self.create(filename)
         self.dbxml.write(filename,root)
+
+    def get(self,xmlfile,chi2,pixels):
+        self.lst.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels))
 
     def get_model(self, iden):
         for item in self.lst:
@@ -365,20 +399,18 @@ class ModelDB(object):
             except:
                 setattr(self,key,val)
 
-    def grab(self,**kwargs):
+    def grab(self,xmlfile,chi2,pixels,**kwargs):
         """grab from xml file"""
         #need to reinstantiate xml file
-        for key, val in model_classes.items():
-            lst=[]
-            for item in self.xml.getDataList(val):
-                lst.append(data_types.Data.factory(xmlfile=self.xml.name,node=item))
-            kwargs[key] = lst
+        mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,**kwargs)
+        self.lst.append(mod)
+        return
 
-        kwargs["xmlfile"]=self.xml.name
-             
-        if kwargs.get("chi2",True):
-            warnings.warn("no chi2 defined")
-        return Model(**kwargs)
+    def set(self,id,**kwargs):
+        mod = self.get_model(id)
+
+    def merge(self,other):
+        self.lst += other.lst
 
     def create(self,filename):
         """create an xml file file structure.  returns root"""
@@ -414,6 +446,9 @@ class ModelDB(object):
                 raise Exception("no children are present")
             current_group.extend(children)
         return root
+
+
+#some helper functions
 
 
 def read_in(name,return_db=True):
@@ -521,6 +556,13 @@ def parse_single_model(xmlfile, lines, iden=None):
             pass
     raise Exception("Input error for model database")
 
+def to_bool(string):
+    string = string.lower()
+    if string=="true":
+        return True
+    else:
+        return False
+    
 
 def inv_dict(tag, dic=model_classes):
     if tag in dic.values():
