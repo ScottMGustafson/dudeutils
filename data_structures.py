@@ -14,45 +14,45 @@ will right the fitting parameters back into the xml
 
 import sys
 import xmlutils
+import data_types
 import warnings
 import numpy as np
 import matplotlib as plt
 import re
 import astronomy_utils as astro
 
+
 c = 299792.458
+model_classes = {"absorbers":"Absorber","continuum_points":"ContinuumPoint","regions":"Region"}
 
 class Model(object):
+    
     def __init__(self, **kwargs):
         """
         inputs:
         -------
-        absorbers: list(xmlutils.Absorber)  is a list of absorber references 
+        absorbers: list(data_types.Absorber)  is a list of absorber references 
         """
-        self.id = kwargs.get('iden',None)
-        self.absorbers = kwargs.get("absorbers",None)
-        self.continuum_points = kwargs.get("continuum_points",None)
-        self.regions = kwargs.get("regions",None)
-        self.xmlfile = kwargs.get("xmlfile",None)
-        if self.absorbers==None and self.continuum_points==None and \
-                            self.regions==None:
-            if self.xmlfile != None:
+        self.id=''
+        self.parse_kwargs(**kwargs)
+        if not all(x in kwargs.values() for x in ["absorbers", "continuum_points", "regions"]):
+            if self.xmlfile:
                 self.get_model(self.xmlfile)
             else:
                 raise Exception("need to define at least one argument")
         if self.xmlfile==None:
             self.xmlfile=self.absorbers[0].xmlfile.name
 
-        self.xml = self.xml()        #xmlutils.Dudexml instance
-        self.chi2 = float(kwargs.get('chi2',0.))
-        self.pixels= kwargs.get('pixels',0.)
+        self.xml_fit = xmlutils.Dudexml(self.xmlfile)
 
-        if self.chi2==0. or self.pixels==0.:
+        if "chi2" not in kwargs.keys() or "pixels" not in kwargs.keys():
+            self.chi2=0.
+            self.pixels=0.
             warnings.warn("chi2 and or pixels are 0.")
         self.locked = {}
 
     def __eq__(self,other):
-        for item in ['iden','chi2','pixels','locked','absorbers']:
+        for item in ['id','chi2','pixels','locked','absorbers']:
             if getattr(self,item)!=getattr(other,item):
                 return False
         return True
@@ -86,30 +86,25 @@ class Model(object):
         string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chi2),float(self.pixels))
         return string
 
-    def get_model(self,xmlfile):
-        xml = xmlutils.Dudexml(xmlfile)
-        ab = xml.get_node_list("Absorber")
-        conts = xml.get_node_list("ContinuumPoint")
-        regions=xml.get_node_list("Region")
+    def parse_kwargs(self,**kwargs):
+        for key, val in kwargs.items():
+            try:
+                setattr(self,key,float(val))
+            except:
+                setattr(self,key,val)
 
-        self.absorbers = [ xmlutils.Absorber(xmlfile=xmlfile,node=item) for item in ab ]
-        self.continuum_points = [ xmlutils.ContinuumPoint(xmlfile=xmlfile,node=item) for item in conts ]
-        self.regions = [ xmlutils.Region(xmlfile=xmlfile,node=item) for item in regions ]
-
-    def xmlfile(self):
-        try:
-            return self.absorbers[0].xmlfile.name
-        except:
-            raise Exception ("need an associated xml fit file for model")
-
-    def xml(self):
-        try:
-            return self.absorbers[0].xmlfile
-        except:
-            xml = xmlutils.Dudexml(self.xmlfile)
-            for item in self.absorbers:
-                item.xmlfile = xml
-            return xml
+    def get_model(self,xmlfile=None):
+        """get all model data from xml and set attribs for self"""
+        xml = xmlutils.Dudexml(xmlfile) if xmlfile !=None else self.xml_fit
+        for key, val in model_classes.items():
+            lst=[]
+            for item in xml.get_node_list(val):
+                assert(item.tag==val)
+                lst.append(data_types.Data.factory(xmlfile=xmlfile,node=item,tag=item.tag))
+            if len(lst)>0:
+                setattr(self,key,lst)
+            else:
+                setattr(self,key,None)
 
     def get(self,iden,param):
         try:
@@ -144,8 +139,11 @@ class Model(object):
         return True
 
     def write(self):
-        for item in self.absorbers:
-            item.writeData()
+        #ModelData to xml data:
+        for key in model_classes.keys():
+            for item in getattr(self,key):
+                item.set_node(**item.__dict__) #set node values to current vals.
+        self.xml_fit.write()
 
     def getabs(self, iden):
         for item in self.absorbers:
@@ -159,9 +157,7 @@ class Model(object):
        
     def parse_node(self,node):
         dat = self.xml.get_node_data(node=node)
-
-
-
+        parse_kwargs(self,**dat)
 
 class ModelDB(object):
     def __init__(self, name=None, models=None, constraints=None,**kwargs): 
@@ -175,24 +171,21 @@ class ModelDB(object):
         name: name of the xml models file.  (not the fit file)
         """
 
-
         for key, val in dict(kwargs).items():
             setattr(self,key,val)
 
         if models:
             self.lst = models
+            self.root=self.create(str(name))
         else:   
             self.lst = read_in(str(name), return_db=False)
+            self.root=self.dbxml.read(filename)
 
         if constraints:
             self.lst = [item for item in self.lst if item.constrain(constraints)]
 
         self.dbxml=xmlutils.Model_xml()
         self.name = self.dbxml.filename if name==None else name
-
-
-    def get_xml(self):
-        self.xml = xmlutils.Dudexml(self.xmlfile)
 
     def get_locked(self, iden, param):
         tmp = []
@@ -261,6 +254,12 @@ class ModelDB(object):
     def append(self, model):
         self.lst.append(self.model)
 
+    def write(self,filename=None):
+        if filename==None:
+            filename=self.name
+        root = self.create(filename)
+        self.dbxml.write(filename,root)
+
     def write_to_db(self, clobber=False, name=None):
         import os.path
         if name is None:
@@ -275,7 +274,7 @@ class ModelDB(object):
         for item in self.lst:
             f.write(str(item)+'\n')
         f.close()
-        self.dbxml.write(db)  #should create xmldb in __init__
+        self.dbxml.write(self)  #should create xmldb in __init__
 
     def get_model(self, iden):
         for item in self.lst:
@@ -288,44 +287,89 @@ class ModelDB(object):
     def pop(self,i):
         return self.lst.pop(i)
     
-    def read(self,filename):
+    @staticmethod
+    def read(filename):
         """read from xml, return inputs for Model"""
-        root=self.xmlfile.get_root(filename)
+        root=xmlutils.Model_xml.get_root(filename)
         models = root.findall('model')
         if len(models)==0:
             raise Exception("no models saved")
-        lst = []
         for model in models:
-            absorbers = [Absorber(xmlnode=item) for item in model.findall('Absorber')]
-            conts = [ContinuumPoint(xmlnode=item) for item in model.findall('ContinuumPoint')]
-            regions = [ Region(xmlnode=item) for item in model.findall('Region') ]
-            kwargs = {}
-            if len(absorbers)>0:
-                kwargs['absorbers'] = absorbers
-            if len(conts)>0:
-                kwargs['continuum_points'] = conts
-            if len(regions)>0:
-                kwargs['regions'] = regions
+            lst = []
+            kwargs={}
+            for key, val in model_classes.items():
+                tmplst=[]
+                for item in model.findall(val):
+                    assert(item.tag==val)
+                    tmplst.append(data_types.Data.factory(node=item,tag=item.tag))
+                if len(tmplst)>0:
+                    kwargs[key]=tmplst
+            kwargs["xmlfile"]=model.get("xmlfile")
+            lst.append(Model(**kwargs))
+        return ModelDB(filename, models=lst)
 
-            lst.append(kwargs)
-        return lst
+    def parse_kwargs(self,**kwargs):
+        for key, val in kwargs.items():
+            try:
+                setattr(self,key,float(val))
+            except:
+                setattr(self,key,val)
 
+    def set(self,id,tag,**kwargs):
+        """set the values of a given data element"""
+        for item in getattr(self,tag):
+            if item.id==id:
+                item.set_node(**kwargs)
 
-    @staticmethod
-    def read_models(filename):
-        lst=xmlutils.Model_xml().read(filename)
-        models = [Model(**item) for item in lst]
-        return ModelDB(filename,models=models)
-
-    def grab(self):
+    def grab(self,**kwargs):
         """grab from xml file"""
         #need to reinstantiate xml file
-        self.get_xml()
-        absorbers = [xmlutils.Absorber(xmlnode=item) for item in self.xml.getDataList("Absorber")]
-        conts = [xmlutils.ContinuumPoint(xmlnode=item) for item in self.xml.getDataList("ContinuumPoint")]
-        #regions = [xmlutils.Region(xmlnode=item) for item in self.xml.getDataList("Region")]
-        self.append(Model(absorbers=absorbers,continuum_points=conts,xmlfile=self.xmlfile))
-        self.write_to_db()  #plain text database and xml_db
+        for key, val in model_classes.items():
+            lst=[]
+            for item in self.xml.getDataList(val):
+                lst.append(data_types.Data.factory(xmlfile=self.xml.name,node=item))
+            kwargs[key] = lst
+
+        kwargs["xmlfile"]=self.xml.name
+             
+        if kwargs.get("chi2",True):
+            warnings.warn("no chi2 defined")
+        return Model(**kwargs)
+
+    def create(self,filename):
+        """create an xml file file structure.  returns root"""
+        import xml.etree.ElementTree as et
+        import datetime
+        now = str(datetime.datetime.now())
+        root = et.Element('modeldb')
+
+        #set up header data
+        head = et.SubElement(root, 'head')
+        title = et.SubElement(head, 'title')
+        title.text = 'Fitting Models'
+        created = et.SubElement(head, 'dateCreated')
+        created.text = now
+        modified = et.SubElement(head, 'dateModified')
+        modified.text = now
+
+        models = et.SubElement(root, 'models')
+
+        #load the model db
+        for item in self.lst:
+            current_group = None
+            group_name = item.id 
+            if current_group is None or group_name != current_group.text:
+                current_group = et.SubElement(root, 'model', {'id':group_name,'xmlfile':item.xmlfile})
+
+            children = []
+
+            for att in model_classes.keys():
+                if getattr(item,att) != None:
+                    children+=[it.node for it in getattr(item,att)]
+            if len(children)==0:
+                raise Exception("no children are present")
+            current_group.extend(children)
+        return root
 
 
 def read_in(name,return_db=True):
@@ -377,6 +421,8 @@ def read_in(name,return_db=True):
     else:
         return models 
 
+
+
 def parse_abs(xmlfile,data):
     """
     parse an individual absorber, either from a list of arguments or a raw string with single absorber
@@ -384,7 +430,7 @@ def parse_abs(xmlfile,data):
     data = re.sub('=\s+','=', data.strip()).split()
     dct=dict([item.split('=') for item in data])
     dct["xmlfile"] = xmlfile
-    return xmlutils.Absorber(**dct)
+    return data_types.Absorber(**dct)
 
 def parse_single_model(xmlfile, lines, iden=None):   
     """parse a string representation of a single model.
@@ -431,8 +477,4 @@ def parse_single_model(xmlfile, lines, iden=None):
         else: 
             pass
     raise Exception("Input error for model database")
-
-
-
-
 

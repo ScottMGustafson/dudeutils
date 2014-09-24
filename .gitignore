@@ -4,3 +4,7 @@ call_sed.py
 plot_ly_series.py
 replacestuffs.py
 speccut_continua.py
+*.txt
+*.dat
+test*.py
+*.bak
