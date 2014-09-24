@@ -22,6 +22,7 @@ class Basexml(object):
     #__metaclass__ = abc.ABCMeta
     def __init__(self):
         pass
+
     @staticmethod
     def get_root(filename):
         if not os.path.exists(filename):
@@ -34,9 +35,8 @@ class Basexml(object):
         tree = et.parse(filename)
         return tree.getroot()
        
-    def write(self):
-        """write the current data"""
-        return
+    def write(self,filename):
+        self.tree.write(filename)
 
     @staticmethod
     def get_children(parent,child_tag):
@@ -108,7 +108,9 @@ class Dudexml(Basexml):
         self.name = name
         if name is None:
             raise Exception('no xml file specified')
-        self.root = super(Dudexml,self).get_root(name)
+        self.tree = et.parse(name)
+        self.root = self.tree.getroot()
+        
         if assign_ids:
             self.assign_ids()
 

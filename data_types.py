@@ -62,7 +62,6 @@ class Data(object):
             node=self.node
         
         data = node.attrib
-        print(data)
         for key, val in data.items():
             try:
                 setattr(self, str(key), float(val))
@@ -86,7 +85,7 @@ class Data(object):
 
 class ContinuumPoint(Data):
     def __str__(self):
-        return "%s %12.7lf %12.8E"%(self.id,self.x,self.y)
+        return "-%s %12.7lf %12.8E"%(self.id,self.x,self.y)
     @classmethod
     def registrar_for(cls,tag):
         return tag=="ContinuumPoint"
@@ -96,7 +95,7 @@ class Absorber(Data):
     def registrar_for(cls,tag):
         return tag=="Absorber"
     def __str__(self):
-        return "iden=%6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.id,self.N,self.b,self.z)
+        return "%-5s id=%-6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.ionName,self.id,self.N,self.b,self.z)
 
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}

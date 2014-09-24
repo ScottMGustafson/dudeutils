@@ -75,7 +75,7 @@ class Model(object):
         string = ""
         locked = {}
         for item in self.absorbers:
-            string+="iden=%6s N=%8.5lf b=%8.5lf z=%lf\n"%(item.id,item.N,item.b,item.z)
+            string+=str(item)+"\n"
             for param in ['NLocked','bLocked','zLocked']:
                 if getattr(item,param):
                     locked[item.id] = param
@@ -92,8 +92,9 @@ class Model(object):
                 setattr(self,key,float(val))
             except:
                 setattr(self,key,val)
+        self.test_chi2
 
-    def get_model(self,xmlfile=None):
+    def get_model(self,xmlfile=None,**kwargs):
         """get all model data from xml and set attribs for self"""
         xml = xmlutils.Dudexml(xmlfile) if xmlfile !=None else self.xml_fit
         for key, val in model_classes.items():
@@ -105,12 +106,18 @@ class Model(object):
                 setattr(self,key,lst)
             else:
                 setattr(self,key,None)
+        self.parse_kwargs(**kwargs)
+        self.test_chi2()
 
-    def get(self,iden,param):
+    def test_chi2(self):
         try:
-            return float(getattr(self.getabs(iden),param))
+            float(self.chi2)
+            float(self.pixels)
         except:
-            return getattr(self.getabs(iden),param)
+            warnings.warn("chi2 and pixels not present...")
+            self.pixels=0
+            self.chi2=0.
+            
 
     def constrain(self, constraints):
         """
@@ -145,19 +152,74 @@ class Model(object):
                 item.set_node(**item.__dict__) #set node values to current vals.
         self.xml_fit.write()
 
-    def getabs(self, iden):
-        for item in self.absorbers:
-            if iden==item.id:
-                return item
-
+    def get(self,id,tag,param=None):
+        if tag in model_classes.values(): tag= inv_dict(tag)
+        for item in getattr(self,tag):
+            if id==item.id:
+                if param:
+                    try:
+                        return float(getattr(item,param))
+                    except:
+                        return getattr(item,param)
+                else:
+                    return item
+        raise Exception("item not found: %s"%(id))
+        
     def get_vel(self,iden1,iden2):
-        z1 = float(self.getabs(iden=iden1).z)
-        z2 = float(self.getabs(iden=iden2).z)
+        z1 = self.get(iden1,'absorbers',"z")
+        z2 = self.get(iden2,'absorbers',"z")
         return astro.get_vel_shift(z1,z2)
        
     def parse_node(self,node):
         dat = self.xml.get_node_data(node=node)
         parse_kwargs(self,**dat)
+
+    def append(self,inst=None,tag=None,**kwargs):
+        if not tag: tag=kwargs.get("tag")
+        if not tag: raise Exception("must specify data type")
+        if tag in model_classes.values(): tag= inv_dict(tag)
+        if inst:
+            getattr(self,tag).append(inst)
+            
+        else:
+            getattr(self,tag).append(data_types.Data.factory(**kwargs))
+            
+    
+    def pop(self,key,tag):
+        if tag in model_classes.values(): tag=inv_dict(tag)
+        if type(key) == str:
+            return self._pop_by_id(key,tag)
+        elif type(key) == int:
+            return self._pop_by_index(key,tag)
+        else:
+            lst = getattr(self,tag)
+            for i in len(lst):
+                if lst[i]==key:
+                    ret = lst.pop(i)
+                    setattr(self,tag,lst)
+                    return ret
+        raise Exception("item not found: %s"%(str(key)))
+
+    def _pop_by_id(self,key,tag):
+        lst = getattr(self,tag)
+        for i in range(len(lst)):
+            if lst[i].id==key:
+                ret = lst.pop(i)
+                setattr(self,tag,lst)
+                return ret
+
+    def _pop_by_index(self,i,tag):
+        ret = getattr(self,tag).pop(i)
+        setattr(self,tag,getattr(self,tag))
+        return ret
+
+    def set(self,id,tag,**kwargs):
+        """set the values of a given data element"""
+        if tag in model_classes.values(): tag=inv_dict(tag)
+        for item in getattr(self,tag):
+            if item.id==id:
+                item.set_node(**kwargs)
+        
 
 class ModelDB(object):
     def __init__(self, name=None, models=None, constraints=None,**kwargs): 
@@ -187,11 +249,14 @@ class ModelDB(object):
         self.dbxml=xmlutils.Model_xml()
         self.name = self.dbxml.filename if name==None else name
 
-    def get_locked(self, iden, param):
+    def get_locked(self, iden, tag, param):
         tmp = []
+       
         for mod in self.lst:
-            if getattr(mod.getabs(iden),param):
-                tmp.append(mod)
+            try:
+                tmp.append(getattr(mod.get(iden,tag,param)))
+            except:
+                pass
         return sorted(tmp, key=lambda x: x.chi2)
 
     def get_best_lst(self, iden=None, param=None):
@@ -252,29 +317,13 @@ class ModelDB(object):
         return getattr(lst[0].getabs(iden),param_name) ,max(onesig), min(onesig)
         
     def append(self, model):
-        self.lst.append(self.model)
+        self.lst.append(model)
 
     def write(self,filename=None):
         if filename==None:
             filename=self.name
         root = self.create(filename)
         self.dbxml.write(filename,root)
-
-    def write_to_db(self, clobber=False, name=None):
-        import os.path
-        if name is None:
-            name=self.name
-        if os.path.isfile(name) and not clobber:
-            answer = input('ok to clobber? '+name+' y/n')
-            if answer=='n':
-                return
-        f = open(name,'w')
-
-        f.write(str(self.xmlfile)+'\n')
-        for item in self.lst:
-            f.write(str(item)+'\n')
-        f.close()
-        self.dbxml.write(self)  #should create xmldb in __init__
 
     def get_model(self, iden):
         for item in self.lst:
@@ -304,7 +353,8 @@ class ModelDB(object):
                     tmplst.append(data_types.Data.factory(node=item,tag=item.tag))
                 if len(tmplst)>0:
                     kwargs[key]=tmplst
-            kwargs["xmlfile"]=model.get("xmlfile")
+            for key, val in model.attrib.items():
+                kwargs[key] = val
             lst.append(Model(**kwargs))
         return ModelDB(filename, models=lst)
 
@@ -314,12 +364,6 @@ class ModelDB(object):
                 setattr(self,key,float(val))
             except:
                 setattr(self,key,val)
-
-    def set(self,id,tag,**kwargs):
-        """set the values of a given data element"""
-        for item in getattr(self,tag):
-            if item.id==id:
-                item.set_node(**kwargs)
 
     def grab(self,**kwargs):
         """grab from xml file"""
@@ -359,7 +403,7 @@ class ModelDB(object):
             current_group = None
             group_name = item.id 
             if current_group is None or group_name != current_group.text:
-                current_group = et.SubElement(root, 'model', {'id':group_name,'xmlfile':item.xmlfile})
+                current_group = et.SubElement(root, 'model', {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),'pixels':str(item.pixels)})
 
             children = []
 
@@ -412,7 +456,6 @@ def read_in(name,return_db=True):
         if i>=len(inp):
             break
         newmod = parse_single_model(xmlfile, temp, iden=str(iden))
-        print(str(newmod))
         models.append(newmod) 
         iden+=1
         i+=1
@@ -477,4 +520,10 @@ def parse_single_model(xmlfile, lines, iden=None):
         else: 
             pass
     raise Exception("Input error for model database")
+
+
+def inv_dict(tag, dic=model_classes):
+    if tag in dic.values():
+        tmp = {v:k for k, v in dic.items()} 
+        return tmp[tag]
 
