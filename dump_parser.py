@@ -1,5 +1,5 @@
 import numpy as np
-import xmlutils as dude
+import data_types as dude
 
 Ryd  = 13.60569253  #(eV)
 hc   =  0.000123984193  # eV Angstroms

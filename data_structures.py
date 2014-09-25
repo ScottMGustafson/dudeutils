@@ -86,6 +86,13 @@ class Model(object):
         string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chi2),float(self.pixels))
         return string
 
+    def monte_carlo_set(self,id,tag,param,val_range):
+        from numpy.random import random_sample
+        new = (range[1]-range[0])*random_sample()+range[0]
+        self.set(id,tag,**{"param":new})
+        self.write()
+        return
+
     def parse_kwargs(self,**kwargs):
         for key, val in kwargs.items():
             try:
@@ -218,7 +225,7 @@ class Model(object):
         if tag in model_classes.values(): tag=inv_dict(tag)
         for item in getattr(self,tag):
             if item.id==id:
-                item.set_node(**kwargs)
+                item.parse_kwargs(**kwargs)
         
 
 class ModelDB(object):
@@ -297,7 +304,7 @@ class ModelDB(object):
         """
         if not param is None:
             self.lst=sorted(self.lst, key=lambda x: x.chi2)
-            return [mod, mod.chi2 for mod in self.lst]
+            return [(mod, mod.chi2) for mod in self.lst]
         else:
             return self.get_locked(iden, param)  #already sorted
 
@@ -371,7 +378,7 @@ class ModelDB(object):
         return self.lst.pop(i)
     
     @staticmethod
-    def read(filename):
+    def read(filename,return_db=True):
         """read from xml, return inputs for Model"""
         root=xmlutils.Model_xml.get_root(filename)
         models = root.findall('model')
@@ -390,7 +397,11 @@ class ModelDB(object):
             for key, val in model.attrib.items():
                 kwargs[key] = val
             lst.append(Model(**kwargs))
-        return ModelDB(filename, models=lst)
+        db = ModelDB(filename, models=lst)
+        if return_db:
+            return db
+        else:
+            return db.lst
 
     def parse_kwargs(self,**kwargs):
         for key, val in kwargs.items():
@@ -568,4 +579,9 @@ def inv_dict(tag, dic=model_classes):
     if tag in dic.values():
         tmp = {v:k for k, v in dic.items()} 
         return tmp[tag]
+
+def newdb(xmlfile,chi2,pixels,dbfile=None,**kwargs):
+    """get a model, append to new database"""
+    model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+    return ModelDB(dbfile,[model],**kwargs)
 
