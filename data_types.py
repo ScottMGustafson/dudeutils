@@ -1,22 +1,41 @@
+import xmlutils
+
+tf = {"true":True, "false":False}
+
 class Data(object):
     def __init__(self,tag):
         self.tag=tag
 
+    def __eq__(self,other):
+        for item in self.__dict__.keys():
+            if getattr(self,item)!=getattr(other,item):
+                return False
+        return True
+
+    def __neq__(self,other):
+        return not self.__eq__(other)
+
+
     @staticmethod
     def factory(**kwargs):
-        try:
-            str(self.tag)
-        except:
-            tag=kwargs.get("tag",None)
+        tag=kwargs.get("tag")
         if tag==None:
-            raise Exception("must specify tag")
+            if "node" in kwargs.keys():
+                node=kwargs.get("node")
+                tag=node.tag
+                assert(tag!=None)
+            else:
+                raise Exception("need to specify either tag and id or node")
+        
         for cls in Data.__subclasses__():
             if cls.registrar_for(tag):
                 if "node" in kwargs.keys():
+                    print("inside the node factory")
                     inst=cls(tag)
                     inst.from_node(**kwargs)
                     return inst
                 elif "xmlfile" in kwargs.keys():
+                    print("inside the xml factory")
                     inst=cls(tag)
                     inst.from_file(**kwargs)
                     return inst
@@ -26,30 +45,38 @@ class Data(object):
 
     def from_node(self,**kwargs):
         """constructor from node"""
-        node=kwargs.get("node")
-        self.parseNode(node=node)
-        self.parse_kwargs(**kwargs)
+        self.node=kwargs.get("node")
+        self.parseNode()
+        self.set_data(**kwargs)
+        self.keys=self.node.attrib.keys()
 
     def from_file(self,**kwargs):
         """constructor from file"""
-        tag=kwargs.get("tag",None)
-        iden=kwargs.get("iden",'')
-        node = self.xmlfile.get_node(iden=iden, tag=tag)
-        self.parseNode(node=node)
+        tag=kwargs.pop("tag")
+        id=kwargs.pop("id")
+        xmlfile = xmlutils.Dudexml(kwargs.pop("xmlfile"))
+        self.node = xmlfile.get_node(id=id, tag=tag)
+        self.keys=self.node.attrib.keys()
+        self.parseNode()
         self.parse_kwargs(**kwargs)
 
-    def parse_kwargs(self,**kwargs):
+    def parse_kwargs(self,**kwargs): #TODO get rid of this since set_data does the same thing
+        """set kwargs to self and apply to node"""
         for key, val in list(kwargs.items()):  #this goes after to override any conflicts
             setattr(self,key,val)
         self.set_node(**kwargs)
            
-    def set_node(self,**kwargs):
+    def set_node(self,**kwargs):  
+        """set values from self to node"""      
         for key, val in list(kwargs.items()):
             if key in self.node.attrib.keys():
+                old=self.node.get(key)
                 self.node.set(key, str(val))
+                new=self.node.get(key)
 
-#is there going to be an issue with id versus iden?
+#is there going to be an issue with id versus id?
     def parseNode(self,node=None):
+        """read from node, set attribs to self"""
         try:
             assert(type(self) in Data.__subclasses__())
         except:
@@ -63,25 +90,24 @@ class Data(object):
         
         data = node.attrib
         for key, val in data.items():
-            try:
-                setattr(self, str(key), float(val))
-            except:
-                setattr(self, str(key), str(val))
+            if "Locked" in key:
+                setattr(self,key,tf[val.lower()])
+            else:
+                try:
+                    setattr(self, str(key), float(val))
+                except:
+                    setattr(self, str(key), str(val))
 
     def set_data(self,**kwargs):
-        self.parse_kwargs(**kwargs)
-
-    def __eq__(self,other):
-        for item in self.__dict__.keys():
-            if getattr(self,item)!=getattr(other,item):
-                return False
-        return True
-
-    def __neq__(self,other):
-        return not self.__eq__(other)
+        """set kwargs to self and apply to node"""
+        for key, val in list(kwargs.items()):  #this goes after to override any conflicts
+            if "Locked" in key:
+                val="true" if val else "false" 
+            setattr(self,key,val)
+        self.set_node(**kwargs)
 
     def get_keys(self):
-        return self.xmlfile.get_keys(self.tag)
+        return self.keys
 
 class ContinuumPoint(Data):
     def __str__(self):

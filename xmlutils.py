@@ -49,15 +49,15 @@ class Basexml(object):
         return dict(zip(attribute_list, [node.get(attr) for attr in attribute_list ]))
             
     @staticmethod
-    def get_node(parent,tag,iden):
-        results=[item for item in parent.findall(tag) if item.get('id')==iden]
+    def get_node(parent,tag,id):
+        results=[item for item in parent.findall(tag) if item.get('id')==id]
         if len(results)>1:
-            warnings.warn("more than one element contains the id \'%s\'\n returning the first one as default"%iden)
+            warnings.warn("more than one element contains the id \'%s\'\n returning the first one as default"%id)
             return results[0]
         elif len(results)==1:
             return results[0]
         else:
-            raise Exception('id '+iden+' not found')
+            raise Exception('id '+id+' not found')
 
     @staticmethod
     def get_node_list(parent,tag):
@@ -132,19 +132,19 @@ class Dudexml(Basexml):
         """returns dict of data for node.  
         input:
         ------
-        iden:  id to look for
+        id:  id to look for
         tag:   tag of xml node
-        node:  if iden and tag not specified, may specify node instead.
+        node:  if id and tag not specified, may specify node instead.
         attribute_list:  list of attributes to return.  by default, returns all
 
         """
-        iden=kwargs.get("iden",None)
+        id=kwargs.get("id",None)
         tag=kwargs.get("tag",None)
         node=kwargs.get("node",None)
         attribute_list=kwargs.get("attribute_list",None)
 
         if node == None:
-            node = self.get_node(iden,tag)  
+            node = self.get_node(id,tag)  
 
         if attribute_list!=None:
             args = [node, attribute_list] 
@@ -152,10 +152,10 @@ class Dudexml(Basexml):
             args = [node]
         return super(Dudexml,self).get_node_data(*args)
   
-    def get_node(self,iden,tag):
-        if iden is None:
-            raise Exception('need to define an iden')
-        return super(Dudexml,self).get_node(self.root.findall('CompositeSpectrum'),tag,iden)
+    def get_node(self,id,tag):
+        if id is None:
+            raise Exception('need to define an id')
+        return super(Dudexml,self).get_node(self.root.findall('CompositeSpectrum')[0],tag,id)
 
     def get_node_list(self,tag,parent=None):
         if tag is None:
@@ -168,6 +168,7 @@ class Dudexml(Basexml):
             return super(Dudexml,self).get_node_list(self.root,tag)
 
     def write(self):
+        print("writing to "+str(self.name))
         self.tree.write(self.name)
 
     def get_keys(self, tag):

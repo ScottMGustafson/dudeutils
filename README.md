@@ -13,7 +13,7 @@ Basically it parses and edits the xml file dude reads from to display and intera
  5. repeat steps 2-4 as necessary
  
 
-####start a new Model_db from a given xml:
+####start a new Model_db from a given xml fit, which will give the first model:
 ```python
 import data_structures as data
 chi2=123
@@ -66,7 +66,7 @@ model.set('old_id','Absorber',**new_vals)
 
 randomly set a value: this example randomly sets the x value between 3403 and 3405 angstroms
 ```python
-model.monte_carlo_set('an_id','ContinuumPoint','x',[3403.,3405.])
+data.random('xmlfile.xml','cont_pt_id','ContinuumPoint','x',[3403.,3405.],"id_for_model")
 ```
 
 ####be sure to write all of your changes back to file if you want them to take effect:

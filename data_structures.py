@@ -12,7 +12,6 @@ will right the fitting parameters back into the xml
 
 """
 
-import sys
 import xmlutils
 import data_types
 import warnings
@@ -20,7 +19,9 @@ import numpy as np
 import matplotlib as plt
 import re
 import astronomy_utils as astro
+from numpy.random import random_sample
 
+#TODO test success of writing
 
 c = 299792.458
 model_classes = {"absorbers":"Absorber","continuum_points":"ContinuumPoint","regions":"Region"}
@@ -45,14 +46,16 @@ class Model(object):
 
         self.xml_fit = xmlutils.Dudexml(self.xmlfile)
 
-        if "chi2" not in kwargs.keys() or "pixels" not in kwargs.keys():
-            self.chi2=0.
-            self.pixels=0.
-            warnings.warn("chi2 and or pixels are 0.")
+        for attr in ["chi2","pixels","params"]:
+            try:
+                assert(attr in kwargs.keys())
+            except AssertionError:
+                setattr(self,item,0.)
+                warnings.warn("%s wasn't defined.  setting to 0."%(item))
         self.locked = {}
 
     def __eq__(self,other):
-        for item in ['id','chi2','pixels','locked','absorbers']:
+        for item in ['id','chi2','pixels','params','locked','absorbers']:
             if getattr(self,item)!=getattr(other,item):
                 return False
         return True
@@ -65,9 +68,9 @@ class Model(object):
         """
         string output for a model will be like:
     
-        iden=HI N=17.12345 b=12.345678 z=1.234567890
-        iden=SiI N=11.12345 b=12.345678 z=1.234567890
-        iden=OI N=11.12345 b=12.345678 z=1.234567890
+        id=HI N=17.12345 b=12.345678 z=1.234567890
+        id=SiI N=11.12345 b=12.345678 z=1.234567890
+        id=OI N=11.12345 b=12.345678 z=1.234567890
         locked=OI:bLocked HI:zLocked
         chi2=123.4 pixels=154
 
@@ -83,14 +86,15 @@ class Model(object):
         for key, val in locked.items():
             if val:
                 string+=str(key)+":"+str(val)+" "
-        string+="\nchi2=%lf pixels=%lf\n\n"%(float(self.chi2),float(self.pixels))
+        string+="\nchi2=%lf pixels=%lf params=%lf\n\n"%(float(self.chi2),float(self.pixels),float(self.params))
         return string
 
     def monte_carlo_set(self,id,tag,param,val_range):
-        from numpy.random import random_sample
-        new = (range[1]-range[0])*random_sample()+range[0]
-        self.set(id,tag,**{"param":new})
-        self.write()
+        """set a param for Data `id` to a random value in val_range"""
+        a=float(val_range[0])
+        b=float(val_range[1])
+        new = (b-a)*random_sample()+a
+        self.set_val(id,tag,**{param:new})
         return
 
     def parse_kwargs(self,**kwargs):
@@ -99,7 +103,7 @@ class Model(object):
                 setattr(self,key,float(val))
             except:
                 setattr(self,key,val)
-        self.test_chi2
+        self.test_chi2()
 
     def get_model(self,xmlfile=None,**kwargs):
         """get all model data from xml and set attribs for self"""
@@ -120,10 +124,12 @@ class Model(object):
         try:
             float(self.chi2)
             float(self.pixels)
+            float(self.params)
         except:
             warnings.warn("chi2 and pixels not present...")
             self.pixels=0
             self.chi2=0.
+            self.params=0
             
 
     def constrain(self, constraints):
@@ -154,9 +160,10 @@ class Model(object):
 
     def write(self):
         #ModelData to xml data:
+        print("beginning write")
         for key in model_classes.keys():
             for item in getattr(self,key):
-                item.set_node(**item.__dict__) #set node values to current vals.
+                item.set_data(**item.__dict__) #set node values to current vals.
         self.xml_fit.write()
 
     def get(self,id,tag,param=None):
@@ -172,9 +179,9 @@ class Model(object):
                     return item
         raise Exception("item not found: %s"%(id))
         
-    def get_vel(self,iden1,iden2):
-        z1 = self.get(iden1,'absorbers',"z")
-        z2 = self.get(iden2,'absorbers',"z")
+    def get_vel(self,id1,id2):
+        z1 = self.get(id1,'absorbers',"z")
+        z2 = self.get(id2,'absorbers',"z")
         return astro.get_vel_shift(z1,z2)
        
     def parse_node(self,node):
@@ -220,12 +227,13 @@ class Model(object):
         setattr(self,tag,getattr(self,tag))
         return ret
 
-    def set(self,id,tag,**kwargs):
+    def set_val(self,id,tag,**kwargs):
         """set the values of a given data element"""
         if tag in model_classes.values(): tag=inv_dict(tag)
         for item in getattr(self,tag):
             if item.id==id:
                 item.parse_kwargs(**kwargs)
+        self.write()
         
 
 class ModelDB(object):
@@ -277,25 +285,25 @@ class ModelDB(object):
     def _pop_by_index(self,i,tag):
         return self.lst.pop(i)
 
-    def set(self,id,**kwargs):
+    def set_val(self,id,**kwargs):
         """set the values of a given data element"""
         new = self.lst.pop(id)
-        new.set(**kwargs)
+        new.set_val(**kwargs)
         self.lst.append(new)
 
-    def get_locked(self, iden, tag, param):
+    def get_locked(self, id, tag, param):
         tmp = []
        
         for mod in self.lst:
             try:
-                if to_bool(mod.get(iden,tag,param+"Locked")):
+                if to_bool(mod.get(id,tag,param+"Locked")):
                     tmp.append(mod)
             except:
                 pass
         tmp =  sorted(tmp, key=lambda x: x.chi2)
-        return [(mod.get(iden,tag,param), mod.chi2) for mod in tmp]
+        return [(mod.get(id,tag,param), mod.chi2) for mod in tmp]
 
-    def get_best_lst(self, iden=None, param=None):
+    def get_best_lst(self, id=None, param=None):
         """
         gets best fit.
 
@@ -306,16 +314,16 @@ class ModelDB(object):
             self.lst=sorted(self.lst, key=lambda x: x.chi2)
             return [(mod, mod.chi2) for mod in self.lst]
         else:
-            return self.get_locked(iden, param)  #already sorted
+            return self.get_locked(id, param)  #already sorted
 
     def get_min_chi2(self):
         return np.amin(np.array([item.chi2 for item in self.lst]))
 
-    def best_fit(self,iden,param,order,xmin,xmax, locked=True, plot=True):
+    def best_fit(self,id,param,order,xmin,xmax, locked=True, plot=True):
         """
         get a best fit of data with respect to `param'
 
-        iden: id of absorber
+        id: id of absorber
         param:  parameter name (N,b,z)
         order:  order of polynomial to fit
         xmax, xmin: range of values to consider
@@ -325,7 +333,7 @@ class ModelDB(object):
         x = []
         y = []
         for item in self.lst:
-            ab = item.getabs(iden)
+            ab = item.getabs(id)
             if (locked and ab.locked(param)) or not locked:
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
@@ -338,7 +346,7 @@ class ModelDB(object):
             plt.show()
         return f, x, y
 
-    def get_err(self, iden, param_name):
+    def get_err(self, id, param_name):
         """get 1 sigma error from chi2 = chi2min + 1
 
         param_name is in [N,b,z]
@@ -351,8 +359,8 @@ class ModelDB(object):
         onesig=[]
         for item in lst:
             if item.chi2<chi2min+1.:
-                onesig.append(getattr(item.getabs(iden),param_name))
-        return getattr(lst[0].getabs(iden),param_name) ,max(onesig), min(onesig)
+                onesig.append(getattr(item.getabs(id),param_name))
+        return getattr(lst[0].getabs(id),param_name) ,max(onesig), min(onesig)
         
     def append(self, model):
         self.lst.append(model)
@@ -363,16 +371,16 @@ class ModelDB(object):
         root = self.create(filename)
         self.dbxml.write(filename,root)
 
-    def get(self,xmlfile,chi2,pixels):
-        self.lst.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels))
+    def get(self,xmlfile,chi2,pixels,params):
+        self.lst.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params))
 
-    def get_model(self, iden):
+    def get_model(self, id):
         for item in self.lst:
-            if item.id==iden: 
+            if item.id==id: 
                 return item
 
-    def get_vel_shift(self,iden1,iden2):
-        return [item.get_vel(iden1,iden2) for item in self.lst]
+    def get_vel_shift(self,id1,id2):
+        return [item.get_vel(id1,id2) for item in self.lst]
 
     def pop(self,i):
         return self.lst.pop(i)
@@ -410,15 +418,15 @@ class ModelDB(object):
             except:
                 setattr(self,key,val)
 
-    def grab(self,xmlfile,chi2,pixels,**kwargs):
+    def grab(self,xmlfile,chi2,pixels,params,**kwargs):
         """grab from xml file"""
         #need to reinstantiate xml file
-        mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,**kwargs)
+        mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params,**kwargs)
         self.lst.append(mod)
         return
 
-    def set(self,id,**kwargs):
-        mod = self.get_model(id)
+    #def set(self,id,**kwargs):
+    #    mod = self.get_model(id)
 
     def merge(self,other):
         self.lst += other.lst
@@ -446,7 +454,7 @@ class ModelDB(object):
             current_group = None
             group_name = item.id 
             if current_group is None or group_name != current_group.text:
-                current_group = et.SubElement(root, 'model', {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),'pixels':str(item.pixels)})
+                current_group = et.SubElement(root, 'model', {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),'pixels':str(item.pixels),'params':str(item.params)})
 
             children = []
 
@@ -480,7 +488,7 @@ def read_in(name,return_db=True):
     except:
         raise Exception(str(name))
     models = []
-    iden=0
+    id=0
     inp = f.readlines()
     assert(len(inp)>1)
     xmlfile = str(inp[0].strip())
@@ -501,9 +509,9 @@ def read_in(name,return_db=True):
                     i+=1
         if i>=len(inp):
             break
-        newmod = parse_single_model(xmlfile, temp, iden=str(iden))
+        newmod = parse_single_model(xmlfile, temp, id=str(id))
         models.append(newmod) 
-        iden+=1
+        id+=1
         i+=1
     if return_db:
         return ModelDB(name, models=models) 
@@ -521,13 +529,13 @@ def parse_abs(xmlfile,data):
     dct["xmlfile"] = xmlfile
     return data_types.Absorber(**dct)
 
-def parse_single_model(xmlfile, lines, iden=None):   
+def parse_single_model(xmlfile, lines, id=None):   
     """parse a string representation of a single model.
 
     an example model is:
-    iden=HI    N=17.12345 b=12.345678 z=1.234567890
-    iden=SiI   N=11.12345 b=12.345678 z=1.234567890
-    iden=OI    N=11.12345 b=12.345678 z=1.234567890
+    id=HI    N=17.12345 b=12.345678 z=1.234567890
+    id=SiI   N=11.12345 b=12.345678 z=1.234567890
+    id=OI    N=11.12345 b=12.345678 z=1.234567890
     locked=OI:bLocked HI:zLocked
     chi2=123.4 pixels=154
 
@@ -549,7 +557,7 @@ def parse_single_model(xmlfile, lines, iden=None):
 
     absorbers = []
     for line in lines:
-        if line[0:4]=='iden':
+        if line[0:4]=='id':
             ab = parse_abs(xmlfile, line)
             absorbers.append(ab)
         elif line[0:4]=='lock':
@@ -562,10 +570,19 @@ def parse_single_model(xmlfile, lines, iden=None):
         elif 'chi2' in line:  #this should always be the last line
             lst=line.split()
             kw=dict([(item.strip()).split('=') for item in lst])
-            return Model(absorbers=absorbers, iden=iden, **kw)
+            return Model(absorbers=absorbers, id=id, **kw)
         else: 
             pass
     raise Exception("Input error for model database")
+
+def random(xmlfile,itemid,tag,param,val_range,modelid=None):
+    """get a new random setting a parameter to a random value in val_range (tuple or list)"""
+    mod=Model(xmlfile=xmlfile,chi2=0,pixels=0,params=0,id=modelid)
+    old = mod.get(itemid,tag)
+    mod.monte_carlo_set(itemid,tag,param,val_range)
+    new=mod.get(itemid,tag)
+    assert(old!=new)
+    print("model written to %s"%(xmlfile))
 
 def to_bool(string):
     string = string.lower()
@@ -574,14 +591,13 @@ def to_bool(string):
     else:
         return False
     
-
 def inv_dict(tag, dic=model_classes):
     if tag in dic.values():
         tmp = {v:k for k, v in dic.items()} 
         return tmp[tag]
 
-def newdb(xmlfile,chi2,pixels,dbfile=None,**kwargs):
+def newdb(xmlfile,chi2,pixels,params,dbfile=None,**kwargs):
     """get a model, append to new database"""
-    model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+    model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params)
     return ModelDB(dbfile,[model],**kwargs)
 
