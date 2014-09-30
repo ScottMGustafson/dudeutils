@@ -23,6 +23,7 @@ class Basexml(object):
     def __init__(self):
         pass
 
+
     @staticmethod
     def get_root(filename):
         if not os.path.exists(filename):
@@ -166,6 +167,13 @@ class Dudexml(Basexml):
             return super(Dudexml,self).get_node_list(parent,tag)
         else:
             return super(Dudexml,self).get_node_list(self.root,tag)
+
+    def set_node(self, id, tag,**kwargs):
+        node=self.get_node(id,tag)
+        for key, val in kwargs.items():
+            node.set(key,str(val))
+        
+#TODO problem lies somewhere in in writing in xmlutils
 
     def write(self):
         print("writing to "+str(self.name))

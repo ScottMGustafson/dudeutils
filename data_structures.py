@@ -36,15 +36,21 @@ class Model(object):
         """
         self.id=''
         self.parse_kwargs(**kwargs)
-        if not all(x in kwargs.values() for x in ["absorbers", "continuum_points", "regions"]):
-            if self.xmlfile:
-                self.get_model(self.xmlfile)
-            else:
-                raise Exception("need to define at least one argument")
+
         if self.xmlfile==None:
-            self.xmlfile=self.absorbers[0].xmlfile.name
+            try:
+                self.xmlfile=self.absorbers[0].xmlfile.name
+            except:
+                raise Exception("must specify either xml filename or model data")
 
         self.xml_fit = xmlutils.Dudexml(self.xmlfile)
+
+        if not all(x in kwargs.keys() for x in ["absorbers", "continuum_points", "regions"]):
+            if self.xmlfile:
+                self.get_model()
+            else:
+                raise Exception("need to define at least one argument")
+        
 
         for attr in ["chi2","pixels","params"]:
             try:
@@ -105,14 +111,13 @@ class Model(object):
                 setattr(self,key,val)
         self.test_chi2()
 
-    def get_model(self,xmlfile=None,**kwargs):
+    def get_model(self,**kwargs):
         """get all model data from xml and set attribs for self"""
-        xml = xmlutils.Dudexml(xmlfile) if xmlfile !=None else self.xml_fit
         for key, val in model_classes.items():
             lst=[]
-            for item in xml.get_node_list(val):
+            for item in self.xml_fit.get_node_list(val):
                 assert(item.tag==val)
-                lst.append(data_types.Data.factory(xmlfile=xmlfile,node=item,tag=item.tag))
+                lst.append(data_types.Data.factory(xmlfile=self.xml_fit.name,node=item,tag=item.tag))
             if len(lst)>0:
                 setattr(self,key,lst)
             else:
@@ -159,12 +164,12 @@ class Model(object):
         return True
 
     def write(self):
-        #ModelData to xml data:
-        print("beginning write")
-        for key in model_classes.keys():
-            for item in getattr(self,key):
-                item.set_data(**item.__dict__) #set node values to current vals.
-        self.xml_fit.write()
+        for item in self.lst:
+            #get the node
+            node=xmlutils.Dudexml.get_node(item.id,item.tag)
+            for key in node.attrib.keys():
+                node.set(key, str(item.key))
+        xmlutils.Dudexml.write()
 
     def get(self,id,tag,param=None):
         if tag in model_classes.values(): tag= inv_dict(tag)
@@ -232,8 +237,9 @@ class Model(object):
         if tag in model_classes.values(): tag=inv_dict(tag)
         for item in getattr(self,tag):
             if item.id==id:
-                item.parse_kwargs(**kwargs)
-        self.write()
+                item.set_data(**kwargs)
+                print("setting to %s"%(str(kwargs)))
+        self.xml_fit.write()
         
 
 class ModelDB(object):
@@ -247,6 +253,7 @@ class ModelDB(object):
         constraints: dict of dicts of tuples of floats.  (see Model.constrain) 
         name: name of the xml models file.  (not the fit file)
         """
+        #TODO  need to set our root as the xml class's root
 
         for key, val in dict(kwargs).items():
             setattr(self,key,val)
@@ -367,7 +374,7 @@ class ModelDB(object):
 
     def write(self,filename=None):
         if filename==None:
-            filename=self.name
+            filename=self.name 
         root = self.create(filename)
         self.dbxml.write(filename,root)
 
@@ -385,11 +392,11 @@ class ModelDB(object):
     def pop(self,i):
         return self.lst.pop(i)
     
-    @staticmethod
+    @staticmethod 
     def read(filename,return_db=True):
         """read from xml, return inputs for Model"""
         root=xmlutils.Model_xml.get_root(filename)
-        models = root.findall('model')
+        models = root.findall('model') 
         if len(models)==0:
             raise Exception("no models saved")
         for model in models:
@@ -578,9 +585,9 @@ def parse_single_model(xmlfile, lines, id=None):
 def random(xmlfile,itemid,tag,param,val_range,modelid=None):
     """get a new random setting a parameter to a random value in val_range (tuple or list)"""
     mod=Model(xmlfile=xmlfile,chi2=0,pixels=0,params=0,id=modelid)
-    old = mod.get(itemid,tag)
+    old = mod.get(itemid,tag,"N")
     mod.monte_carlo_set(itemid,tag,param,val_range)
-    new=mod.get(itemid,tag)
+    new=mod.get(itemid,tag,"N")
     assert(old!=new)
     print("model written to %s"%(xmlfile))
 
