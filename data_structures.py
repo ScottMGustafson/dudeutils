@@ -3,12 +3,10 @@ import xmlutils
 import data_types
 import warnings
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import re
 import astronomy_utils as astro
 from numpy.random import random_sample
-
-#TODO test success of writing
 
 c = 299792.458
 model_classes = {"absorbers":"Absorber","continuum_points":"ContinuumPoint","regions":"Region"}
@@ -68,12 +66,12 @@ class Model(object):
         chi2=123.4 pixels=154
 
         """
-        string = "--------continuum points--------"
+        string = "--------continuum points--------\n"
         for item in self.continuum_points:
             string+=str(item)+"\n"
 
         locked = {}
-        string = "-----------absorbers------------"
+        string = "-----------absorbers------------\n"
         for item in self.absorbers:
             string+=str(item)+"\n"
             for param in ['NLocked','bLocked','zLocked']:
@@ -317,7 +315,7 @@ class ModelDB(object):
     def get_min_chi2(self):
         return np.amin(np.array([item.chi2 for item in self.lst]))
 
-    def best_fit(self,id,param,order,xmin,xmax, locked=True, plot=True):
+    def best_fit(self,id,param,order,xmin,xmax, plot=True):
         """
         get a best fit of data with respect to `param'
 
@@ -331,14 +329,15 @@ class ModelDB(object):
         x = []
         y = []
         for item in self.lst:
-            ab = item.getabs(id)
-            if (locked and ab.locked(param)) or not locked:
+            ab = item.get(id,"Absorber")
+            if ab.locked(param):
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
 
         f = np.poly1d(np.polyfit(np.array(x),np.array(y),int(order)))
         xx = np.arange(xmin,xmax, (xmin-xmax)/(600.))
         if plot:
+            plt.xlim(xmin,xmax)
             plt.plot(x,y,'ro')
             plt.plot(xx,f(xx),'b-')
             plt.show()

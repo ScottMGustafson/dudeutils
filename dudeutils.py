@@ -7,6 +7,9 @@ def newdb(xmlfile,chi2,pixels,params,dbfile=None,**kwargs):
     model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params)
     return ModelDB(dbfile,[model],**kwargs)
 
+def load_from_db(dbxml):
+    return ModelDB.read(dbxml)
+
 def getdb(dbfile):
     return ModelDB.read(dbfile)
 

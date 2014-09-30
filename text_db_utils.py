@@ -98,7 +98,7 @@ def parse_single_model(xmlfile, lines, id=None):
         elif line[0:4]=='lock':
             lst=(line.split('=')[1]).split()
             dic = dict([item.split(':') for item in lst])
-            for key, val in dic.items():
+            for key, val in dic.items(
                 for item in absorbers:
                     if item.id==key.strip():
                         setattr(item,val.strip(),True)

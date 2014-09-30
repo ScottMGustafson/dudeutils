@@ -61,6 +61,8 @@ class Data(object):
     def parse_kwargs(self,**kwargs): #TODO get rid of this since set_data does the same thing
         """set kwargs to self and apply to node"""
         for key, val in list(kwargs.items()):  #this goes after to override any conflicts
+            if "Locked" in key:
+                val = True if val=='true' else False
             setattr(self,key,val)
         self.set_node(**kwargs)
            
@@ -106,6 +108,9 @@ class Data(object):
 
     def get_keys(self):
         return self.keys
+
+    def locked(self,param):
+        return getattr(self,param+"Locked")
 
 class ContinuumPoint(Data):
     def __str__(self):
