@@ -81,8 +81,12 @@ class Model(object):
         chi2=123.4 pixels=154
 
         """
-        string = ""
+        string = "--------continuum points--------"
+        for item in self.continuum_points:
+            string+=str(item)+"\n"
+
         locked = {}
+        string = "-----------absorbers------------"
         for item in self.absorbers:
             string+=str(item)+"\n"
             for param in ['NLocked','bLocked','zLocked']:
@@ -264,7 +268,7 @@ class ModelDB(object):
             self.lst = models
             self.root=self.create(str(name))
         elif name:   
-            self.lst = read_in(str(name), return_db=False)
+            self.lst = ModelDB.read(str(name), return_db=False)
             self.root=self.dbxml.read(name)
             
         else:
@@ -399,8 +403,9 @@ class ModelDB(object):
         models = root.findall('model') 
         if len(models)==0:
             raise Exception("no models saved")
+        model_list = []
         for model in models:
-            lst = []
+            
             kwargs={}
             for key, val in model_classes.items():
                 tmplst=[]
@@ -411,8 +416,8 @@ class ModelDB(object):
                     kwargs[key]=tmplst
             for key, val in model.attrib.items():
                 kwargs[key] = val
-            lst.append(Model(**kwargs))
-        db = ModelDB(filename, models=lst)
+            model_list.append(Model(**kwargs))
+        db = ModelDB(filename, models=model_list)
         if return_db:
             return db
         else:
@@ -607,4 +612,7 @@ def newdb(xmlfile,chi2,pixels,params,dbfile=None,**kwargs):
     """get a model, append to new database"""
     model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params)
     return ModelDB(dbfile,[model],**kwargs)
+
+def getdb(dbfile):
+    return ModelDB.read(dbfile)
 

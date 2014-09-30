@@ -30,12 +30,10 @@ class Data(object):
         for cls in Data.__subclasses__():
             if cls.registrar_for(tag):
                 if "node" in kwargs.keys():
-                    print("inside the node factory")
                     inst=cls(tag)
                     inst.from_node(**kwargs)
                     return inst
                 elif "xmlfile" in kwargs.keys():
-                    print("inside the xml factory")
                     inst=cls(tag)
                     inst.from_file(**kwargs)
                     return inst
@@ -111,7 +109,7 @@ class Data(object):
 
 class ContinuumPoint(Data):
     def __str__(self):
-        return "-%s %12.7lf %12.8E"%(self.id,self.x,self.y)
+        return "id=%s x=%12.7lf y=%12.8E"%(self.id,self.x,self.y)
     @classmethod
     def registrar_for(cls,tag):
         return tag=="ContinuumPoint"
