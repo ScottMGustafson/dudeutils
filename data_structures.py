@@ -143,14 +143,20 @@ class Model(object):
             True
 
         """
+        for key in constraints.keys():
+            for param in constraints[key].keys():
+                if param not in ["N","b","z"]:
+                    raise Exception("param %s not found"%(param))
+            if key not in [item.id for item in self.absorbers]:
+                raise Exception("key %s not found"%(key))
+
         for item in self.absorbers:
-            try:
-                for key, val in constraints[item.id].items():
-                    if getattr(item,key)<val[0] or getattr(item,key)>val[1]:
+            for key, val in constraints.items():
+                for param, lims in val.items():
+                    if not (lims[0]<=self.get(key,"Absorber",param)<=lims[1]):
                         return False
-            except KeyError:
-                pass
         return True
+                               
 
     def write(self):
         for item in self.lst:
@@ -315,7 +321,7 @@ class ModelDB(object):
     def get_min_chi2(self):
         return np.amin(np.array([item.chi2 for item in self.lst]))
 
-    def best_fit(self,id,param,order,xmin,xmax, plot=True):
+    def best_fit(self,id,param,order,xmin=None,xmax=None, plot=True, constraints=None):
         """
         get a best fit of data with respect to `param'
 
@@ -328,18 +334,36 @@ class ModelDB(object):
         """
         x = []
         y = []
+
+        if constraints!=None:
+            lst=[]
+            for item in self.lst:
+                if item.constrain(constraints):
+                    lst.append(item)
+        else:
+            lst = self.lst
+    
         for item in self.lst:
             ab = item.get(id,"Absorber")
             if ab.locked(param):
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
 
-        f = np.poly1d(np.polyfit(np.array(x),np.array(y),int(order)))
-        xx = np.arange(xmin,xmax, (xmin-xmax)/(600.))
+        if xmin==None and xmax==None:
+            xmax = max(x)
+            xmin = min(x)
+
+        x=np.array(x)
+        y=np.array(y)
+
+        coeffs=np.polyfit(x-x.mean(),y,int(order))
+        f = np.poly1d(coeffs)
         if plot:
+            xx = np.arange(xmin,xmax, np.abs(xmax-xmin)/100.)
+            yy = f(xx-x.mean())
             plt.xlim(xmin,xmax)
+            plt.plot(xx,yy,'b-')
             plt.plot(x,y,'ro')
-            plt.plot(xx,f(xx),'b-')
             plt.show()
         return f, x, y
 
