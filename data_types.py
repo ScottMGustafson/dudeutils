@@ -15,7 +15,6 @@ class Data(object):
     def __neq__(self,other):
         return not self.__eq__(other)
 
-
     @staticmethod
     def factory(**kwargs):
         tag=kwargs.get("tag")
@@ -128,10 +127,9 @@ class Absorber(Data):
 
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
-        tf_lst = ['true', 'True', 'TRUE']
         try:
             ans = getattr(self,param_lock[param])
-            if str(ans) not in tf_lst:
+            if str(ans) not in ['true', 'True', 'TRUE']:
                 return False
             else:
                 return True

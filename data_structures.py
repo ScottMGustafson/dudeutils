@@ -1,4 +1,3 @@
-
 import xmlutils
 import data_types
 import warnings
@@ -143,6 +142,8 @@ class Model(object):
             True
 
         """
+
+        #test for valid inputs
         for key in constraints.keys():
             for param in constraints[key].keys():
                 if param not in ["N","b","z"]:
@@ -150,6 +151,7 @@ class Model(object):
             if key not in [item.id for item in self.absorbers]:
                 raise Exception("key %s not found"%(key))
 
+        #now constrain the model.
         for item in self.absorbers:
             for key, val in constraints.items():
                 for param, lims in val.items():
@@ -248,7 +250,6 @@ class ModelDB(object):
         constraints: dict of dicts of tuples of floats.  (see Model.constrain) 
         name: name of the xml models file.  (not the fit file)
         """
-        #TODO  need to set our root as the xml class's root
 
         for key, val in dict(kwargs).items():
             setattr(self,key,val)
@@ -336,14 +337,11 @@ class ModelDB(object):
         y = []
 
         if constraints!=None:
-            lst=[]
-            for item in self.lst:
-                if item.constrain(constraints):
-                    lst.append(item)
+            lst=[item for item in self.lst if item.constrain(constraints)]
         else:
             lst = self.lst
     
-        for item in self.lst:
+        for item in lst:
             ab = item.get(id,"Absorber")
             if ab.locked(param):
                 x.append(float(getattr(ab,param)))
