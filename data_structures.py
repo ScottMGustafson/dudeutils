@@ -8,6 +8,11 @@ import astronomy_utils as astro
 from numpy.random import random_sample
 
 c = 299792.458
+
+
+
+
+
 model_classes = {"absorbers":"Absorber","continuum_points":"ContinuumPoint","regions":"Region"}
 
 class Model(object):
@@ -145,18 +150,30 @@ class Model(object):
 
         #test for valid inputs
         for key in constraints.keys():
-            for param in constraints[key].keys():
-                if param not in ["N","b","z"]:
-                    raise Exception("param %s not found"%(param))
-            if key not in [item.id for item in self.absorbers]:
-                raise Exception("key %s not found"%(key))
+            if key not in ["chi2","pixels","params"]:
+                for param in constraints[key].keys():
+                    if param not in ["N","b","z"]:
+                        raise Exception("param %s not found"%(param))
+                if key not in [item.id for item in self.absorbers]:
+                    raise Exception("key %s not found"%(key))
 
         #now constrain the model.
-        for item in self.absorbers:
-            for key, val in constraints.items():
-                for param, lims in val.items():
-                    if not (lims[0]<=self.get(key,"Absorber",param)<=lims[1]):
-                        return False
+        for key, val in constraints.items():
+            if key in ["chi2","pixels","params"]:
+                try:
+                    assert(len(val)==2)
+                except:
+                    if type(val) in [list,tuple]:
+                        raise Exception("cosntraint must be length 2")
+                    else:
+                        val = [0,val]
+                if not getattr(self,key) in range(val[0],val[-1]):
+                    return False
+            else:
+                for item in self.absorbers:
+                    for param, lims in val.items():
+                        if not (lims[0]<=self.get(key,"Absorber",param)<=lims[1]):
+                            return False
         return True
                                
 
@@ -341,11 +358,13 @@ class ModelDB(object):
         else:
             lst = self.lst
     
-        for item in lst:
             ab = item.get(id,"Absorber")
             if ab.locked(param):
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
+
+        if len(x)==0 or len(y)==0 or len(x)!=len(y):
+            raise Exception("ill condittioned input: \n  x=%s\n  y=%s"%(str(x),str(y)))
 
         if xmin==None and xmax==None:
             xmax = max(x)
