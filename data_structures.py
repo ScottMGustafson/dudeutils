@@ -5,13 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import astronomy_utils as astro
+from constraints import Constraint
 from numpy.random import random_sample
 
 c = 299792.458
-
-
-
-
 
 model_classes = {"absorbers":"Absorber","continuum_points":"ContinuumPoint","regions":"Region"}
 
@@ -23,7 +20,7 @@ class Model(object):
         -------
         absorbers: list(data_types.Absorber)  is a list of absorber references 
         """
-        self.id=''
+        self.model_id=''
         self.parse_kwargs(**kwargs)
 
         if self.xmlfile==None:
@@ -50,7 +47,7 @@ class Model(object):
         self.locked = {}
 
     def __eq__(self,other):
-        for item in ['id','chi2','pixels','params','locked','absorbers']:
+        for item in ['model_id','chi2','pixels','params','locked','absorbers']:
             if getattr(self,item)!=getattr(other,item):
                 return False
         return True
@@ -63,9 +60,9 @@ class Model(object):
         """
         string output for a model will be like:
     
-        id=HI N=17.12345 b=12.345678 z=1.234567890
-        id=SiI N=11.12345 b=12.345678 z=1.234567890
-        id=OI N=11.12345 b=12.345678 z=1.234567890
+        model_id=HI N=17.12345 b=12.345678 z=1.234567890
+        model_id=SiI N=11.12345 b=12.345678 z=1.234567890
+        model_id=OI N=11.12345 b=12.345678 z=1.234567890
         locked=OI:bLocked HI:zLocked
         chi2=123.4 pixels=154
 
@@ -80,7 +77,7 @@ class Model(object):
             string+=str(item)+"\n"
             for param in ['NLocked','bLocked','zLocked']:
                 if getattr(item,param):
-                    locked[item.id] = param
+                    locked[item.absorber_id] = param
         string+="locked="
         for key, val in locked.items():
             if val:
@@ -129,54 +126,6 @@ class Model(object):
             self.chi2=0.
             self.params=0
             
-
-    def constrain(self, constraints):
-        """
-        Inputs:
-        -------
-        constraints: a dict of constraints using Absorber attirbutes.  
-        Each key-value pair is a string-tuple of floats.
-        
-        returns: boolean
-
-        example:
-
-        >>>ab=xmlutils.Absorber(N=12.2,b=10.,z=0.)
-        >>>model=Model([ab])
-        >>>model.constrain({ID:{N:(12,13), b:(9,11), z:(-1,1)}})
-            True
-
-        """
-
-        #test for valid inputs
-        for key in constraints.keys():
-            if key not in ["chi2","pixels","params"]:
-                for param in constraints[key].keys():
-                    if param not in ["N","b","z"]:
-                        raise Exception("param %s not found"%(param))
-                if key not in [item.id for item in self.absorbers]:
-                    raise Exception("key %s not found"%(key))
-
-        #now constrain the model.
-        for key, val in constraints.items():
-            if key in ["chi2","pixels","params"]:
-                try:
-                    assert(len(val)==2)
-                except:
-                    if type(val) in [list,tuple]:
-                        raise Exception("cosntraint must be length 2")
-                    else:
-                        val = [0,val]
-                if not getattr(self,key) in range(val[0],val[-1]):
-                    return False
-            else:
-                for item in self.absorbers:
-                    for param, lims in val.items():
-                        if not (lims[0]<=self.get(key,"Absorber",param)<=lims[1]):
-                            return False
-        return True
-                               
-
     def write(self):
         for item in self.lst:
             #get the node
@@ -264,7 +213,7 @@ class ModelDB(object):
         Inputs:
         -------
         models:  list of Model instances
-        constraints: dict of dicts of tuples of floats.  (see Model.constrain) 
+        constraints: dict of dicts of tuples of floats.  (see ModelDB.constrain) 
         name: name of the xml models file.  (not the fit file)
         """
 
@@ -284,7 +233,7 @@ class ModelDB(object):
             self.lst = []
 
         if constraints:
-            self.lst = [item for item in self.lst if item.constrain(constraints)]
+            self.lst = ModelDB.constrain(self,constraints)
 
     def pop(self,key):
         if type(key) == str:
@@ -339,6 +288,15 @@ class ModelDB(object):
     def get_min_chi2(self):
         return np.amin(np.array([item.chi2 for item in self.lst]))
 
+    @staticmethod
+    def constrain(obj,constraints):
+        """
+        example constraints:   
+            constraints={"chi2":123,"params":3,"pixels":2345,"D":{"N":(12.3,14.3),"b":(15,16)}}
+        """
+        constraint=Constraint(**constraints)
+        return [item for item in obj.lst if constraint.compare(item)]
+
     def best_fit(self,id,param,order,xmin=None,xmax=None, plot=True, constraints=None):
         """
         get a best fit of data with respect to `param'
@@ -354,10 +312,14 @@ class ModelDB(object):
         y = []
 
         if constraints!=None:
-            lst=[item for item in self.lst if item.constrain(constraints)]
+            lst=ModelDB.constrain(self,constraints)
+            if len(lst)==0:
+                raise Exception("no surviving models:\n%s"%(str(constraints)))
+            assert(len(lst)!=len(self.lst))
         else:
             lst = self.lst
     
+        for item in lst:
             ab = item.get(id,"Absorber")
             if ab.locked(param):
                 x.append(float(getattr(ab,param)))
@@ -491,9 +453,9 @@ class ModelDB(object):
         #load the model db
         for item in self.lst:
             current_group = None
-            group_name = item.id 
+            group_name = item.model_id 
             if current_group is None or group_name != current_group.text:
-                current_group = et.SubElement(root, 'model', {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),'pixels':str(item.pixels),'params':str(item.params)})
+                current_group = et.SubElement(root, 'model', {'model_id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),'pixels':str(item.pixels),'params':str(item.params)})
 
             children = []
 

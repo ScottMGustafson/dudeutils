@@ -1,22 +1,58 @@
-class Contraint(object):
+class Constraint(object):
     def __init__(self,**kwargs):
+        self.abs=[]
         for key, val in kwargs.items():
-            try:
-                setattr(self,key,tuple(map(float,val)))
-            except:
-                setattr(self,key,tuple(map(float,[0,val])))
+            if type(val)==dict:
+                self.abs.append(AbsConstraint(key,**val))
+            elif key=='chi2':
+                Constraint.to_range(self,key,val) 
+            else:  #pixel, param    
+                setattr(self,key,float(val))
+                
+    def compare(self,model):
+        pix = self.__dict__.get("pixels",model.pixels)
+        params=self.__dict__.get("params",model.params)
         
-    def compare(self):
-        for key, val in self.__dict__.items():
-            pass
+        if model.pixels!=pix or params!=model.params:
+            return False
+        if "chi2" in self.__dict__.keys():
+            if not self.chi2[0]<=model.chi2<=self.chi2[1]:
+                return False
+
+        for ab in model.absorbers:
+            for item in self.abs:
+                if item.id==ab.id:
+                    if not item.compare(ab):
+                        return False
+        return True
+
+    @staticmethod
+    def to_range(cls,key,val):
+        """convert provided vales to range"""
+        try:
+            val=tuple(map(float,val))
+        except:
+            val=tuple(map(float,[0,val]))
+        setattr(cls,key,val)
 
 class AbsConstraint(object):
-    def __init__(self,**kwargs):
-        self.id = kwargs.pop("id")
+    def __init__(self,id,**kwargs):
+        self.id = id
         for key, val in kwargs.items():
+            Constraint.to_range(self,key,val)
+
+    def compare(self,absorber):
+        assert(absorber.id==self.id)
+        for key in ["N","b","z"]:
             try:
-                setattr(self,key,tuple(map(float,val)))
+                val = getattr(self,key)
+                if not val[0]<=getattr(absorber,key)<=val[-1]:
+                    print(val,getattr(absorber,key))
+                    return False
             except:
-                setattr(self,key,tuple(map(float,[0,val])))
-            
+                pass
+        return True
+
+    
+
 
