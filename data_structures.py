@@ -315,7 +315,8 @@ class ModelDB(object):
             lst=ModelDB.constrain(self,constraints)
             if len(lst)==0:
                 raise Exception("no surviving models:\n%s"%(str(constraints)))
-            assert(len(lst)!=len(self.lst))
+            if len(lst)==len(self.lst):
+                warnings.warn("everything passed")
         else:
             lst = self.lst
     
