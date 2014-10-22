@@ -53,12 +53,9 @@ class AbsConstraint(object):
             try:
                 val = getattr(self,key)
                 if not val[0]<=getattr(absorber,key)<=val[-1]:
-                    print(val,getattr(absorber,key))
                     return False
             except:
                 pass
         return True
 
-    
-
-
+   

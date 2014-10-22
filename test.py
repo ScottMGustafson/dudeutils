@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 
-def best_fit_DH(moddb,order,param="N",xmin=None,xmax=None, plot=True, constraints=None):
+def best_fit_DH(moddb,order,param="N",xmin=None,xmax=None, plot=True, constraints=None,thecolor='ro'):
     """
     get a best fit of data with respect to `param'
 
@@ -30,7 +30,6 @@ def best_fit_DH(moddb,order,param="N",xmin=None,xmax=None, plot=True, constraint
 
         D = item.get("D","Absorber")
         H = item.get("H","Absorber")
-        print(str(H.locked(param)))
         if D.locked(param) or H.locked(param):
             x.append(float(getattr(D,param))-float(getattr(H,param)))
             y.append(float(item.chi2))
@@ -47,26 +46,28 @@ def best_fit_DH(moddb,order,param="N",xmin=None,xmax=None, plot=True, constraint
     x=np.array(x)
     y=np.array(y)
 
-    coeffs=np.polyfit(x-x.mean(),y,int(order))
-    f = np.poly1d(coeffs)
+    #coeffs=np.polyfit(x-x.mean(),y,int(order))
+    #f = np.poly1d(coeffs)
     if plot:
-        xx = np.arange(xmin,xmax, np.abs(xmax-xmin)/100.)
-        yy = f(xx-x.mean())
+        #xx = np.arange(xmin,xmax, np.abs(xmax-xmin)/100.)
+        #yy = f(xx-x.mean())
         plt.xlim(xmin,xmax)
-        plt.plot(xx,yy,'b-')
-        plt.plot(x,y,'ro')
+        #plt.plot(xx,yy,'b-')
+        plt.plot(x,y,thecolor)
         plt.title(title)
         plt.show()
-    return f, x, y
+    #return f, x, y
 
 if __name__=="__main__":
     db = load_from_db("2014-10-15db.xml")
     z=2.98841195
-    vel=10.
+    vel=2.0
     delz = (vel/299792.458)*(1.+z)
-    constraints = {"D":{"z":(z-delz,z+delz)},"H2":{"z":(2.9874,2.9877)},"params":14,"chi2":1811,"xmlfile":"lo_2014-10-15.xml"}
+    best_constr = {"D":{"z":(z-delz,z+delz)},"H2":{"z":(2.9874,2.9877),"b":(5.0,30.)},"chi2":1820,"xmlfile":"best_2014-10-15.xml"}
+    hi_constr = {"D":{"z":(z-delz,z+delz)},"H2":{"z":(2.9874,2.9877),"b":(5.0,30.)},"chi2":1900,"xmlfile":"hi_2014-10-15.xml"}
+    lo_constr = {"D":{"z":(z-delz,z+delz)},"H2":{"z":(2.9874,2.9877),"b":(5.0,30.)},"chi2":1900,"xmlfile":"lo_2014-10-15.xml"}
     #db.best_fit("D","z",6,constraints=constraints)
-    best_fit_DH(db,6,constraints={"xmlfile":"hi_2014-10-15.xml"})
-    best_fit_DH(db,6,constraints={"xmlfile":"lo_2014-10-15.xml"})
-    best_fit_DH(db,6,constraints={"xmlfile":"best_2014-10-15.xml"})
+    best_fit_DH(db,6,constraints=best_constr)
+    #best_fit_DH(db,6,constraints=hi_constr,thecolor='bo')
+    #best_fit_DH(db,6,constraints=lo_constr,thecolor='go')
 
