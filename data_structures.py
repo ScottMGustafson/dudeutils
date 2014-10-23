@@ -19,7 +19,7 @@ class Model(object):
         inputs:
         -------
         absorbers: list(data_types.Absorber)  is a list of absorber references 
-        """
+        """ 
         self.model_id=''
         self.parse_kwargs(**kwargs)
 
@@ -139,18 +139,12 @@ class Model(object):
         self.parse_kwargs(**kwargs)
         self.test_chi2()
 
-    def get_vel(self,id1,id2):
-        z1 = self.get(id1,'absorbers',"z")
-        z2 = self.get(id2,'absorbers',"z")
-
     def monte_carlo_set(self,id,tag,param,val_range):
         """set a param for Data `id` to a random value in val_range"""
         a=float(val_range[0])
         b=float(val_range[1])
         new = (b-a)*random_sample()+a
         self.set_val(id,tag,**{param:new})
-
-
 
     def parse_kwargs(self,**kwargs):
         for key, val in kwargs.items():

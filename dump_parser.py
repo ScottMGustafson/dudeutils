@@ -18,19 +18,6 @@ class FitData(object):
         temp = []
         for item in regions:
             temp.append(np.where(self.allwaves in [item.start, item.end])[0])
-        #convert to single np array.
-        
-    def get_highlighted_regions(self,xmlfile)
-        regions = [ dude.Region(xmlnode=it) for it in dude.getList(xmlfile,"Regions") ]
-        regions.sort(key=lambda x: x.start)
-        consolidated = []
-        for i in range(len(regions)):
-            j=i
-            while regions[j].start<regions[i].end: j+=1
-            consolidated.append(dude.Region(start=regions[i].start,end=regions[j].end))   
-          
-        return consolidated
-        
 
     def get_cut(self,start,end):
         ind = []
