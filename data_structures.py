@@ -6,32 +6,37 @@ import matplotlib.pyplot as plt
 import re
 from constraints import Constraint
 from numpy.random import random_sample
+import flyweight
+import xml.etree.ElementTree as et
+
 
 c = 299792.458
 
-model_classes = {"absorbers":"Absorber","continuum_points":"ContinuumPoint","regions":"Region"}
-
-atomic_data=data_types.SpectralLine.get_lines()
 
 class Model(object): 
+    #this dict maps ObjList subclasses to their associated data type
+    model_classes = {"AbsorberList":"Absorber","ContinuumPointList":"ContinuumPoint",
+                "RegionList":"Region","SingleViewList":"SingleView",
+                "VelocityViewList":"VelocityView"}
+
     def __init__(self, **kwargs):
         """
         inputs:
         -------
-        absorbers: list(data_types.Absorber)  is a list of absorber references 
+        AbsorberList: flyweight.ObjList() [effectively used as list(data_types.Absorber)]
         """ 
-        self.model_id=''
+        self.id=flyweight.ObjList.generate(taken_names)
         self.parse_kwargs(**kwargs)
 
         if self.xmlfile==None:
             try:
-                self.xmlfile=self.absorbers[0].xmlfile.name
+                self.xmlfile=self.AbsorberList[0].xmlfile.name
             except:
                 raise Exception("must specify either xml filename or model data")
 
         self.xml_fit = xmlutils.Dudexml(self.xmlfile)
 
-        if not all(x in kwargs.keys() for x in ["absorbers", "continuum_points", "regions"]):
+        if not all(x in kwargs.keys() for x in Model.model_classes.keys()):
             if self.xmlfile:
                 self.get_model()
             else:
@@ -47,7 +52,7 @@ class Model(object):
         self.count_params()
 
     def __eq__(self,other):
-        for item in ['model_id','chi2','pixels','params','locked','absorbers']:
+        for item in ['id','chi2','pixels','params','locked','AbsorberList']:
             if getattr(self,item)!=getattr(other,item):
                 return False
         return True
@@ -60,20 +65,20 @@ class Model(object):
         """
         string output for a model will be like:
     
-        model_id=HI N=17.12345 b=12.345678 z=1.234567890
-        model_id=SiI N=11.12345 b=12.345678 z=1.234567890
-        model_id=OI N=11.12345 b=12.345678 z=1.234567890
+        id=HI N=17.12345 b=12.345678 z=1.234567890
+        id=SiI N=11.12345 b=12.345678 z=1.234567890
+        id=OI N=11.12345 b=12.345678 z=1.234567890
         locked=OI:bLocked HI:zLocked
         chi2=123.4 pixels=154
 
         """
         string = "--------continuum points--------\n"
-        for item in self.continuum_points:
+        for item in self.ContinuumPointList:
             string+=str(item)+"\n"
 
         locked = {}
-        string = "-----------absorbers------------\n"
-        for item in self.absorbers:
+        string = "-----------AbsorberList------------\n"
+        for item in self.AbsorberList:
             string+=str(item)+"\n"
             for param in ['NLocked','bLocked','zLocked']:
                 if getattr(item,param):
@@ -88,29 +93,46 @@ class Model(object):
     def append(self,inst=None,tag=None,**kwargs):
         if not tag: tag=kwargs.get("tag")
         if not tag: raise Exception("must specify data type")
-        if tag in model_classes.values(): tag= inv_dict(tag)
+        if tag in Model.model_classes.values(): tag= inv_dict(tag)
         if inst:
             getattr(self,tag).append(inst)
             
         else:
             getattr(self,tag).append(data_types.Data.factory(**kwargs))
 
+    def build_xml(self,raw_data='',spname='',sptype=''):
+        """build a dude-style xml for this model"""
+        #define the boilerplate
+        duderoot = et.Element("SpecTool",{"version":"1.0"})
+        dudespec = et.SubElement(boilerplate,"CompositeSpectrum", {"id":raw_data})
+        et.SubElement(boilerplate,"Spectrum",{"spec":spname,"spectype":sptype})
+
+        #add spectrum stuff
+        dudespec.extend([item.node for item in self.AbsorberList])
+        dudespec.extend([item.node for item in self.ContinuumPointList])
+
+        #noe the view stuff
+        duderoot.extend([item.node for item in self.SingleViewList])
+        duderoot.extend([item.node for item in self.VelocityViewList])
+        duderoot.extend([item.node for item in self.RegionList])
+        return duderoot
+
     def consolidate_regions(self):
-        self.regions = data_types.Region.consolidate_regions(self.regions)
+        self.RegionList = data_types.Region.consolidate_regions(self.RegionList)
         self.write()
 
     def count_params(self):
         """get the number of params being optimized"""
         params=0
-        for ab in self.absorbers:
-            if ab.in_region(self.regions):
+        for ab in self.AbsorberList:
+            if ab.in_region(self.RegionList):
                 for lock in ["bLocked","zLocked","NLocked"]:
                     if getattr(ab,lock)==True:
                         params+=1
         self.params = params
 
     def get(self,id,tag,param=None):
-        if tag in model_classes.values(): tag= inv_dict(tag)
+        if tag in Model.model_classes.values(): tag=inv_dict(tag)
         for item in getattr(self,tag):
             if id==item.id:
                 if param:
@@ -124,16 +146,14 @@ class Model(object):
         
     def get_model(self,**kwargs):
         """get all model data from xml and set attribs for self"""
-        for key, val in model_classes.items():
+        for key, val in Model.model_classes.items():
             lst=[]
             for item in self.xml_fit.get_node_list(val):
                 assert(item.tag==val)
                 inp = {"xmlfile":self.xml_fit.name,"node":item,"tag":item.tag}
-                if item.tag=="Absorber":  #append atomic data if absorber
-                    inp["atomic_data"]=atomic_data
                 lst.append(data_types.Data.factory(**inp))
             if len(lst)>0:
-                setattr(self,key,lst)
+                setattr(self,key,flyweight.ObjList.factory(lst,taken_names))
             else:
                 setattr(self,key,None)
         self.parse_kwargs(**kwargs)
@@ -159,7 +179,7 @@ class Model(object):
         parse_kwargs(self,**dat)
 
     def pop(self,key,tag):
-        if tag in model_classes.values(): tag=inv_dict(tag)
+        if tag in Model.model_classes.values(): tag=inv_dict(tag)
         if type(key) == str:
             return self._pop_by_id(key,tag)
         elif type(key) == int:
@@ -188,7 +208,7 @@ class Model(object):
 
     def set_val(self,id,tag,**kwargs):
         """set the values of a given data element"""
-        if tag in model_classes.values(): tag=inv_dict(tag)
+        if tag in Model.model_classes.values(): tag=inv_dict(tag)
         for item in getattr(self,tag):
             if item.id==id:
                 item.set_data(**kwargs)
@@ -307,8 +327,15 @@ class ModelDB(object):
         constraint=Constraint(**constraints)
         return [item for item in obj.lst if constraint.compare(item)]
 
+
+    def construct_xml(self,model):
+        """given a model, return xml fit"""
+        pass
+
+    #TODO need a new xml create class  separate AbsorberList, views, continua etc.
+
     def create(self,filename):
-        """create an xml file file structure.  returns root"""
+        """create an xmlfile file structure.  returns root"""
         import xml.etree.ElementTree as et
         import datetime
         now = str(datetime.datetime.now())
@@ -318,28 +345,24 @@ class ModelDB(object):
         head = et.SubElement(root, 'head')
         title = et.SubElement(head, 'title')
         title.text = 'Fitting Models'
-        created = et.SubElement(head, 'dateCreated')
-        created.text = now
         modified = et.SubElement(head, 'dateModified')
         modified.text = now
-
         models = et.SubElement(root, 'models')
-
         #load the model db
         for item in self.lst:
             current_group = None
-            group_name = item.model_id 
+            group_name = item.id 
             if current_group is None or group_name != current_group.text:
-                current_group = et.SubElement(root, 'model', {'model_id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),'pixels':str(item.pixels),'params':str(item.params)})
+                data = {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),
+                    'pixels':str(item.pixels),'params':str(item.params)}
+                for attr in Model.model_classes.keys():
+                    inst = getattr(self,attr)
+                    data[inst.__class__.name+'id']=inst.id
+                current_group = et.SubElement(models, 'model', data)
+        for attr in Model.model_classes.keys():  #write AbsorberList, cont points and views
+            for it in attr:   
+                root=getattr(self,it).xml_rep(root)
 
-            children = []
-
-            for att in model_classes.keys():
-                if getattr(item,att) != None:
-                    children+=[it.node for it in getattr(item,att)]
-            if len(children)==0:
-                raise Exception("no children are present")
-            current_group.extend(children)
         return root
 
     def get(self,xmlfile,chi2,pixels,params):
@@ -394,6 +417,17 @@ class ModelDB(object):
             if item.id==id: 
                 return item
 
+    def get_taken_names(self):
+        """
+        get list of uuids
+        """
+        taken =[item.id for item in self.lst]
+
+        for attr in Model.model_classes.keys():
+            taken+=[item.id for item in attr]
+        return taken
+        
+
     def get_vel_shift(self,id1,id2):
         return [item.get_vel(id1,id2) for item in self.lst]
 
@@ -403,9 +437,6 @@ class ModelDB(object):
         mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params,**kwargs)
         self.lst.append(mod)
         return
-        
-    def merge(self,other):
-        self.lst += other.lst
 
     def parse_kwargs(self,**kwargs):
         for key, val in kwargs.items():
@@ -428,13 +459,11 @@ class ModelDB(object):
         for model in models:
             
             kwargs={}
-            for key, val in model_classes.items():
+            for key, val in Model.model_classes.items():
                 tmplst=[]
                 for item in model.findall(val):
                     assert(item.tag==val)
                     inp = {"node":item,"tag":item.tag}
-                    if val=="Absorber": 
-                        inp["atomic_data"]=atomic_data
                     tmplst.append(data_types.Data.factory(**inp))
                 if len(tmplst)>0:
                     kwargs[key]=tmplst
@@ -462,7 +491,7 @@ class ModelDB(object):
 #    some helper functions:
 #------------------------------
  
-def inv_dict(tag, dic=model_classes):
+def inv_dict(tag, dic=Model.model_classes):
     if tag in dic.values():
         tmp = {v:k for k, v in dic.items()} 
         return tmp[tag]

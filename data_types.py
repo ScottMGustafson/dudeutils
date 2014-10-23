@@ -3,6 +3,8 @@ import warnings
 
 tf = {"true":True, "false":False}
 
+atomic_data=SpectralLine.instance().atomic_data
+
 class Data(object):
     node_attrib=[]
     def __init__(self,tag,**kwargs):
@@ -127,7 +129,7 @@ class Data(object):
 
 class Absorber(Data):
     node_attrib=["id","N","NLocked","NError","b","bLocked","bError","z","zLocked","zError","ionName"]
-
+    
     @classmethod
     def registrar_for(cls,tag):
         return tag=="Absorber"
@@ -136,8 +138,7 @@ class Absorber(Data):
         return "%-5s id=%-6s N=%8.5lf b=%8.5lf z=%10.8lf"%(self.ionName,self.id,self.N,self.b,self.z)
 
     def alt_init(self,**kwargs):
-        data=kwargs.get("atomic_data")#,SpectralLine.get_lines())
-        self.obs=[item.get_obs(self.z) for item in data[self.ionName.replace(" ","")]]
+        self.obs=[item.get_obs(self.z) for item in atomic_data[self.ionName.replace(" ","")]]
 
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
@@ -159,7 +160,7 @@ class Absorber(Data):
             lines=self.obs
         except AttributeError:
             warnings.warn("\n\n  \'alt_init\' wasn\'t called for \'Absorber\'\n\n")
-            self.alt_init(atomic_data=SpectralLine.get_lines())
+            self.alt_init()
             lines=self.obs
         for region in regions:
             for line in lines: 
@@ -217,8 +218,32 @@ class VelocityView(Data):
     def registrar_for(cls,tag):
         return tag=="VelocityView"
 
+class Singleton(object):
+    """
+    adapted from:
+    http://stackoverflow.com/questions/42558/python-and-the-singleton-pattern
+    """
+    def __init__(self,decorated):
+        self._decorated=decorated
+
+    def singleton(self):
+        try:
+            return self._instance
+        except AttributeError:
+            self._instance=self._decorated()
+            return self._instance
+
+    def __call__(self):
+        raise TypeError("singletons should be called as cls.singleton()")
+
+    def __instancecheck__(self, inst):
+        return isinstance(inst, self._decorated)
+
+
+@Singleton
 class SpectralLine(object):
     def __init__(self,**kwargs):
+        self.atomic_data=SpectralLine.get_lines()
         for key, val in kwargs.items():
             setattr(self,key,val)
         self.obs = None
@@ -228,7 +253,7 @@ class SpectralLine(object):
 
     def get_obs(self,z):
         return (1.+z)*self.wave
-        
+
     @staticmethod
     def get_lines(fname='atom.dat'):
         all_lines={}
