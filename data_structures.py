@@ -111,7 +111,7 @@ class Model(object):
         dudespec.extend([item.node for item in self.AbsorberList])
         dudespec.extend([item.node for item in self.ContinuumPointList])
 
-        #noe the view stuff
+        #the view stuff
         duderoot.extend([item.node for item in self.SingleViewList])
         duderoot.extend([item.node for item in self.VelocityViewList])
         duderoot.extend([item.node for item in self.RegionList])

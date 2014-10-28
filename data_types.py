@@ -3,8 +3,6 @@ import warnings
 
 tf = {"true":True, "false":False}
 
-atomic_data=SpectralLine.instance().atomic_data
-
 class Data(object):
     node_attrib=[]
     def __init__(self,tag,**kwargs):
@@ -168,8 +166,6 @@ class Absorber(Data):
                     return True
         return False
 
-
-
 class ContinuumPoint(Data):
     node_attrib=["id","x","xLocked","xError","y","yLocked","yError"]
     def __str__(self):
@@ -218,41 +214,16 @@ class VelocityView(Data):
     def registrar_for(cls,tag):
         return tag=="VelocityView"
 
-class Singleton(object):
-    """
-    adapted from:
-    http://stackoverflow.com/questions/42558/python-and-the-singleton-pattern
-    """
-    def __init__(self,decorated):
-        self._decorated=decorated
+class Singleton(type):
+    _instances = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
-    def singleton(self):
-        try:
-            return self._instance
-        except AttributeError:
-            self._instance=self._decorated()
-            return self._instance
-
-    def __call__(self):
-        raise TypeError("singletons should be called as cls.singleton()")
-
-    def __instancecheck__(self, inst):
-        return isinstance(inst, self._decorated)
-
-
-@Singleton
-class SpectralLine(object):
-    def __init__(self,**kwargs):
-        self.atomic_data=SpectralLine.get_lines()
-        for key, val in kwargs.items():
-            setattr(self,key,val)
-        self.obs = None
-
-    def set_obs_wave(self,z):
-        self.obs=self.wave*(1.+z)
-
-    def get_obs(self,z):
-        return (1.+z)*self.wave
+class AtomicData(object, metaclass=Singleton):
+    def __init__(self):
+        self.atomic_data = AtomicData.get_lines()
 
     @staticmethod
     def get_lines(fname='atom.dat'):
@@ -267,4 +238,16 @@ class SpectralLine(object):
         for k in all_lines.keys():
             all_lines[k] = sorted(all_lines[k], key=lambda item:item.wave, reverse=True)
         return all_lines
+
+
+class SpectralLine(object):
+    def __init__(self,**kwargs):
+        for key, val in kwargs.items():
+            setattr(self,key,val)
+
+    def get_obs(self,z):
+        return (1.+z)*self.wave
+
+
+atomic_data=AtomicData().atomic_data
 

@@ -1,8 +1,9 @@
 import xml.etree.ElementTree as et
 import data_types
+import weakref
 import uuid
 
-class Flyweight(object):
+class Flyweight(type):
     """a flyweight wrapper class"""
     def __init__(self,cls):
         self._instances = {}
@@ -10,10 +11,30 @@ class Flyweight(object):
     def __call__(self,*args,**kwargs):
         self._instance.setdefault((*args,tuple(kwargs.items())), 
                                     self._cls(*args,**kwargs))
-            
-@Flyweight
+#class Singleton(type):
+#    _instances = {}
+#    def __call__(cls, *args, **kwargs):
+#        if cls not in cls._instances:
+#            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+#        return cls._instances[cls]
+
+
+#@Flyweight
 class ObjList(object):
     """this and associated subclasses are simply extended lists"""
+
+    _pool=weakref.WeakValueDictionary()
+    #key can be uuid, val will be object instance?
+
+    def __new__(cls, **kwargs):
+        obj=ObjList(**kwargs)
+        if not obj in ObjList._pool.values(): #if already in pool
+            obj = object.__new__(cls)
+            ObjList._pool[obj.uuid] = obj
+        else:
+            obj=_pool[obj.uuid]  #return the old object, new one will be garbage collected
+        return obj
+
     def __init__(self,objlst,taken_names=[],id=None):
         self.cls = objlst[0].__class__
         self.name = self.cls.__name__+"List"
@@ -23,6 +44,22 @@ class ObjList(object):
             self.id=ObjList.generate_id(taken_names)    
         else:
             self.id=id  
+
+    def __eq__(self,other):
+        for i in range(len(self.objlst)):
+            try:
+                assert(self.objlst[i]==other.objlst[i])
+            except IndexError:
+                return False
+            except AssertionError:
+                if not self.objlst[i] in other.objlst:
+                    return False
+            except:
+                raise
+        return len(other.objlst)==len(self.objlst)  #last check     
+        
+    def __neq__(self,other):
+        return not self.__eq__(other)
 
     def __iter__(self):
         for i in range(len(self.objlist)):
