@@ -1,7 +1,95 @@
 import xmlutils
 import warnings
+import weakref
+import uuid
 
 tf = {"true":True, "false":False}
+
+class ObjList(object):
+    """this and associated subclasses are simply extended lists which implement a flyweight"""
+
+    _pool=weakref.WeakValueDictionary()
+    taken_names = []
+
+    def __new__(cls, objlist,id=None):
+        if not objlist in [item.objlist for item in ObjList._pool.values()]: #if not already in pool
+            obj = object.__new__(cls)
+            obj.id = ObjList.generate_id() if id==None else id
+            ObjList._pool[obj.id] = obj
+            return obj
+        else:
+            for item in ObjList._pool.values():
+                if objlist==item.objlist:
+                    return ObjList._pool[item.id]  #return the old object
+            raise Exception("list not in object:  this shouldn't happen")
+
+    def __init__(self,objlist,id=None):
+        self.cls = objlist[0].__class__
+        self.objlist = objlist
+
+    def __iter__(self):
+        for i in range(len(self.objlist)):
+            yield self.objlist[i]               
+
+    def __getitem__(self,i):
+        return self.objlist[i]
+
+    @staticmethod
+    def generate_id():
+        iden=str(uuid.uuid4())
+        while iden in ObjList.taken_names:
+            iden=str(uuid.uuid4())  
+
+        ObjList.taken_names.append(iden)
+        return iden
+
+    @staticmethod
+    def factory(objlst,**kwargs):
+        for cls in ObjList.__subclasses__():
+            if cls.registrar_for(objlst[0].__class__.__name__):
+                return cls(objlst,**kwargs)
+
+    def xml_rep(self,parent):
+        """return the list of all relevant nodes in xml"""
+        current = et.SubElement(parent,self.name,{"id":self.id})
+        current.extend(self.nodelist)
+        return parent
+
+    @staticmethod
+    def xml_read(parent):
+        """read from and ModelDb xml file"""
+        for cls in ObjList.__subclasses__():
+            theTag = cls.__name__
+            for sublist in parent.findall(theTag):  #find all of one sub-type of ObjLst
+                #make list of allelements (all individual absorbers for example)
+                theID = sublist.get("id")
+                objlist = [data_types.Data.factory(**{"node":item}) for item in sublist]
+                yield cls(objlist,id=theID)
+
+class AbsorberList(ObjList):
+    @classmethod
+    def registrar_for(cls,tag):
+        return tag=="Absorber"
+
+class ContinuumPointList(ObjList):
+    @classmethod
+    def registrar_for(cls,tag):
+        return tag=="ContinuumPoint"
+
+class RegionList(ObjList):
+    @classmethod
+    def registrar_for(cls,tag):
+        return tag=="Region"
+
+class SingleViewList(ObjList):
+    @classmethod
+    def registrar_for(cls,tag):
+        return tag=="SingleView"
+
+class VelocityViewList(ObjList):
+    @classmethod
+    def registrar_for(cls,tag):
+        return tag=="VelocityView"
 
 class Data(object):
     node_attrib=[]

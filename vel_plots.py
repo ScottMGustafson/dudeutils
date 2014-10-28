@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-import data_structures
+import model
 
 unc=3.0     #allowed D uncertainty in km/s
 dh_unc = 0.5
@@ -22,7 +22,7 @@ def get_onesig(modeldb,chi2min):
             onesig.append(modeldb.pop(i))
         else:
             pass
-    onesigdb = data_structures.ModelDB(name=str(modeldb.name), models=onesig)
+    onesigdb = model.ModelDB(name=str(modeldb.name), models=onesig)
     return onesigdb, modeldb
     
 
@@ -70,22 +70,22 @@ def get_data(cls):
     return {"DH":DH, "dvel":dvel, "vel":vel, "chi2":chi2}
     
 if __name__ == "__main__":
-    # instantiate three instances of data_structures.ModelDB()
+    # instantiate three instances of model.ModelDB()
 
     data = {}  
 
-    hi = data_structures.ModelDB(name="chi2_hi_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
+    hi = model.ModelDB(name="chi2_hi_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
     hi_onesigdb, hidb = get_onesig(hi,hi.chi2min)   
     data["hi"] = get_data(hidb)
     data["hionesig"] = get_data(hi_onesigdb)
 
-    best = data_structures.ModelDB(name="test_database.txt.new", params=8, datapts=957, chi2lim=1825., chi2min=1801., best=True)
+    best = model.ModelDB(name="test_database.txt.new", params=8, datapts=957, chi2lim=1825., chi2min=1801., best=True)
     before_clip = get_data(best)
     best_onesigdb, bestdb = get_onesig(best,best.chi2min) 
     data["best"] = get_data(bestdb)
     data["bestonesig"] = get_data(best_onesigdb) 
 
-    lo = data_structures.ModelDB(name="chi2_lo_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
+    lo = model.ModelDB(name="chi2_lo_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
     lo_onesigdb, lodb = get_onesig(lo,lo.chi2min)  
     data["lo"] = get_data(lodb)
     data["loonesig"] = get_data(lo_onesigdb) 

@@ -1,4 +1,4 @@
-from data_structures import Model, ModelDB
+from model import Model, ModelDB
 
 def read_in(name,return_db=True):
     """

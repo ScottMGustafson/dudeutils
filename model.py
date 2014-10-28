@@ -6,12 +6,11 @@ import matplotlib.pyplot as plt
 import re
 from constraints import Constraint
 from numpy.random import random_sample
-import flyweight
+import data_types
 import xml.etree.ElementTree as et
 
 
 c = 299792.458
-
 
 class Model(object): 
     #this dict maps ObjList subclasses to their associated data type
@@ -23,9 +22,9 @@ class Model(object):
         """
         inputs:
         -------
-        AbsorberList: flyweight.ObjList() [effectively used as list(data_types.Absorber)]
+        AbsorberList: data_types.ObjList() [effectively used as list(data_types.Absorber)]
         """ 
-        self.id=flyweight.ObjList.generate(taken_names)
+        self.id=data_types.ObjList.generate(taken_names)
         self.parse_kwargs(**kwargs)
 
         if self.xmlfile==None:
@@ -153,7 +152,7 @@ class Model(object):
                 inp = {"xmlfile":self.xml_fit.name,"node":item,"tag":item.tag}
                 lst.append(data_types.Data.factory(**inp))
             if len(lst)>0:
-                setattr(self,key,flyweight.ObjList.factory(lst,taken_names))
+                setattr(self,key,data_types.ObjList.factory(lst,taken_names))
             else:
                 setattr(self,key,None)
         self.parse_kwargs(**kwargs)

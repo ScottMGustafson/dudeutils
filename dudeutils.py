@@ -1,4 +1,4 @@
-from data_structures import Model, ModelDB
+from model import Model, ModelDB
 
 """a collection of helper functions"""
 
