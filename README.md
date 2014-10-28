@@ -82,5 +82,27 @@ Saving an entire db:
 ```python
 db.write()
 ```
+
+####XML formats
+A large portion of this software boils down to parsing and storing xml data according to a few specific formats using xml.etree.
+
+#####fit database formats:
+each distinct data type will be stored separately with a unique id as an identifier.
+
+for example:
+```xml
+<AbsorberList id="abslistID">
+    <Absorber N="13.4" NError="0.0" NLocked="true" b="11.34" bError="0.0" bLocked="true" id="anAbsorber" ionName="C III" z="2.9" zError="0.0" zLocked="true" />
+</AbsorberList>
+<ContinuumPointList id="contpntID">
+    <ContinuumPoint id="pnt" x="1234.5" xError="0.0" xLocked="true" y="4.0E-14" yError="0.0" yLocked="true" />
+</ContinuumPointList>
+<ModelDB>
+    <Model id="modelid", AbsorberList="abslistID", ContinuumPointList="contpntID", chi2="1892", pixels="187", params="12">
+</ModelDB>
+```
+
+#####an individual fit's xml file
+This should be the standard dude xml output.  If you have no idea whe this means, then you don't have dude and this entire repository is probably not for you
     
     

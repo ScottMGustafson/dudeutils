@@ -8,16 +8,19 @@ tf = {"true":True, "false":False}
 class ObjList(object):
     """this and associated subclasses are simply extended lists which implement a flyweight"""
 
-    _pool=weakref.WeakValueDictionary()
-    taken_names = []
+    #store refs in a dict used to check is inst of data already exists.  
+    #dict will be used as access point for the flyweight
+    _pool=weakref.WeakValueDictionary()  
+
+    taken_names = []  #uuids that are already in use
 
     def __new__(cls, objlist,id=None):
-        if not objlist in [item.objlist for item in ObjList._pool.values()]: #if not already in pool
+        if not objlist in [item.objlist for item in ObjList._pool.values()]: #if new object
             obj = object.__new__(cls)
             obj.id = ObjList.generate_id() if id==None else id
             ObjList._pool[obj.id] = obj
             return obj
-        else:
+        else:  #return old object
             for item in ObjList._pool.values():
                 if objlist==item.objlist:
                     return ObjList._pool[item.id]  #return the old object
@@ -26,6 +29,7 @@ class ObjList(object):
     def __init__(self,objlist,id=None):
         self.cls = objlist[0].__class__
         self.objlist = objlist
+        self.nodelist = [item.node for item in self.objlist]
 
     def __iter__(self):
         for i in range(len(self.objlist)):
@@ -44,10 +48,10 @@ class ObjList(object):
         return iden
 
     @staticmethod
-    def factory(objlst,**kwargs):
+    def factory(objlist,**kwargs):
         for cls in ObjList.__subclasses__():
-            if cls.registrar_for(objlst[0].__class__.__name__):
-                return cls(objlst,**kwargs)
+            if cls.registrar_for(objlist[0].__class__.__name__):
+                return cls(objlist,**kwargs)
 
     def xml_rep(self,parent):
         """return the list of all relevant nodes in xml"""
@@ -56,15 +60,20 @@ class ObjList(object):
         return parent
 
     @staticmethod
-    def xml_read(parent):
+    def _xml_read(parent):
         """read from and ModelDb xml file"""
         for cls in ObjList.__subclasses__():
             theTag = cls.__name__
-            for sublist in parent.findall(theTag):  #find all of one sub-type of ObjLst
+            for sublist in parent.findall(theTag):  #find all of one sub-type of objlist
                 #make list of allelements (all individual absorbers for example)
                 theID = sublist.get("id")
                 objlist = [data_types.Data.factory(**{"node":item}) for item in sublist]
                 yield cls(objlist,id=theID)
+
+    @staticmethod
+    def list_from_xml(parent):
+        """returns a list of ObjList objects from a given parent"""
+        return [item for item in _xml_read(parent)]
 
 class AbsorberList(ObjList):
     @classmethod
@@ -337,5 +346,6 @@ class SpectralLine(object):
         return (1.+z)*self.wave
 
 
-atomic_data=AtomicData().atomic_data
+atomic_data=AtomicData().atomic_data  
+#having this here and calling atomic_data from the module makes the singleton unnecessary
 

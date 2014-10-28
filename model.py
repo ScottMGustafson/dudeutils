@@ -24,7 +24,7 @@ class Model(object):
         -------
         AbsorberList: data_types.ObjList() [effectively used as list(data_types.Absorber)]
         """ 
-        self.id=data_types.ObjList.generate(taken_names)
+        self.id=data_types.ObjList.generate()
         self.parse_kwargs(**kwargs)
 
         if self.xmlfile==None:
@@ -152,7 +152,7 @@ class Model(object):
                 inp = {"xmlfile":self.xml_fit.name,"node":item,"tag":item.tag}
                 lst.append(data_types.Data.factory(**inp))
             if len(lst)>0:
-                setattr(self,key,data_types.ObjList.factory(lst,taken_names))
+                setattr(self,key,data_types.ObjList.factory(lst))
             else:
                 setattr(self,key,None)
         self.parse_kwargs(**kwargs)
@@ -361,7 +361,6 @@ class ModelDB(object):
         for attr in Model.model_classes.keys():  #write AbsorberList, cont points and views
             for it in attr:   
                 root=getattr(self,it).xml_rep(root)
-
         return root
 
     def get(self,xmlfile,chi2,pixels,params):
@@ -416,17 +415,6 @@ class ModelDB(object):
             if item.id==id: 
                 return item
 
-    def get_taken_names(self):
-        """
-        get list of uuids
-        """
-        taken =[item.id for item in self.lst]
-
-        for attr in Model.model_classes.keys():
-            taken+=[item.id for item in attr]
-        return taken
-        
-
     def get_vel_shift(self,id1,id2):
         return [item.get_vel(id1,id2) for item in self.lst]
 
@@ -449,25 +437,18 @@ class ModelDB(object):
     
     @staticmethod 
     def read(filename,return_db=True):
-        """read from xml, return inputs for Model"""
+        """read from xml db, return inputs for Model"""
         root=xmlutils.Model_xml.get_root(filename)
         models = root.findall('model') 
         if len(models)==0:
             raise Exception("no models saved")
+        objlist=data_types.ObjList.list_from_xml(root) #get all absorber/contpoint/view/etc data
         model_list = []
-        for model in models:
-            
-            kwargs={}
-            for key, val in Model.model_classes.items():
-                tmplst=[]
-                for item in model.findall(val):
-                    assert(item.tag==val)
-                    inp = {"node":item,"tag":item.tag}
-                    tmplst.append(data_types.Data.factory(**inp))
-                if len(tmplst)>0:
-                    kwargs[key]=tmplst
-            for key, val in model.attrib.items():
-                kwargs[key] = val
+        for model in models:   #get model data (includes an id mapping to something in objlisr)
+            kwargs = {}
+            for key, val in model.attrib: #
+                if key in model_classes.keys(): #key is classname,  val is an id
+                    kwargs[key] = val
             model_list.append(Model(**kwargs))
         db = ModelDB(filename, models=model_list)
         if return_db:
