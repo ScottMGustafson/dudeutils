@@ -184,7 +184,11 @@ class Dudexml(Basexml):
         return list(dict(children[0].attrib).keys())
 
 def prettify(elem):
-    reparsed = minidom.parseString(et.tostring(elem, 'utf-8'))
-    return reparsed.toprettyxml(indent="  ")
+    #need to find a better way to make output actually pretty
+    return et.tostring(elem, encoding="unicode")
+    #reparsed = minidom.parseString(et.tostring(elem, 'utf-8'))
+    #return reparsed.toprettyxml(indent="  ",newl='\n')
+    #return 
+
 
 

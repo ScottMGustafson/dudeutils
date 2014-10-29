@@ -2,6 +2,7 @@ import xmlutils
 import warnings
 import weakref
 import uuid
+import xml.etree.ElementTree as et
 
 tf = {"true":True, "false":False}
 
@@ -66,9 +67,10 @@ class ObjList(object):
 
     def xml_rep(self,parent):
         """return the list of all relevant nodes in xml"""
-        current = et.SubElement(parent,self.name,{"id":self.id})
+        current = et.SubElement(parent,self.__class__.__name__,{"id":self.id})
+        assert(len(self.nodelist)>0)
         current.extend(self.nodelist)
-        return parentab[0]
+        return current
 
     @staticmethod
     def _xml_read(parent):
@@ -91,8 +93,8 @@ class ObjList(object):
         lst = []
         if not type(subclass) is str:
             raise Exception("subclass input shoulf be a string")
-        for val in ObjList._pool.values():
-            if str(type(val)) == subclass:
+        for val in dict(ObjList._pool).values():
+            if val.__class__.__name__ == subclass:
                 lst.append(val)
         return lst
         

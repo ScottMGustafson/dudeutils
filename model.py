@@ -386,10 +386,18 @@ class ModelDB(object):
         for attr in Model.model_classes.keys():  #write AbsorberList, cont points and views
             parent = et.SubElement(root,str(attr)+'s')
             instances = data_types.ObjList.get_all_instances(attr)
+            #instances = [ item for item in data_types.ObjList._pool.values() if attr==str(type(item))]
             print(attr, len(instances))
-            for item in instances:
-                subparent=et.SubElement(attr,{"id":item.id})
-                subparent = item.xml_rep(subparent)  
+            if attr=="AbsorberList": assert(len(instances)>0)
+            parent.extend([ item.xml_rep(parent) for item in instances ])
+            
+            """for item in instances:
+                child=et.SubElement(parent,item.__class__.name,{"id":item.id})
+                for it in item:
+                    node=et.SubElement(child,item.__class__.name,item.node.attrib)
+                #child.extend(item.nodelist)
+                #for it in item:
+            """  
         return root
 
     @staticmethod
