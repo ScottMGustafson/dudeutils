@@ -48,16 +48,27 @@ class ObjList(object):
         return iden
 
     @staticmethod
+    def get(theID):
+        return ObjList._pool[theID]
+
+    @staticmethod
+    def set(value):  #shouldn't ever need this
+        ObjList._pool[value.id] = value
+
+    @staticmethod
     def factory(objlist,**kwargs):
         for cls in ObjList.__subclasses__():
-            if cls.registrar_for(objlist[0].__class__.__name__):
-                return cls(objlist,**kwargs)
+            try:
+                if cls.registrar_for(objlist[0].__class__.__name__):
+                    return cls(objlist,**kwargs)
+            except IndexError:
+                return None
 
     def xml_rep(self,parent):
         """return the list of all relevant nodes in xml"""
         current = et.SubElement(parent,self.name,{"id":self.id})
         current.extend(self.nodelist)
-        return parent
+        return parentab[0]
 
     @staticmethod
     def _xml_read(parent):
@@ -75,6 +86,16 @@ class ObjList(object):
         """returns a list of ObjList objects from a given parent"""
         return [item for item in _xml_read(parent)]
 
+    @staticmethod   
+    def get_all_instances(subclass):
+        lst = []
+        if not type(subclass) is str:
+            raise Exception("subclass input shoulf be a string")
+        for val in ObjList._pool.values():
+            if str(type(val)) == subclass:
+                lst.append(val)
+        return lst
+        
 class AbsorberList(ObjList):
     @classmethod
     def registrar_for(cls,tag):
@@ -111,6 +132,8 @@ class Data(object):
                 setattr(self,key,val)
 
     def __eq__(self,other):
+        if type(self)!=type(other):
+            return False
         for item in self.__class__.node_attrib:
             if getattr(self,item)!=getattr(other,item):
                 return False
