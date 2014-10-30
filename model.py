@@ -23,9 +23,6 @@ class Model(object):
         -------
         AbsorberList: data_types.ObjList() [effectively used as list(data_types.Absorber)]
         """ 
-        iden = kwargs.get("id")
-        if iden in data_types.ObjList.taken_names and iden!=None:
-            raise Exception("name "+iden+"already taken")
         self.id=kwargs.pop("id",data_types.ObjList.generate_id())
         self.parse_kwargs(**kwargs)
 
@@ -486,24 +483,27 @@ class ModelDB(object):
         """read from xml db, return inputs for Model"""
         
         root=xmlutils.Model_xml.get_root(filename)
-        
+        data_types.ObjList._pool = {}  #clear out cache of data
         #build all data first before instantiating individual models
         for key in Model.model_classes.keys():
             parent = root.find(key+'s')
             objlist=data_types.ObjList.list_from_xml(parent) #instantiate all absorber/contpoint/view/etc data. data stored in data_types.ObjList._pool
-   
+        print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
         model_list = []
         models = root.find('ModelDB').findall('model')
 
         for model in models:   
 #get model data (includes an id mapping to something in objlisr)
             kwargs = {}
-            for key, val in model.attrib: 
-                if key in model_classes.keys(): #key is classname,  val is an id
+            for key, val in dict(model.attrib).items(): 
+                if key in Model.model_classes.keys(): #key is classname,  val is an id
                     kwargs[key] = data_types.ObjList.get(val)
                 else:
                     kwargs[key] = val
-            model_list.append(Model(**kwargs))
+            try:
+                model_list.append(Model(**kwargs))
+            except:
+                raise Exception(str(kwargs))
 
         if len(models)==0:
             raise Exception("no models saved")
@@ -520,7 +520,7 @@ class ModelDB(object):
     def write(self,filename=None):
         if filename==None:
             filename=self.name 
-        root = self.build_xml(filename)
+        root = self.build_xml()
         self.dbxml.write(filename,root)
 
     @staticmethod

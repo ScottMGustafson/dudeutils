@@ -75,18 +75,38 @@ class ObjList(object):
     @staticmethod
     def _xml_read(parent):
         """read from and ModelDb xml file"""
+        for sublist in parent.findall(theTag):  #find all of one sub-type of objlist
+            #make list of allelements (all individual absorbers for example)
+            theID = sublist.get("id")
+            objlist = [data_types.Data.factory(**{"node":item}) for item in sublist]
+            yield cls(objlist,id=theID)
+
+    @staticmethod
+    def _read_node(node):
+        """read from and ModelDb xml file"""
         for cls in ObjList.__subclasses__():
             theTag = cls.__name__
-            for sublist in parent.findall(theTag):  #find all of one sub-type of objlist
-                #make list of allelements (all individual absorbers for example)
-                theID = sublist.get("id")
-                objlist = [data_types.Data.factory(**{"node":item}) for item in sublist]
-                yield cls(objlist,id=theID)
+            if node.tag==theTag:  
+                objlist = [Data.factory(**{"node":item}) for item in node]
+                return cls(objlist,id=node.get("id"))
+
+    @staticmethod
+    def sublass_str():
+        """return subclass names as list of strings"""
+        return [item.__name__ for item in ObjList.__subclasses__() ]
+
+    @staticmethod
+    def get_from_xml(id,parent):
+        for item in parent:
+            if item.tag in [it+"s" for it in ObjList.subclass_str()]:
+                if item.id==id:
+                    return ObjList._read_node(item)
+        return None
 
     @staticmethod
     def list_from_xml(parent):
         """returns a list of ObjList objects from a given parent"""
-        return [item for item in _xml_read(parent)]
+        return [ObjList._read_node(item) for item in parent]
 
     @staticmethod   
     def get_all_instances(subclass):
