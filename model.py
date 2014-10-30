@@ -8,6 +8,7 @@ from constraints import Constraint
 from numpy.random import random_sample
 import data_types
 import xml.etree.ElementTree as et
+import builtins
 
 c = 299792.458
 
@@ -26,7 +27,8 @@ class Model(object):
         iden = kwargs.get("id")
         if iden in data_types.ObjList.taken_names and iden!=None:
             raise Exception("name "+iden+"already taken")
-        self.id=kwargs.pop("id",data_types.ObjList.generate_id())
+        #self.id=kwargs.pop("id",data_types.ObjList.generate_id())
+        self.id=kwargs.pop("id",str(builtins.id(self)))        
         self.parse_kwargs(**kwargs)
 
         if self.xmlfile==None:
@@ -377,9 +379,10 @@ class ModelDB(object):
                 data = {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),
                     'pixels':str(item.pixels),'params':str(item.params)}
                 for attr in Model.model_classes.keys():
-                    inst = getattr(item,attr)
-                    if inst==None: continue
-                    data[attr]=inst.id
+                    try:
+                        data[attr] = getattr(item,attr).id
+                    except:
+                        continue
                 current_group = et.SubElement(models, 'model', data)
 
         #build the actuall fitting data
@@ -388,8 +391,9 @@ class ModelDB(object):
             instances = data_types.ObjList.get_all_instances(attr)
             #instances = [ item for item in data_types.ObjList._pool.values() if attr==str(type(item))]
             print(attr, len(instances))
-            if attr=="AbsorberList": assert(len(instances)>0)
-            parent.extend([ item.xml_rep(parent) for item in instances ])
+            extend_list = [ item.xml_rep(parent) for item in instances ]
+            assert(len(extend_list)==len(instances))
+            parent.extend(extend_list)
             
             """for item in instances:
                 child=et.SubElement(parent,item.__class__.name,{"id":item.id})
@@ -409,8 +413,8 @@ class ModelDB(object):
         constraint=Constraint(**constraints)
         return [item for item in obj.lst if constraint.compare(item)]
 
-    def get(self,xmlfile,chi2,pixels,params):
-        self.models.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params))
+    def get(self,xmlfile,chi2,pixels):
+        self.models.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels))
 
     def get_best_lst(self, id=None, param=None):
         """
@@ -520,7 +524,7 @@ class ModelDB(object):
     def write(self,filename=None):
         if filename==None:
             filename=self.name 
-        root = self.build_xml(filename)
+        root = self.build_xml()
         self.dbxml.write(filename,root)
 
     @staticmethod
