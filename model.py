@@ -404,7 +404,7 @@ class ModelDB(object):
             constraints={"chi2":123,"params":3,"pixels":2345,"D":{"N":(12.3,14.3),"b":(15,16)}}
         """
         constraint=Constraint(**constraints)
-        return [item for item in obj.lst if constraint.compare(item)]
+        return [item for item in obj.models if constraint.compare(item)]
 
     def get(self,xmlfile,chi2,pixels):
         self.models.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels))

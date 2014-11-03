@@ -26,7 +26,12 @@ class ObjList(object):
         if obj is None:  #behold, we have a new element in our midst
             obj = object.__new__(cls)
             #obj.id = ObjList.generate_id() if id==None else id
-            obj.id = str(builtins.id(obj))
+            obj.id = str(builtins.id(obj)) if id==None else str(id)
+            try:
+                assert(obj.id not in ObjList._pool.keys())
+            except AssertionError:
+                obj.id = ObjList.generate_id()
+
             ObjList._pool[obj.id] = obj
         return obj
 
@@ -85,7 +90,7 @@ class ObjList(object):
     @staticmethod
     def generate_id():
         iden=str(uuid.uuid4())
-        while iden in ObjList.taken_names:
+        while iden in ObjList._pool.keys():
             iden=str(uuid.uuid4())  
 
         ObjList.taken_names.append(iden)
