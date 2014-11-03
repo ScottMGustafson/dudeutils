@@ -406,8 +406,8 @@ class ModelDB(object):
         constraint=Constraint(**constraints)
         return [item for item in obj.lst if constraint.compare(item)]
 
-    def get(self,xmlfile,chi2,pixels,params):
-        self.models.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params))
+    def get(self,xmlfile,chi2,pixels):
+        self.models.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels))
 
     def get_best_lst(self, id=None, param=None):
         """
