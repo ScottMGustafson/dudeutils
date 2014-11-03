@@ -3,6 +3,8 @@ import warnings
 import weakref
 import uuid
 import xml.etree.ElementTree as et
+import collections
+import builtins
 
 tf = {"true":True, "false":False}
 
@@ -11,21 +13,62 @@ class ObjList(object):
 
     #store refs in a dict used to check is inst of data already exists.  
     #dict will be used as access point for the flyweight
-    _pool=weakref.WeakValueDictionary()  
+    #_pool=weakref.WeakValueDictionary()  
+
+    _pool = dict()
 
     taken_names = []  #uuids that are already in use
 
+#test if two lists have the same elements, not necessarily in the same order
+
     def __new__(cls, objlist,id=None):
-        if not objlist in [item.objlist for item in ObjList._pool.values()]: #if new object
+        obj = ObjList._check_list_in_list(objlist, list(ObjList._pool.values()) )
+        if obj is None:  #behold, we have a new element in our midst
             obj = object.__new__(cls)
-            obj.id = ObjList.generate_id() if id==None else id
+            #obj.id = ObjList.generate_id() if id==None else id
+            obj.id = str(builtins.id(obj))
+            ObjList._pool[obj.id] = obj
+        return obj
+
+
+        """
+        for item in ObjList._pool.values():
+            if objlist==item.objlist:
+                return ObjList._pool[item.id]  #return the old object
+        raise Exception("list not in object:  this shouldn't happen")
+
+        else:  #return new object
+            obj = object.__new__(cls)
+            #obj.id = ObjList.generate_id() if id==None else id
+            obj.id = str(builtins.id(obj))
             ObjList._pool[obj.id] = obj
             return obj
-        else:  #return old object
-            for item in ObjList._pool.values():
-                if objlist==item.objlist:
-                    return ObjList._pool[item.id]  #return the old object
-            raise Exception("list not in object:  this shouldn't happen")
+        """
+        
+    @staticmethod
+    def _check_two_lists(lst1,lst2):
+        """items are not guaranteed to be in same order ... but this will do for now"""
+        assert("List" not in lst1.__class__.__name__)
+        if (len(lst1)!=len(lst2)): return False
+    
+        for i in range(len(lst1)):
+            if lst1[i] != lst2[i]:
+                return False
+        return True
+        #return collections.Counter(lst1)==collections.Counter(lst2)
+
+    @staticmethod
+    def _check_list_in_list(lst, superlst):
+        """superlst is a list of lists.  does is contain lst?"""
+
+        for item in superlst:
+            try:
+                temp = list(item.objlist)
+            except AttributeError:
+                return None
+            if ObjList._check_two_lists(temp,lst):
+                return item
+        return None
 
     def __init__(self,objlist,id=None):
         self.cls = objlist[0].__class__
@@ -64,6 +107,7 @@ class ObjList(object):
                     return cls(objlist,**kwargs)
             except IndexError:
                 return None
+        raise TypeError("invalid type: "+objlist[0].__class__.__name__)
 
     def xml_rep(self,parent):
         """return the list of all relevant nodes in xml"""
@@ -156,13 +200,13 @@ class Data(object):
     def __eq__(self,other):
         if type(self)!=type(other):
             return False
-        for item in self.__class__.node_attrib:
-            if getattr(self,item)!=getattr(other,item):
-                return False
-        return True
+        return self.node.attrib==other.node.attrib
 
     def __neq__(self,other):
         return not self.__eq__(other)
+
+    def __hash__(self):
+        return builtins.id(self)
 
     @staticmethod
     def factory(**kwargs):
