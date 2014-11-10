@@ -348,6 +348,7 @@ class ModelDB(object):
 
         coeffs=np.polyfit(x-x.mean(),y,int(order))
         f = np.poly1d(coeffs)
+
         if plot:
             xx = np.arange(xmin,xmax, np.abs(xmax-xmin)/100.)
             yy = f(xx-x.mean())
