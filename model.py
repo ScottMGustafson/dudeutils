@@ -32,7 +32,7 @@ class Model(object):
             except:
                 raise Exception("must specify either xml filename or model data")
 
-        self.xml_fit = xmlutils.Dudexml(self.xmlfile)
+        #self.xml_fit = xmlutils.Dudexml(self.xmlfile)
         self.read()
         self.test_chi2()
 
@@ -162,7 +162,7 @@ class Model(object):
             lst=[]
             for item in data_types.ObjList.get(val):
                 assert(item.tag==val)
-                inp = {"xmlfile":self.xml_fit.name,"node":item,"tag":item.tag}
+                inp = {"xmlfile":self.xmlfile,"node":item,"tag":item.tag}
                 lst.append(data_types.Data.factory(**inp))
             if len(lst)>0:
                 setattr(self,key,data_types.ObjList.factory(lst))
@@ -245,7 +245,8 @@ class Model(object):
                 item.set_data(**kwargs)
                 print("setting to %s"%(str(kwargs)))
         new_lst= data_types.ObjList.factory(getattr(self,tag))
-        self.xml_fit.write()
+        self.tree.write(self.xmlfile)
+        #self.xml_fit.write()
 
     def test_chi2(self):
         for item in ["chi2", "pixels", "params"]:
@@ -264,8 +265,10 @@ class Model(object):
         #    node=xmlutils.Dudexml.get_node(item.id,item.tag)
         #    for key in node.attrib.keys():
         #        node.set(key, str(item.key))
-        self.root = self.build_xml()
-        self.xml_fit.write()
+        root = self.build_xml()
+        self.tree._setroot(root)
+        self.tree.write(self.xmlfile)
+        #self.xml_fit.write()
 
 
 class ModelDB(object):
@@ -284,7 +287,7 @@ class ModelDB(object):
             setattr(self,key,val)
 
         self.name=name
-        self.dbxml=xmlutils.Model_xml(filename=name)
+        #self.dbxml=xmlutils.Model_xml(filename=name)
         if len(models)>0:
             self.models = models
             for key in Model.model_classes.keys():
@@ -292,7 +295,9 @@ class ModelDB(object):
             self.root=self.build_xml()
         elif name:   
             self.models = ModelDB.read(str(name), return_db=False)
-            self.root=self.dbxml.read(name)
+            self.tree = et.parse(self.filename)
+            self.root = self.tree.getroot()
+            #self.root=self.dbxml.read(name)
         else:
             self.models = []
 
@@ -482,7 +487,9 @@ class ModelDB(object):
     def read(filename):
         """read from xml db, return inputs for Model"""
         
-        root=xmlutils.Model_xml.get_root(filename)
+        tree = et.parse(filename)
+        root = tree.getroot()
+        #root=xmlutils.Model_xml.get_root(filename)
         data_types.ObjList._pool = {}  #clear out cache of data
         #build all data first before instantiating individual models
         for key in Model.model_classes.keys():
@@ -521,7 +528,9 @@ class ModelDB(object):
         if filename==None:
             filename=self.name 
         root = self.build_xml()
-        self.dbxml.write(filename,root)
+        self.tree._setroot(root)
+        self.tree.write(filename)
+        #self.dbxml.write(filename,root)
 
     @staticmethod
     def xml_in(**kwargs):
@@ -543,3 +552,23 @@ def to_bool(string):
         return True
     else:
         return False
+
+def check_for_conflicts(root):
+    """for some unknown reason, duplicates of a certain node will be printed.  
+    this does not fix the underlying cause, but is a fix to prevent duplicate 
+    printing.  If two nodes have the same id, but differing contents, an 
+    exception will be raised"""
+    ids = []
+    for item in root:
+        try:
+            id = item.get("id")
+            assert(id not in ids)
+        except AssertionError:
+            #code
+            pass
+
+    
+
+
+
+

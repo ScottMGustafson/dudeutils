@@ -13,15 +13,12 @@ class ObjList(object):
 
     #store refs in a dict used to check is inst of data already exists.  
     #dict will be used as access point for the flyweight
-    #_pool=weakref.WeakValueDictionary()  
 
+    #_pool=weakref.WeakValueDictionary()  
     _pool = dict()
 
-    taken_names = []  #uuids that are already in use
-
-#test if two lists have the same elements, not necessarily in the same order
-
     def __new__(cls, objlist,id=None):
+        """implements a flyweight pattern using ObjList._pool"""
         obj = ObjList._check_list_in_list(objlist, list(ObjList._pool.values()) )
         if obj is None:  #behold, we have a new element in our midst
             obj = object.__new__(cls)
@@ -34,21 +31,6 @@ class ObjList(object):
 
             ObjList._pool[obj.id] = obj
         return obj
-
-
-        """
-        for item in ObjList._pool.values():
-            if objlist==item.objlist:
-                return ObjList._pool[item.id]  #return the old object
-        raise Exception("list not in object:  this shouldn't happen")
-
-        else:  #return new object
-            obj = object.__new__(cls)
-            #obj.id = ObjList.generate_id() if id==None else id
-            obj.id = str(builtins.id(obj))
-            ObjList._pool[obj.id] = obj
-            return obj
-        """
         
     @staticmethod
     def _check_two_lists(lst1,lst2):
@@ -60,7 +42,6 @@ class ObjList(object):
             if lst1[i] != lst2[i]:
                 return False
         return True
-        #return collections.Counter(lst1)==collections.Counter(lst2)
 
     @staticmethod
     def _check_list_in_list(lst, superlst):
@@ -246,8 +227,13 @@ class Data(object):
         """constructor from file"""
         tag=kwargs.pop("tag")
         id=kwargs.pop("id")
-        xmlfile = xmlutils.Dudexml(kwargs.pop("xmlfile"))
-        node = xmlfile.get_node(id=id, tag=tag)
+        #xmlfile = xmlutils.Dudexml(kwargs.pop("xmlfile"))
+        #node = xmlfile.get_node(id=id, tag=tag)
+
+        root = et.parse(kwargs.pop("xmlfile")).getroot()
+        node = xmlutils.get_node(root.find('CompositeSpectrum'),tag,id)
+            
+
         return cls(tag,id=id,xmlfile=xmlfile,node=node,**kwargs)
 
 
@@ -271,15 +257,14 @@ class Data(object):
 
     def locked(self,param):
         return getattr(self,param+"Locked")
-
+    """
     def parse_kwargs(self,**kwargs): #TODO get rid of this since set_data does the same thing
-        """set kwargs to self and apply to node"""
         for key, val in list(kwargs.items()):  #this goes after to override any conflicts
             if "Locked" in key:
                 val = True if val=='true' else False
             setattr(self,key,val)
         self.set_node(**kwargs)
-           
+    """
     def parseNode(self,node=None):
         """read from node, set attribs to self"""
         try:
