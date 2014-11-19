@@ -74,7 +74,7 @@ class ObjList(object):
         while iden in ObjList._pool.keys():
             iden=str(uuid.uuid4())  
 
-        ObjList.taken_names.append(iden)
+        #ObjList.taken_names.append(iden)
         return iden
 
     @staticmethod
@@ -82,7 +82,7 @@ class ObjList(object):
         return ObjList._pool[theID]
 
     @staticmethod
-    def set(value):  #shouldn't ever need this
+    def set(value): 
         ObjList._pool[value.id] = value
 
     @staticmethod

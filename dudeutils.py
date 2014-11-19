@@ -16,8 +16,9 @@ def getdb(dbfile):
 def random(xmlfile,itemid,tag,param,val_range,modelid=None):
     """get a new random setting a parameter to a random value in val_range (tuple or list)"""
     mod=Model(xmlfile=xmlfile,chi2=0,pixels=0,params=0,id=modelid)
-    old = mod.get(itemid,tag,"N")
+    old = mod.get_datum(itemid,tag,"N")
     mod.monte_carlo_set(itemid,tag,param,val_range)
-    new=mod.get(itemid,tag,"N")
+    new=mod.get_datum(itemid,tag,"N")
     assert(old!=new)
     print("model written to %s"%(xmlfile))
+

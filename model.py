@@ -9,6 +9,8 @@ from numpy.random import random_sample
 import data_types
 import xml.etree.ElementTree as et
 
+#shouldn't need to change model values .. i.e. should never need to edit entries in _pool, only add new ones when reading from Model
+
 c = 299792.458
 
 class Model(object): 
@@ -24,25 +26,23 @@ class Model(object):
         AbsorberList: data_types.ObjList() [effectively used as list(data_types.Absorber)]
         """ 
         self.id=kwargs.pop("id",data_types.ObjList.generate_id())
-        self.parse_kwargs(**kwargs)
-
+        #self.parse_kwargs(**kwargs)
+        for key, val in dict(kwargs).items():
+            setattr(self,key,val)  #data lists will be the id needed to fetch from the data pool
+                 
         if self.xmlfile==None:
             try:
-                self.xmlfile=self.AbsorberList[0].xmlfile.name
+                self.xmlfile=Model.get(self.AbsorberList)[0].xmlfile.name
             except:
                 raise Exception("must specify either xml filename or model data")
 
         #self.xml_fit = xmlutils.Dudexml(self.xmlfile)
-        self.read()
-        self.test_chi2()
+        if not "AbsorberList" in kwargs.keys(): #no fitting data is specified in __init__, then read
+            self.read()
+        else:
+            assert(self.AbsorberList in data_types.ObjList._pool.keys())
+        #self.test_chi2()
 
-        """
-        if not all(x in kwargs.keys() for x in Model.model_classes.keys()):
-            if self.xmlfile:
-                self.get_model()
-            else:
-                raise Exception("need to define at least one argument")
-        """
         for attr in ["chi2","pixels","params"]:
             try:
                 assert(attr in kwargs.keys())
@@ -75,12 +75,12 @@ class Model(object):
 
         """
         string = "--------continuum points--------\n"
-        for item in self.ContinuumPointList:
+        for item in Model.get(self.ContinuumPointList):
             string+=str(item)+"\n"
 
         locked = {}
         string = "-----------AbsorberList------------\n"
-        for item in self.AbsorberList:
+        for item in Model.get(self.AbsorberList):
             string+=str(item)+"\n"
             for param in ['NLocked','bLocked','zLocked']:
                 if getattr(item,param):
@@ -92,6 +92,7 @@ class Model(object):
         string+="\nchi2=%lf pixels=%lf params=%lf\n\n"%(float(self.chi2),float(self.pixels),float(self.params))
         return string
 
+    """shouldn't need this
     def append(self,inst=None,tag=None,**kwargs):
         if not tag: raise Exception("must specify data type")
         if tag in Model.model_classes.values(): tag= inv_dict(tag)
@@ -100,6 +101,8 @@ class Model(object):
             
         else:
             getattr(self,tag).append(data_types.Data.factory(**kwargs))
+    """
+
 
     def build_xml(self,raw_data='',spname='',sptype=''):
         """build a dude-style xml for this model"""
@@ -111,7 +114,7 @@ class Model(object):
         #add spectrum stuff
         for attr in ["AbsorberList", "ContinuumPointList"]:
             try:
-                dudespec.extend([item.node for item in getattr(self,attr)])
+                dudespec.extend([item.node for item in Model.get(getattr(self,attr))])
             except:
                 if getattr(self,attr) is None:
                     pass
@@ -121,31 +124,33 @@ class Model(object):
         #the view stuff
         for attr in ["SingleViewList", "VelocityViewList", "RegionList"]:
             try:
-                duderoot.extend([item.node for item in getattr(self,attr)])
+                duderoot.extend([item.node for item in Model.get(getattr(self,attr))])
             except:
-                if getattr(self,attr) is None:
+                if not getattr(self,attr):  #if the id is either '' or None
                     pass
                 else: raise
         return duderoot
 
+    """would be nice, but I wanna keep writing to _pool out of the picture except when instantiating new ObjList objects
     def consolidate_regions(self):
         self.RegionList = data_types.Region.consolidate_regions(self.RegionList)
         self.write()
-
+    """
     def count_params(self):
         """get the number of params being optimized"""
         params=0
-        for ab in self.AbsorberList:
+        for ab in Model.get(self.AbsorberList):
             
-            if ab.in_region(self.RegionList):
+            if ab.in_region(Model.get(self.RegionList)):
                 for lock in ["bLocked","zLocked","NLocked"]:
                     if getattr(ab,lock)==True:
                         params+=1
         self.params = params
 
-    def get(self,id,tag,param=None):
+    def get_datum(self,id,tag,param=None):
+        """get an individual datum from model's data list.  (ex: an individual absorber)"""
         if tag in Model.model_classes.values(): tag=inv_dict(tag)
-        for item in getattr(self,tag):
+        for item in Model.get(getattr(self,tag)):
             if id==item.id:
                 if param:
                     try:
@@ -156,6 +161,11 @@ class Model(object):
                     return item
         raise Exception("item not found: %s"%(id))
         
+    @staticmethod
+    def get(id):
+        """just an alias for:"""
+        return data_types.ObjList.get(id)
+
     def get_model(self,**kwargs):
         """get all model data from xml and set attribs for self"""
         for key, val in Model.model_classes.items():
@@ -165,10 +175,10 @@ class Model(object):
                 inp = {"xmlfile":self.xmlfile,"node":item,"tag":item.tag}
                 lst.append(data_types.Data.factory(**inp))
             if len(lst)>0:
-                setattr(self,key,data_types.ObjList.factory(lst))
+                setattr(self,key,data_types.ObjList.factory(lst)) #create new datalist from file
             else:
                 setattr(self,key,None)
-        self.parse_kwargs(**kwargs)
+        #self.parse_kwargs(**kwargs)
         self.test_chi2()
 
     def monte_carlo_set(self,id,tag,param,val_range):
@@ -177,7 +187,7 @@ class Model(object):
         b=float(val_range[1])
         new = (b-a)*random_sample()+a
         self.set_val(id,tag,**{param:new})
-
+    """
     def parse_kwargs(self,**kwargs):
         for key, val in kwargs.items():
             if val in data_types.ObjList.taken_names:
@@ -191,7 +201,9 @@ class Model(object):
     def parse_node(self,node):
         dat = self.xml.get_node_data(node=node)
         parse_kwargs(self,**dat)
+    """
 
+    """
     def pop(self,key,tag):
         if tag in Model.model_classes.values(): tag=inv_dict(tag)
         if type(key) == str:
@@ -219,6 +231,7 @@ class Model(object):
         ret = getattr(self,tag).pop(i)
         setattr(self,tag,getattr(self,tag))
         return ret
+    """
 
     def read(self,filename=None):
         if not filename:
@@ -235,18 +248,23 @@ class Model(object):
                 #raise AssertionError
                 if item.tag == val:
                     lst.append(data_types.Data.factory(node=item))
-            setattr(self,key,data_types.ObjList.factory(lst))
+            newobj = data_types.ObjList.factory(lst)
+            assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
+            setattr(self,key,newobj)
 
     def set_val(self,id,tag,**kwargs):
-        """set the values of a given data element"""
+        """set the values of a given data element in xml file.  
+           don't need to reset value in pool since data will be gotten
+           later in get
+        """
         if tag in Model.model_classes.values(): tag=inv_dict(tag)
-        for item in getattr(self,tag):
-            if item.id==id:
+        for item in getattr(self,tag):  #for item in abslist
+            if item.id==id:  #if the id of the absorber matches
                 item.set_data(**kwargs)
                 print("setting to %s"%(str(kwargs)))
-        new_lst= data_types.ObjList.factory(getattr(self,tag))
-        self.tree.write(self.xmlfile)
-        #self.xml_fit.write()
+        new_lst= data_types.ObjList.factory(getattr(self,tag))  #dont need to return this, since being automatically written to _pool
+        assert(new_lst.id in data_types.ObjList._pool.keys())  #test that data was added to pool
+        self.tree.write(kwargs.get("filename", self.xmlfile+"_scratch.xml"))
 
     def test_chi2(self):
         for item in ["chi2", "pixels", "params"]:
@@ -288,7 +306,7 @@ class ModelDB(object):
 
         self.name=name
         #self.dbxml=xmlutils.Model_xml(filename=name)
-        if len(models)>0:
+        if len(models)>0:  #instantiate new db from models
             self.models = models
             for key in Model.model_classes.keys():
                 setattr(self,key,[getattr(item,key) for item in self.models])
@@ -307,6 +325,37 @@ class ModelDB(object):
     def append(self, model):
         self.models.append(model)
 
+    def get_all_abs(self,id,param,locked=False,constraints=None):
+        """return a list of desired param values from all models"""
+        x = []
+        y = []
+        if constraints!=None:
+            lst=ModelDB.constrain(self,constraints)
+            if len(lst)==0:
+                raise Exception("no surviving models:\n%s"%(str(constraints)))
+            if len(lst)==len(self.models):
+                warnings.warn("everything passed")
+        if locked:
+            for item in lst:
+                item=Model.get(item)
+                ab = item.get(id,"Absorber")
+                if ab.locked(param):
+                    x.append(float(getattr(ab,param)))
+                    y.append(float(item.chi2))
+        else:
+            for item in lst:
+                item=Model.get(item)
+                ab = item.get(id,"Absorber")
+                x.append(float(getattr(ab,param)))
+                y.append(float(item.chi2))
+
+
+        if len(x)==0 or len(y)==0 or len(x)!=len(y):
+            raise Exception("ill condittioned input: \n  x=%s\n  y=%s"%(str(x),str(y)))
+
+        return x,y
+            
+
     def best_fit(self,id,param,order,xmin=None,xmax=None, plot=True, constraints=None):
         """
         get a best fit of data with respect to `param'
@@ -318,26 +367,7 @@ class ModelDB(object):
         locked:  get only locked parameters?
         plot:   plot the data?  otherwise return function, x, y
         """
-        x = []
-        y = []
-
-        if constraints!=None:
-            lst=ModelDB.constrain(self,constraints)
-            if len(lst)==0:
-                raise Exception("no surviving models:\n%s"%(str(constraints)))
-            if len(lst)==len(self.models):
-                warnings.warn("everything passed")
-        else:
-            lst = self.models
-    
-        for item in lst:
-            ab = item.get(id,"Absorber")
-            if ab.locked(param):
-                x.append(float(getattr(ab,param)))
-                y.append(float(item.chi2))
-
-        if len(x)==0 or len(y)==0 or len(x)!=len(y):
-            raise Exception("ill condittioned input: \n  x=%s\n  y=%s"%(str(x),str(y)))
+        x, y = self.get_all_abs(self,id,param,locked=True,constraints=constraints)
 
         if xmin==None and xmax==None:
             xmax = max(x)
@@ -381,8 +411,8 @@ class ModelDB(object):
                     'pixels':str(item.pixels),'params':str(item.params)}
                 for attr in Model.model_classes.keys():
                     inst = getattr(item,attr)
-                    if inst==None: continue
-                    data[attr]=inst.id
+                    if not inst: continue
+                    data[attr]=inst
                 current_group = et.SubElement(models, 'model', data)
 
         #build the actuall fitting data
@@ -390,7 +420,7 @@ class ModelDB(object):
             parent = et.SubElement(root,str(attr)+'s')
             instances = data_types.ObjList.get_all_instances(attr)
             #instances = [ item for item in data_types.ObjList._pool.values() if attr==str(type(item))]
-            print(attr, len(instances))
+            #print(attr, len(instances))
             if attr=="AbsorberList": assert(len(instances)>0)
             parent.extend([ item.xml_rep(parent) for item in instances ])
             
@@ -413,7 +443,9 @@ class ModelDB(object):
         return [item for item in obj.models if constraint.compare(item)]
 
     def get(self,xmlfile,chi2,pixels):
-        self.models.append(Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels))
+        """get from xml fit file"""
+        mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+        self.models.append(mod)
 
     def get_best_lst(self, id=None, param=None):
         """
@@ -449,12 +481,12 @@ class ModelDB(object):
        
         for mod in self.models:
             try:
-                if to_bool(mod.get(id,tag,param+"Locked")):
+                if to_bool(mod.get_datum(id,tag,param+"Locked")):
                     tmp.append(mod)
             except:
                 pass
         tmp =  sorted(tmp, key=lambda x: x.chi2)
-        return [(mod.get(id,tag,param), mod.chi2) for mod in tmp]
+        return [(mod.get_datum(id,tag,param), mod.chi2) for mod in tmp]
 
     def get_min_chi2(self):
         return np.amin(np.array([item.chi2 for item in self.models]))
@@ -473,6 +505,7 @@ class ModelDB(object):
         mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params,**kwargs)
         self.models.append(mod)
         return
+
     """
     def parse_kwargs(self,**kwargs):
         for key, val in kwargs.items():
@@ -505,9 +538,9 @@ class ModelDB(object):
             kwargs = {}
             for key, val in dict(model.attrib).items(): 
                 if key in Model.model_classes.keys(): #key is classname,  val is an id
-                    kwargs[key] = data_types.ObjList.get(val)
+                    kwargs[key] = data_types.ObjList.get(val) #get the id
                 else:
-                    kwargs[key] = val
+                    kwargs[key] = val  #if not an ObjList object, then just get the value (ex: chi2, params)
             try:
                 model_list.append(Model(**kwargs))
             except:
