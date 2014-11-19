@@ -14,7 +14,6 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.grid(False)
 
-
 def get_onesig(modeldb,chi2min):
     onesig = []
     for i in range(len(modeldb.lst)):
