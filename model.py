@@ -1,3 +1,25 @@
+"""
+Implementation notes:
+
+all xml fit file data (AbsorberList, ContinuumPointList, RegionList, 
+SingleViewList, VelocityViewList) is written to the flyweight: 
+data_types.ObjList._pool and will ONLY be accessed from there.
+
+to access data here, we use Model.get(some id) where id is the key for our 
+flyweight.
+
+There shouldn't ever be the need to alter any model data, since it will be 
+altered in dude, however, should the need arise, using Model.set_val will 
+change the values and save as a new xml fit file (blah.xml_scratch.xml).  This 
+is not written into data_types.ObjList._pool because it is expected that you 
+will edit this in dude before using it as a viable model.
+
+this will then be saved when you write it later.
+
+"""
+
+
+
 import xmlutils
 import data_types
 import warnings
@@ -9,7 +31,7 @@ from numpy.random import random_sample
 import data_types
 import xml.etree.ElementTree as et
 
-#shouldn't need to change model values .. i.e. should never need to edit entries in _pool, only add new ones when reading from Model
+
 
 c = 299792.458
 
@@ -335,17 +357,19 @@ class ModelDB(object):
                 raise Exception("no surviving models:\n%s"%(str(constraints)))
             if len(lst)==len(self.models):
                 warnings.warn("everything passed")
+        else:
+            lst = self.models
         if locked:
             for item in lst:
-                item=Model.get(item)
-                ab = item.get(id,"Absorber")
+                abslist = Model.get(item.AbsorberList)
+                ab = abslist.get_item(id)
                 if ab.locked(param):
                     x.append(float(getattr(ab,param)))
                     y.append(float(item.chi2))
         else:
             for item in lst:
-                item=Model.get(item)
-                ab = item.get(id,"Absorber")
+                abslist=Model.get(item.AbsorberList)
+                ab = abslist.get_item(id)
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
 
@@ -537,10 +561,7 @@ class ModelDB(object):
 #get model data (includes an id mapping to something in objlisr)
             kwargs = {}
             for key, val in dict(model.attrib).items(): 
-                if key in Model.model_classes.keys(): #key is classname,  val is an id
-                    kwargs[key] = data_types.ObjList.get(val) #get the id
-                else:
-                    kwargs[key] = val  #if not an ObjList object, then just get the value (ex: chi2, params)
+                kwargs[key] = val
             try:
                 model_list.append(Model(**kwargs))
             except:

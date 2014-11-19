@@ -77,8 +77,15 @@ class ObjList(object):
         #ObjList.taken_names.append(iden)
         return iden
 
+    def get_item(self,id):
+        """get element from objlist"""
+        for item in self.objlist:
+            if id==item.id:
+                return item
+
     @staticmethod
     def get(theID):
+        """retrieve from _pool"""
         return ObjList._pool[theID]
 
     @staticmethod
