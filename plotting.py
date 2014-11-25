@@ -1,4 +1,5 @@
 import dudeutils
+from model import c
 import matplotlib.pyplot as plt
 
 def xy(x_id, y_id, x,y, dbfile, constraints=None, chi2=False):
@@ -24,24 +25,24 @@ def make_subplot(x,y, style='bo', xname=None,yname=None, ax=None):
     
     return line
        
-
-if __name__ == '__main__':
-
-    db = dudeutils.getdb("2014-11-03db.xml")
-    ND, NH, _ = xy("D","H","N","N",db)
-    velH2, chi2, _ =xy("H2",None,"z","chi2",db)
+def plotDH(db):
+    ND, NH, chi2 = xy("D","H","N","N",db)
+    zH, zD, _ =xy("D","H","z","z",db)
     
-
     DH = [float(ND[i])-float(NH[i]) for i in range(len(NH))]
-    velH2 = list(map(float, velH2))
+    vel = [(float(zD[i])-float(zH[i]))*c/(1.+float(zH[i])) for i in range(len(zH))]
     chi2 = list(map(float, chi2))
-    assert(len(DH)==len(velH2)==len(chi2))
+    assert(len(DH)==len(vel)==len(chi2))
     fig1, (ax1, ax2) = plt.subplots(nrows=2)
     
-    _1 = make_subplot(velH2, DH, ax=ax1)
-    _2 = make_subplot(velH2, chi2, ax=ax2)
+    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H')
+    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2')
 
     #fig2 = plt.figure()
     #plot(x, np.cos(x))
 
     plt.show()
+
+if __name__ == '__main__':
+
+    plotDH()

@@ -62,6 +62,7 @@ class Model(object):
         if not "AbsorberList" in kwargs.keys(): #no fitting data is specified in __init__, then read
             self.read()
         else:
+            assert(type(self.AbsorberList) is str)
             assert(self.AbsorberList in data_types.ObjList._pool.keys())
         #self.test_chi2()
 
@@ -162,7 +163,6 @@ class Model(object):
         """get the number of params being optimized"""
         params=0
         for ab in Model.get(self.AbsorberList):
-            
             if ab.in_region(Model.get(self.RegionList)):
                 for lock in ["bLocked","zLocked","NLocked"]:
                     if getattr(ab,lock)==True:
@@ -188,18 +188,19 @@ class Model(object):
         """just an alias for:"""
         return data_types.ObjList.get(id)
 
-    def get_model(self,**kwargs):
+    def get_model(self,**kwargs):  
         """get all model data from xml and set attribs for self"""
         for key, val in Model.model_classes.items():
             lst=[]
-            for item in data_types.ObjList.get(val):
+            for item in data_types.ObjList.get_all(val):
                 assert(item.tag==val)
                 inp = {"xmlfile":self.xmlfile,"node":item,"tag":item.tag}
-                lst.append(data_types.Data.factory(**inp))
+                lst.append(data_types.Data.factory(**inp))  #creates list of absorbers, cont points, etc.
             if len(lst)>0:
-                setattr(self,key,data_types.ObjList.factory(lst)) #create new datalist from file
+                data=data_types.ObjList.factory(lst)  #store as objlist.  if already exists, does nothing by default
+                setattr(self,key,data.id) #store key for flyweight
             else:
-                setattr(self,key,None)
+                setattr(self,key,None)  #else, store as none
         #self.parse_kwargs(**kwargs)
         self.test_chi2()
 
@@ -256,6 +257,7 @@ class Model(object):
     """
 
     def read(self,filename=None):
+        """read from xml fit file, apply attribs to self"""
         if not filename:
             filename=self.xmlfile
         duderoot = et.parse(filename).getroot()  ##should be SpecTool
@@ -272,7 +274,7 @@ class Model(object):
                     lst.append(data_types.Data.factory(node=item))
             newobj = data_types.ObjList.factory(lst)
             assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
-            setattr(self,key,newobj)
+            setattr(self,key,newobj.id)
 
     def set_val(self,id,tag,**kwargs):
         """set the values of a given data element in xml file.  
@@ -286,7 +288,7 @@ class Model(object):
                 print("setting to %s"%(str(kwargs)))
         new_lst= data_types.ObjList.factory(getattr(self,tag))  #dont need to return this, since being automatically written to _pool
         assert(new_lst.id in data_types.ObjList._pool.keys())  #test that data was added to pool
-        self.tree.write(kwargs.get("filename", self.xmlfile+"_scratch.xml"))
+        self.write(kwargs.get("filename", self.xmlfile+"_scratch.xml"))
 
     def test_chi2(self):
         for item in ["chi2", "pixels", "params"]:
@@ -299,16 +301,21 @@ class Model(object):
                     warnings.warn(item+" not present...")
                     setattr(self,item,0.)
             
-    def write(self):
+    def write(self,filename=None):
         #for item in attr:
             #get the node
         #    node=xmlutils.Dudexml.get_node(item.id,item.tag)
         #    for key in node.attrib.keys():
         #        node.set(key, str(item.key))
+        if filename is None: filename=self.xmlfile
         root = self.build_xml()
-        self.tree._setroot(root)
-        self.tree.write(self.xmlfile)
-        #self.xml_fit.write()
+        out = prettify(root)
+        out.replace('\n\n','\n')
+        f = open(filename,'w')
+        f.write(out)
+        
+        #tree = et.ElementTree(root)
+        #tree.write(self.xmlfile)
 
 
 class ModelDB(object):
@@ -332,12 +339,9 @@ class ModelDB(object):
             self.models = models
             for key in Model.model_classes.keys():
                 setattr(self,key,[getattr(item,key) for item in self.models])
-            self.root=self.build_xml()
+            
         elif name:   
-            self.models = ModelDB.read(str(name), return_db=False)
-            self.tree = et.parse(self.filename)
-            self.root = self.tree.getroot()
-            #self.root=self.dbxml.read(name)
+            self.models = ModelDB.read(str(name), returndb=False)
         else:
             self.models = []
 
@@ -368,7 +372,7 @@ class ModelDB(object):
                     y.append(float(item.chi2))
         else:
             for item in lst:
-                abslist=Model.get(item.AbsorberList)
+                abslist=Model.get(item.AbsorberList.id)
                 ab = abslist.get_item(id)
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
@@ -412,22 +416,23 @@ class ModelDB(object):
             plt.show()
         return f, x, y
 
-    def build_xml(self):
+    @staticmethod
+    def build_xml(models):
         """create an xmlfile file structure.  returns root"""
         import datetime
         now = str(datetime.datetime.now())
-        root = et.Element('modeldb')
+        #root = et.Element('modeldb')
 
         #set up header data
-        head = et.SubElement(root, 'head')
-        title = et.SubElement(head, 'title')
+        root = et.Element('head')
+        title = et.SubElement(root, 'title')
         title.text = 'Fitting Models'
-        modified = et.SubElement(head, 'dateModified')
+        modified = et.SubElement(root, 'dateModified')
         modified.text = now
-        models = et.SubElement(root, 'ModelDB')
+        modeldb = et.SubElement(root, 'ModelDB')
 
         #build individual models
-        for item in self.models:
+        for item in models:
             current_group = None
             group_name = item.id 
             if current_group is None or group_name != current_group.text:
@@ -436,8 +441,9 @@ class ModelDB(object):
                 for attr in Model.model_classes.keys():
                     inst = getattr(item,attr)
                     if not inst: continue
+                    assert(type(inst) is str)
                     data[attr]=inst
-                current_group = et.SubElement(models, 'model', data)
+                current_group = et.SubElement(modeldb, 'model', data)
 
         #build the actuall fitting data
         for attr in Model.model_classes.keys():  #write AbsorberList, cont points and views
@@ -446,15 +452,16 @@ class ModelDB(object):
             #instances = [ item for item in data_types.ObjList._pool.values() if attr==str(type(item))]
             #print(attr, len(instances))
             if attr=="AbsorberList": assert(len(instances)>0)
-            parent.extend([ item.xml_rep(parent) for item in instances ])
+            #parent.extend([ item.xml_rep(parent) for item in instances ])
             
-            """for item in instances:
-                child=et.SubElement(parent,item.__class__.name,{"id":item.id})
+            for item in instances:
+                name=data_types.ObjList.classname(item.__class__)
+                child=et.SubElement(parent,name,{"id":item.id})
                 for it in item:
-                    node=et.SubElement(child,item.__class__.name,item.node.attrib)
+                    node=et.SubElement(child,it.node.tag,it.node.attrib)
                 #child.extend(item.nodelist)
                 #for it in item:
-            """  
+            
         return root
 
     @staticmethod
@@ -466,9 +473,9 @@ class ModelDB(object):
         constraint=Constraint(**constraints)
         return [item for item in obj.models if constraint.compare(item)]
 
-    def get(self,xmlfile,chi2,pixels):
+    def get(self,xmlfile,chi2,pixels,params=None):
         """get from xml fit file"""
-        mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+        mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params)
         self.models.append(mod)
 
     def get_best_lst(self, id=None, param=None):
@@ -542,7 +549,7 @@ class ModelDB(object):
         return self.models.pop(i)
     
     @staticmethod 
-    def read(filename):
+    def read(filename, returndb=True):
         """read from xml db, return inputs for Model"""
         
         tree = et.parse(filename)
@@ -553,7 +560,7 @@ class ModelDB(object):
         for key in Model.model_classes.keys():
             parent = root.find(key+'s')
             objlist=data_types.ObjList.list_from_xml(parent) #instantiate all absorber/contpoint/view/etc data. data stored in data_types.ObjList._pool
-        print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
+        #print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
         model_list = []
         models = root.find('ModelDB').findall('model')
 
@@ -565,12 +572,16 @@ class ModelDB(object):
             try:
                 model_list.append(Model(**kwargs))
             except:
+                raise
                 raise Exception(str(kwargs))
 
         if len(models)==0:
             raise Exception("no models saved")
 
-        return ModelDB(filename, models=model_list)
+        if not returndb:
+            return model_list
+        else:
+            return ModelDB(filename, models=model_list)
         
 
     def set_val(self,id,**kwargs):
@@ -582,9 +593,13 @@ class ModelDB(object):
     def write(self,filename=None):
         if filename==None:
             filename=self.name 
-        root = self.build_xml()
-        self.tree._setroot(root)
-        self.tree.write(filename)
+        root = ModelDB.build_xml(self.models)
+        out = prettify(root)
+        out.replace('\n\n','\n')
+        f = open(filename,'w')
+        f.write(out)
+        #tree = et.ElementTree(root)
+        #tree.write(filename)
         #self.dbxml.write(filename,root)
 
     @staticmethod
@@ -623,6 +638,15 @@ def check_for_conflicts(root):
             pass
 
     
+def prettify(elem):
+    """Return a pretty-printed XML string for the Element.
+    copied and modified from:
+    http://stackoverflow.com/questions/17402323/use-xml-etree-elementtree-to-write-out-nicely-formatted-xml-files
+    """
+    from xml.dom import minidom
+    rough_string = et.tostring(elem, 'utf-8')
+    reparsed = minidom.parseString(rough_string)
+    return reparsed.toprettyxml(indent="  ")
 
 
 

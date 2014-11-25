@@ -10,7 +10,7 @@ def newdb(xmlfile,chi2,pixels,dbfile=None,**kwargs):
 def load_from_db(dbxml):
     return ModelDB.read(dbxml)
 
-def getdb(dbfile):
+def get_db(dbfile):
     return ModelDB.read(dbfile)
 
 def random(xmlfile,itemid,tag,param,val_range,modelid=None):

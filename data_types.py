@@ -35,7 +35,7 @@ class ObjList(object):
     @staticmethod
     def _check_two_lists(lst1,lst2):
         """items are not guaranteed to be in same order ... but this will do for now"""
-        assert("List" not in lst1.__class__.__name__)
+        assert("List" not in ObjList.classname(lst1.__class__))
         if (len(lst1)!=len(lst2)): return False
     
         for i in range(len(lst1)):
@@ -96,15 +96,25 @@ class ObjList(object):
     def factory(objlist,**kwargs):
         for cls in ObjList.__subclasses__():
             try:
-                if cls.registrar_for(objlist[0].__class__.__name__):
+                if cls.registrar_for(ObjList.classname(objlist[0].__class__)):
                     return cls(objlist,**kwargs)
             except IndexError:
                 return None
-        raise TypeError("invalid type: "+objlist[0].__class__.__name__)
+        raise TypeError("invalid type: "+ObjList.classname(objlist[0].__class__))
+
+    classmethod
+    def classname(cls):
+        return cls.__name__.split('.')[-1]
 
     def xml_rep(self,parent):
         """return the list of all relevant nodes in xml"""
-        current = et.SubElement(parent,self.__class__.__name__,{"id":self.id})
+        try:
+            assert(type(parent) in [str, unicode] )
+            parent=str(parent)
+        except:
+            parent=ObjList.classname(parent.__class__)  #if a class is given instead of class name, just get the class name
+            parent = parent.split('.')[-1]
+        current = et.SubElement(parent,ObjList.classname(self.__class__),{"id":self.id})
         assert(len(self.nodelist)>0)
         current.extend(self.nodelist)
         return current
@@ -120,12 +130,17 @@ class ObjList(object):
 
     @staticmethod
     def _read_node(node):
-        """read from and ModelDb xml file"""
-        for cls in ObjList.__subclasses__():
-            theTag = cls.__name__
-            if node.tag==theTag:  
-                objlist = [Data.factory(**{"node":item}) for item in node]
-                return cls(objlist,id=node.get("id"))
+        """given a node that is an AbsorberList or similar type parse individual datum"""
+
+        def get_class():
+            for item in ObjList.__subclasses__():
+                if node.tag==ObjList.classname(item):
+                    return item
+            raise Exception("class %s not recognized"%(node.tag))
+        
+        cls=get_class()      
+        objlist = [Data.factory(**{"node":item}) for item in list(node)]  #each item should be xml node
+        return cls(objlist,id=node.get("id"))
 
     @staticmethod
     def sublass_str():
@@ -134,7 +149,9 @@ class ObjList(object):
 
     @staticmethod
     def get_from_xml(id,parent):
-        for item in parent:
+        #parent should be an xml node, with a list of children.
+        raise Exception(str(parent))
+        for item in list(parent):
             if item.tag in [it+"s" for it in ObjList.subclass_str()]:
                 if item.id==id:
                     return ObjList._read_node(item)
@@ -142,16 +159,16 @@ class ObjList(object):
 
     @staticmethod
     def list_from_xml(parent):
-        """returns a list of ObjList objects from a given parent"""
+        """returns a list of ObjList objects from a given parent.  eg: parent will be absorberLists, sub elements will be absorberList, composed of Absorber objects"""
         return [ObjList._read_node(item) for item in parent]
 
     @staticmethod   
     def get_all_instances(subclass):
         lst = []
         if not type(subclass) is str:
-            raise Exception("subclass input shoulf be a string")
+            raise Exception("subclass input should be a string")
         for val in dict(ObjList._pool).values():
-            if val.__class__.__name__ == subclass:
+            if ObjList.classname(val.__class__) == subclass:
                 lst.append(val)
         return lst
         
@@ -227,7 +244,7 @@ class Data(object):
                 except: 
                     pass
                 return inst
-        raise ValueError("%s not a valid data type"%(str(tag)))
+        raise ValueError("\n%s not a valid data type.  \nValid types are \n  %s"%(str(tag), str(Data.__subclasses__())))
 
     @classmethod
     def from_file(cls,**kwargs):
