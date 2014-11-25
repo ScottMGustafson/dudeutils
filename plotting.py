@@ -16,27 +16,31 @@ def xy(x_id, y_id, x,y, dbfile, constraints=None, chi2=False):
     return _x, _y, chi2
     
 
-def make_subplot(x,y, style='bo', xname=None,yname=None, ax=None):
+def make_subplot(x,y, style='bo', xname=None,yname=None, ax=None,xlim=None,ylim=None):
     if ax is None:
         ax = plt.gca()
     line, = ax.plot(x, y, style)
+    
     if yname: ax.set_ylabel(yname)
     if xname: ax.set_xlabel(xname)
+    if not xlim is None: ax.set_xlim(xlim)
+    if not ylim is None: ax.set_ylim(ylim)
     
     return line
        
 def plotDH(db):
     ND, NH, chi2 = xy("D","H","N","N",db)
-    zH, zD, _ =xy("D","H","z","z",db)
-    
+    zH, zD, _ =xy("D","H","z","z",db) 
+
     DH = [float(ND[i])-float(NH[i]) for i in range(len(NH))]
     vel = [(float(zD[i])-float(zH[i]))*c/(1.+float(zH[i])) for i in range(len(zH))]
-    chi2 = list(map(float, chi2))
+    chi2 = [float(chi2[i]) for i in range(len(zH))]
+    #chi2 = list(map(float, chi2))
     assert(len(DH)==len(vel)==len(chi2))
     fig1, (ax1, ax2) = plt.subplots(nrows=2)
     
-    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H')
-    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2')
+    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H',xlim=[-1.2,1.2])
+    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2',xlim=[-1.2,1.2])
 
     #fig2 = plt.figure()
     #plot(x, np.cos(x))
@@ -45,4 +49,5 @@ def plotDH(db):
 
 if __name__ == '__main__':
 
-    plotDH()
+    db=dudeutils.load_from_db('2014-11-24db.xml')
+    plotDH(db)

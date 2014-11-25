@@ -372,7 +372,7 @@ class ModelDB(object):
                     y.append(float(item.chi2))
         else:
             for item in lst:
-                abslist=Model.get(item.AbsorberList.id)
+                abslist=Model.get(item.AbsorberList)
                 ab = abslist.get_item(id)
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))

@@ -2,7 +2,7 @@ from model import Model, ModelDB
 
 """a collection of helper functions"""
 
-def newdb(xmlfile,chi2,pixels,dbfile=None,**kwargs):
+def newdb(xmlfile,chi2,pixels,dbfile=None,params=None,**kwargs):
     """get a model, append to new database"""
     model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
     return ModelDB(dbfile,[model],**kwargs)
