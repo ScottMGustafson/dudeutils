@@ -1,6 +1,7 @@
 import dudeutils
 from model import c
 import matplotlib.pyplot as plt
+import constraints
 
 def xy(x_id, y_id, x,y, dbfile, constraints=None, chi2=False):
     if type(dbfile) is str:
@@ -28,9 +29,9 @@ def make_subplot(x,y, style='bo', xname=None,yname=None, ax=None,xlim=None,ylim=
     
     return line
        
-def plotDH(db):
-    ND, NH, chi2 = xy("D","H","N","N",db)
-    zH, zD, _ =xy("D","H","z","z",db) 
+def plotDH(db,constraints=None):
+    ND, NH, chi2 = xy("D","H","N","N",db,constraints=constraints)
+    zH, zD, _ =xy("D","H","z","z",db,constraints=constraints) 
 
     DH = [float(ND[i])-float(NH[i]) for i in range(len(NH))]
     vel = [(float(zD[i])-float(zH[i]))*c/(1.+float(zH[i])) for i in range(len(zH))]
@@ -49,5 +50,7 @@ def plotDH(db):
 
 if __name__ == '__main__':
 
+    constraints = constraints.Constraint(**{"H2":{"z":(2.9875,2.98765)}})
+
     db=dudeutils.load_from_db('2014-11-24db.xml')
-    plotDH(db)
+    plotDH(db,constraints={"H2":{"z":(2.9875,2.98765)}})

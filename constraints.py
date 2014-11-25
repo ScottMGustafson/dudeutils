@@ -2,7 +2,7 @@ class Constraint(object):
     def __init__(self,**kwargs):
         self.abs=[]
         for key, val in kwargs.items():
-            if type(val)==dict:
+            if type(val)==dict:  #only an absorber would have dict input
                 self.abs.append(AbsConstraint(key,**val))
             elif key=='chi2':
                 Constraint.to_range(self,key,val) 
