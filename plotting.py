@@ -3,7 +3,11 @@ from model import c
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
-import constraints
+from constraints import Constraint
+
+def z_from_vel(vel, z1):
+    delz =  float(vel)*(1.+float(z1))/c
+    return z1+delz
 
 def xy(x_id, y_id, x,y, dbfile, constraints=None, chi2=False):
     if type(dbfile) is str:
@@ -42,8 +46,8 @@ def plotDH(db,constraints=None):
     assert(len(DH)==len(vel)==len(chi2))
     fig1, (ax1, ax2) = plt.subplots(nrows=2)
     
-    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H',xlim=[-1.2,1.2])
-    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2',xlim=[-1.2,1.2])
+    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H',xlim=[-1.5,1.5])
+    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2',xlim=[-1.5,1.5])
 
     #fig2 = plt.figure()
     #plot(x, np.cos(x))
@@ -130,7 +134,8 @@ def plotchi2():
 
 if __name__ == '__main__':
 
-    constraints = constraints.Constraint(**{"H2":{"z":(2.9875,2.98765)}})
+    constraints = Constraint(**{"H2":{"z":(2.9875,2.9876)},"chi2":(2130.,2142.)})
 
     db=dudeutils.load_from_db('2014-11-24db.xml')
+    db.trim(constraints)
     plotDH(db)#,constraints={"H2":{"z":(2.9875,2.98765)}})

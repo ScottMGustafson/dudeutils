@@ -5,7 +5,7 @@ class Constraint(object):
             if type(val)==dict:  #only an absorber would have dict input
                 self.abs.append(AbsConstraint(key,**val))
             elif key=='chi2':
-                self.chi2 = ParamterConstraint("chi2",val)
+                self.chi2 = ParameterConstraint("chi2",val)
             else:  #pixel, param   
                 try: 
                     setattr(self,key,float(val))
@@ -56,7 +56,7 @@ class ParameterConstraint(object):
             
     def __contains__(self,val):
         try:
-            return self.rng[0]<=val<=self.rng[1]
+            return self.rng[0]<=float(val)<=self.rng[1]
         except IndexError:
             raise IndexError("input range must be list or tuple of length 2.  Instead got:\n  %s"%(str(self.rng)))
    

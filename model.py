@@ -467,6 +467,9 @@ class ModelDB(object):
             
         return root
 
+    def trim(self,constraints):
+        self.models = ModelDB.constrain(self.models,constraints)
+
     @staticmethod
     def constrain(models,constraints):
         """
@@ -475,8 +478,8 @@ class ModelDB(object):
         """
 
         if type(constraints) is dict: 
-            constraint=Constraint(**constraints)
-        return [item for item in models if item in constraint]
+            constraints=Constraint(**constraints)
+        return [item for item in models if item in constraints]
 
     def get(self,xmlfile,chi2,pixels,params=None):
         """get from xml fit file"""
