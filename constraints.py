@@ -5,7 +5,7 @@ class Constraint(object):
             if type(val)==dict:  #only an absorber would have dict input
                 self.abs.append(AbsConstraint(key,**val))
             elif key=='chi2':
-                Constraint.to_range(self,key,val) 
+                self.chi2 = ParamterConstraint("chi2",val)
             else:  #pixel, param   
                 try: 
                     setattr(self,key,float(val))
@@ -13,49 +13,50 @@ class Constraint(object):
                     if key in ["pixels","params"]:
                         raise
                     else:
-                        setattr(self,key,val)
+                        setattr(self,key,val) 
                 
-    def compare(self,model):
-        pix = self.__dict__.get("pixels",model.pixels)
-        params=self.__dict__.get("params",model.params)
-        xmlfile=self.__dict__.get("xmlfile")
-        if model.pixels!=pix or params!=model.params or xmlfile!=model.xmlfile:
-            return False
-        if "chi2" in self.__dict__.keys():
-            if not self.chi2[0]<=model.chi2<=self.chi2[1]:
-                return False
-
-        for ab in model.absorbers:
-            for item in self.abs:
-                if item.id==ab.id:
-                    if not item.compare(ab):
-                        return False
+    def __contains__(self,model):
+        for key, val in self.__dict__.items():
+            if key in ["pixels","params"]:
+                if getattr(self,key)!=getattr(model,key):
+                    return False
+            elif key=='chi2':
+                if not getattr(model,key) in getattr(self,key):
+                    return False
+            else:
+                for ab_ in self.abs:
+                    for ab in model.get_lst("AbsorberList"):
+                        if ab.id==ab_.id:
+                            if not ab in ab_:
+                                return False
         return True
 
-    @staticmethod
-    def to_range(cls,key,val):
-        """convert provided vales to range"""
-        try:
-            val=tuple(map(float,val))
-        except:
-            val=tuple(map(float,[0,val]))
-        setattr(cls,key,val)
 
 class AbsConstraint(object):
     def __init__(self,id,**kwargs):
         self.id = id
         for key, val in kwargs.items():
-            Constraint.to_range(self,key,val)
+            setattr(self, str(key), ParameterConstraint(str(key),val))
 
-    def compare(self,absorber):
-        assert(absorber.id==self.id)
-        for key in ["N","b","z"]:
-            try:
-                val = getattr(self,key)
-                if not val[0]<=getattr(absorber,key)<=val[-1]:
-                    return False
-            except:
-                pass
+    def __contains__(self,absorber):
+        if absorber.id!=self.id:
+            return False
+        keys = [key for key in self.__dict__.keys() if key in ['N', 'b', 'z']]
+        for key in keys:
+            val = getattr(self,key)
+            if not getattr(absorber,key) in getattr(self,key):
+                return False
         return True
 
+
+class ParameterConstraint(object):
+    def __init__(self,id,rng):
+        self.id=id
+        self.rng = list(map(float,rng))
+            
+    def __contains__(self,val):
+        try:
+            return self.rng[0]<=val<=self.rng[1]
+        except IndexError:
+            raise IndexError("input range must be list or tuple of length 2.  Instead got:\n  %s"%(str(self.rng)))
    

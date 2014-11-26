@@ -188,6 +188,10 @@ class Model(object):
         """just an alias for:"""
         return data_types.ObjList.get(id)
 
+    def get_lst(self,attr):
+        """just an alias for:"""
+        return data_types.ObjList.get(getattr(self,attr))
+
     def get_model(self,**kwargs):  
         """get all model data from xml and set attribs for self"""
         for key, val in Model.model_classes.items():
@@ -346,7 +350,7 @@ class ModelDB(object):
             self.models = []
 
         if constraints:
-            self.models = ModelDB.constrain(self,constraints)
+            self.models = ModelDB.constrain(self.models,constraints)
 
     def append(self, model):
         self.models.append(model)
@@ -355,8 +359,8 @@ class ModelDB(object):
         """return a list of desired param values from all models"""
         x = []
         y = []
-        if constraints!=None:
-            lst=ModelDB.constrain(self,constraints)
+        if not constraints is None:
+            lst=ModelDB.constrain(self.models,constraints)
             if len(lst)==0:
                 raise Exception("no surviving models:\n%s"%(str(constraints)))
             if len(lst)==len(self.models):
@@ -372,8 +376,7 @@ class ModelDB(object):
                     y.append(float(item.chi2))
         else:
             for item in lst:
-                abslist=Model.get(item.AbsorberList)
-                ab = abslist.get_item(id)
+                ab=item.get_lst("AbsorberList").get_item(id)
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
 
@@ -465,13 +468,15 @@ class ModelDB(object):
         return root
 
     @staticmethod
-    def constrain(obj,constraints):
+    def constrain(models,constraints):
         """
         example constraints:   
             constraints={"chi2":123,"params":3,"pixels":2345,"D":{"N":(12.3,14.3),"b":(15,16)}}
         """
-        constraint=Constraint(**constraints)
-        return [item for item in obj.models if constraint.compare(item)]
+
+        if type(constraints) is dict: 
+            constraint=Constraint(**constraints)
+        return [item for item in models if item in constraint]
 
     def get(self,xmlfile,chi2,pixels,params=None):
         """get from xml fit file"""
