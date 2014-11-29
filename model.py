@@ -266,6 +266,8 @@ class Model(object):
             filename=self.xmlfile
         duderoot = et.parse(filename).getroot()  ##should be SpecTool
         dudespec = duderoot.find("CompositeSpectrum")
+        if dudespec is None:
+            raise Exception("error reading fit file.  check %s to verify."%(filename))
         spectrum = dudespec.find("Spectrum")
         spec, spectype = spectrum.get("spec"), spectrum.get("spectype")
 

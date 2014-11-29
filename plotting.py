@@ -43,8 +43,25 @@ def plotDH(db,constraints=None):
     assert(len(DH)==len(vel)==len(chi2))
     fig1, (ax1, ax2) = plt.subplots(nrows=2)
     
-    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H',xlim=[-1.5,1.5])
-    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2',xlim=[-1.5,1.5])
+    _1 = make_subplot(vel, DH, ax=ax1, yname='D/H')#,xlim=[-1.5,1.5])
+    _2 = make_subplot(vel, chi2, ax=ax2, xname='D velocity (km/s)', yname='chi2')#,xlim=[-1.5,1.5])
+
+    #fig2 = plt.figure()
+    #plot(x, np.cos(x))
+    plt.show()
+
+
+def plot_cont_vel(db,constraints=None):
+    zH2, zH, chi2 = xy("H2","H","z","z",db,constraints=constraints)
+    zD, zH, _ = xy("D","H","z","z",db,constraints=constraints)
+
+    vel2 = [(float(zH2[i])-float(zH[i]))*c/(1.+float(zH[i])) for i in range(len(zH))]
+    velD = [(float(zD[i])-float(zH[i]))*c/(1.+float(zH[i])) for i in range(len(zH))]
+    chi2 = [float(chi2[i]) for i in range(len(zH))]
+    fig1, (ax1, ax2) = plt.subplots(nrows=2)
+    
+    _1 = make_subplot(vel2, velD, ax=ax1, yname='D velocity offset (km/s)')#,xlim=[-1.5,1.5])
+    _2 = make_subplot(vel2, chi2, ax=ax2, xname='H2 velocity (km/s)', yname='chi2')#,xlim=[-1.5,1.5])
 
     #fig2 = plt.figure()
     #plot(x, np.cos(x))
@@ -129,9 +146,10 @@ def plotchi2():
 
 if __name__ == '__main__':
 
-    constraints = Constraint(**{"H2":{"z":(2.98755,2.9876)},"chi2":(2130.,2142.)})
-
-    db=dudeutils.load_from_db('2014-11-24db.xml')
-    db.trim(constraints)
-    plotDH(db)#,constraints={"H2":{"z":(2.9875,2.98765)}})
-    plotND_NH(db)
+    constraints = None#Constraint(**{"D":{"z":(2.98840,2.98843)}})
+    
+    db=dudeutils.load_from_db('2014-11-28db.xml')
+    #db.trim(constraints)
+    plotDH(db,constraints=constraints)
+    plotND_NH(db,constraints=constraints)
+    plot_cont_vel(db,constraints=constraints)
