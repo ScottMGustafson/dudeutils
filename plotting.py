@@ -12,14 +12,13 @@ def xy(x_id, y_id, x,y, dbfile, constraints=None, chi2=False):
     else:
         db=dbfile
     _x, chi2 = db.get_all_abs(x_id, str(x), constraints=constraints)
-    if y=='chi2' or y_id=="chi2":
+    if y_id=="chi2":
         _y=chi2
     else:
         _y, _    = db.get_all_abs(y_id, str(y), constraints=constraints)
         assert(chi2==_ and len(_x)==len(_y))
     return _x, _y, chi2
     
-
 def make_subplot(x,y, style='bo', xname=None,yname=None, ax=None,xlim=None,ylim=None):
     if ax is None:
         ax = plt.gca()
@@ -85,71 +84,29 @@ def plotND_NH(db,constraints=None):
     plt.show()
 
 def plotchi2():
-    hi = model.ModelDB(name="chi2_hi_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
-    hi_onesigdb, hidb = get_onesig(hi,hi.chi2min)   
-    data["hi"] = get_data(hidb)
-    data["hionesig"] = get_data(hi_onesigdb)
-
-    best = model.ModelDB(name="test_database.txt.new", params=8, datapts=957, chi2lim=1825., chi2min=1801., best=True)
-    before_clip = get_data(best)
-    best_onesigdb, bestdb = get_onesig(best,best.chi2min) 
-    data["best"] = get_data(bestdb)
-    data["bestonesig"] = get_data(best_onesigdb) 
-
-    lo = model.ModelDB(name="chi2_lo_database.txt.new", params=11, datapts=957, chi2min=1980., chi2lim=2000.)
-    lo_onesigdb, lodb = get_onesig(lo,lo.chi2min)  
-    data["lo"] = get_data(lodb)
-    data["loonesig"] = get_data(lo_onesigdb) 
-
-
-
-#now set up the plots
-
-    f = plt.figure(figsize=(4.1,9.3))
-
-#hi
-    gs1 = GridSpec(2,1)
-    gs1.update(left=0.2, right=0.9, top=0.95, bottom=0.68, hspace=0.1)
-    ax1 = plt.subplot(gs1[:-1, 0])
-    ax2 = plt.subplot(gs1[-1, 0])
-    #ax1.set_ylim([1980.,2000.])
-    #ax2.set_ylim([-5.0,-4.4])
-    #plt.setp( ax2.get_xticklabels(), visible=False)
-
-    plot_one_pair(ax1,ax2,data["hi"], data["hionesig"])
-
-#best
-    gs2 = GridSpec(2,1)
-    gs2.update(left=0.2, right=0.9, top=0.64, bottom=0.36, hspace=0.1)
-    ax3 = plt.subplot(gs2[:-1, 0])
-    ax4 = plt.subplot(gs2[-1, 0])
-    #ax3.set_yticks(np.arange(1800.,1825.,5.))
-    #ax3.set_ylim([1795.,1825.])
-    #ax4.set_ylim([-5.0,-4.4])
-    #plt.setp( ax4.get_xticklabels(), visible=False)
-    plot_one_pair(ax3,ax4,data["best"], data["bestonesig"])
-#lo
-    gs3 = GridSpec(2,1)
-    gs3.update(left=0.2, right=0.9, top=0.32, bottom=0.05, hspace=0.1)
-    ax5 = plt.subplot(gs3[:-1, 0])
-    ax6 = plt.subplot(gs3[-1, 0])
-    #ax5.set_ylim([1980.,2000.])
-    #ax6.set_ylim([-5.0,-4.4])
-    plot_one_pair(ax5,ax6,data["lo"], data["loonesig"]) 
-
-    #ax6.set_xlabel(r"velocity from {\textrm{H}\,\textsc{i}~} (km s$^{-1}$)")
-
-    plt.show()
-    #plt.savefig('/home/scott/Desktop/hi_best_lo.png',dpi=600)
-    plt.clf()
-
+    pass
+    #plot 
 
 if __name__ == '__main__':
 
     constraints = None#Constraint(**{"D":{"z":(2.98840,2.98843)}})
     
-    db=dudeutils.load_from_db('2014-11-28db.xml')
+
+    hidb=dudeutils.load_from_db('2014-11-28hidb.xml')
     #db.trim(constraints)
+    plotDH(hidb,constraints=constraints)
+    plotND_NH(hidb,constraints=constraints)
+    plot_cont_vel(hidb,constraints=constraints)
+
+    db=dudeutils.load_from_db('2014-11-28db.xml')
     plotDH(db,constraints=constraints)
     plotND_NH(db,constraints=constraints)
     plot_cont_vel(db,constraints=constraints)
+
+    lodb=dudeutils.load_from_db('2014-11-28lodb.xml')
+    plotDH(lodb,constraints=constraints)
+    plotND_NH(lodb,constraints=constraints)
+    plot_cont_vel(lodb,constraints=constraints)
+
+
+

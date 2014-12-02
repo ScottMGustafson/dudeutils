@@ -4,6 +4,8 @@ class Constraint(object):
         for key, val in kwargs.items():
             if type(val)==dict:  #only an absorber would have dict input
                 self.abs.append(AbsConstraint(key,**val))
+            elif key=='continuum':
+                self.continuum=val  #continuum id
             elif key=='chi2':
                 self.chi2 = ParameterConstraint("chi2",val)
             else:  #pixel, param   
@@ -22,6 +24,10 @@ class Constraint(object):
                     return False
             elif key=='chi2':
                 if not getattr(model,key) in getattr(self,key):
+                    return False
+            elif key=='continuum':
+                if not getattr(model,'ContinuumPointList')==val:  
+                    #model.ContinuumPointList should be an id 
                     return False
             else:
                 for ab_ in self.abs:

@@ -78,7 +78,8 @@ class ObjList(object):
         return iden
 
     def get_item(self,id):
-        """get element from objlist"""
+        """get element from objlist.  
+        if AbsList, this will be the user assigned id, not the _pool key"""
         for item in self.objlist:
             if id==item.id:
                 return item
@@ -86,7 +87,12 @@ class ObjList(object):
     @staticmethod
     def get(theID):
         """retrieve from _pool"""
-        return ObjList._pool[theID]
+        try:
+            return ObjList._pool[theID]
+        except KeyError:
+            msg = "\n  key not found: %s"%(str(theID))
+            msg+="\n\n  available keys are:\n%s\n"%(str(sorted(ObjList._pool.keys())))
+            raise KeyError(msg)
 
     @staticmethod
     def set(value): 

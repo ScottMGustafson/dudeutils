@@ -43,9 +43,6 @@ class Model(object):
 
     def __init__(self, **kwargs):
         """
-        inputs:
-        -------
-        AbsorberList: data_types.ObjList() [effectively used as list(data_types.Absorber)]
         """ 
         self.id=kwargs.pop("id",data_types.ObjList.generate_id())
         #self.parse_kwargs(**kwargs)
@@ -378,7 +375,8 @@ class ModelDB(object):
                     y.append(float(item.chi2))
         else:
             for item in lst:
-                ab=item.get_lst("AbsorberList").get_item(id)
+                abslist = Model.get(item.AbsorberList)
+                ab = abslist.get_item(id)
                 x.append(float(getattr(ab,param)))
                 y.append(float(item.chi2))
 
