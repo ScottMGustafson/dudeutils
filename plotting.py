@@ -89,24 +89,25 @@ def plotchi2():
 
 if __name__ == '__main__':
 
-    constraints = None#Constraint(**{"D":{"z":(2.98840,2.98843)}})
-    
+
+    constraints = Constraint(**{"D":{"z":(2.988397,2.988426)}, "H2":{"z":(2.98759,2.987637)}})
+    #constraints = Constraint(**{"H2":{"z":(2.98759,2.987637)}})
 
     hidb=dudeutils.load_from_db('2014-11-28hidb.xml')
     #db.trim(constraints)
     plotDH(hidb,constraints=constraints)
-    plotND_NH(hidb,constraints=constraints)
-    plot_cont_vel(hidb,constraints=constraints)
+    #plotND_NH(hidb,constraints=constraints)
+    #plot_cont_vel(hidb,constraints=constraints)
 
     db=dudeutils.load_from_db('2014-11-28db.xml')
     plotDH(db,constraints=constraints)
-    plotND_NH(db,constraints=constraints)
-    plot_cont_vel(db,constraints=constraints)
+    #plotND_NH(db,constraints=constraints)
+    #plot_cont_vel(db,constraints=constraints)
 
     lodb=dudeutils.load_from_db('2014-11-28lodb.xml')
     plotDH(lodb,constraints=constraints)
-    plotND_NH(lodb,constraints=constraints)
-    plot_cont_vel(lodb,constraints=constraints)
+    #plotND_NH(lodb,constraints=constraints)
+    #plot_cont_vel(lodb,constraints=constraints)
 
 
 
