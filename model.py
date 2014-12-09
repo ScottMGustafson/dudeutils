@@ -189,6 +189,18 @@ class Model(object):
         """just an alias for:"""
         return data_types.ObjList.get(getattr(self,attr))
 
+    def check_vals(self):
+        unphysical={"b":[1.0,50.],"N":[11.00,25.00]}
+        abslist = self.get(self.AbsorberList)
+        for item in abslist:
+            assert(isinstance(item,data_types.Absorber))
+            for key, val in unphysical.items():
+                try:
+                    assert(val[0]<=float(getattr(item,key))<=val[1])
+                except: 
+                    raise Exception("%s %s: %s has unphysical value of %lf"%(item.ionName,item.id,key,(getattr(item,key))))
+
+
     def get_model(self,**kwargs):  
         """get all model data from xml and set attribs for self"""
         for key, val in Model.model_classes.items():
@@ -351,6 +363,13 @@ class ModelDB(object):
         if constraints:
             self.models = ModelDB.constrain(self.models,constraints)
 
+    def __iter__(self):
+        for i in range(len(self.models)):
+            yield self.models[i]               
+
+    def __getitem__(self,i):
+        return self.models[i]
+
     def append(self, model):
         self.models.append(model)
 
@@ -484,6 +503,9 @@ class ModelDB(object):
     def get(self,xmlfile,chi2,pixels,params=None):
         """get from xml fit file"""
         mod = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels,params=params)
+        #test for unphysical values 
+        mod.check_vals()
+            
         self.models.append(mod)
 
     def get_best_lst(self, id=None, param=None):
