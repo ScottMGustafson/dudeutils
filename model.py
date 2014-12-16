@@ -60,7 +60,10 @@ class Model(object):
             self.read()
         else:
             assert(type(self.AbsorberList) is str)
-            assert(self.AbsorberList in data_types.ObjList._pool.keys())
+            try:
+                assert(self.AbsorberList in data_types.ObjList._pool.keys())
+            except AssertionError:
+                raise KeyError(self.AbsorberList,data_types.ObjList._pool.keys())
         #self.test_chi2()
 
         for attr in ["chi2","pixels","params"]:
@@ -190,7 +193,10 @@ class Model(object):
         return data_types.ObjList.get(getattr(self,attr))
 
     def check_vals(self):
-        unphysical={"b":[1.0,50.],"N":[11.00,25.00]}
+        unphysical={"b":[1.0,50.],"N":[10.00,25.00]} 
+
+#<10 is unphysical bc it likely cannot be measured
+#b<50.km/s because it would be very unlikely to see something so hot (but not impossible)
         abslist = self.get(self.AbsorberList)
         for item in abslist:
             assert(isinstance(item,data_types.Absorber))
@@ -578,7 +584,6 @@ class ModelDB(object):
             try:
                 model_list.append(Model(**kwargs))
             except:
-                raise
                 raise Exception(str(kwargs))
 
         if len(models)==0:

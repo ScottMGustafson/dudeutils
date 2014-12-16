@@ -68,9 +68,6 @@ class ObjList(object):
     def __getitem__(self,i):
         return self.objlist[i]
 
-
-    
-
     @staticmethod
     def generate_id():
         iden=str(uuid.uuid4())
