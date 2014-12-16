@@ -91,22 +91,21 @@ def plotchi2():
 if __name__ == '__main__':
 
 
-    constraints = Constraint(**{"D":{"z":(2.988397,2.988426)}, "H2":{"z":(2.98759,2.987637), "b":(0.,40.)}})
+    constraints = Constraint(**{"D":{"z":(2.988399,2.988424),"b":{0.,25.}}, "H2":{"z":(2.98759,2.987637), "b":(0.,10.)}})
     #constraints = Constraint(**{"H2":{"z":(2.98759,2.987637)}})
 
-    #hidb=dudeutils.load_from_db('2014-11-28hidb.xml')
-    #db.trim(constraints)
-    #plotDH(hidb,constraints=constraints,the_title="hi")
+    hidb=dudeutils.load_from_db('2014-12-14_hidb.xml')
+    plotDH(hidb,constraints=constraints,the_title="hi")
     #plotND_NH(hidb,constraints=constraints,the_title="hi")
     #plot_cont_vel(hidb,constraints=constraints,the_title="hi")
 
     db=dudeutils.load_from_db('2014-12-08db.xml')
     plotDH(db,constraints=constraints,the_title="best",dh_lim=[-4.65,-4.4])
-    plotND_NH(db,constraints=constraints,the_title="best")
-    plot_cont_vel(db,constraints=constraints,the_title="best")
+    #plotND_NH(db,constraints=constraints,the_title="best")
+    #plot_cont_vel(db,constraints=constraints,the_title="best")
 
-    #lodb=dudeutils.load_from_db('2014-11-28lodb.xml')
-    #plotDH(lodb,constraints=constraints,the_title="lo")
+    lodb=dudeutils.load_from_db('2014-12-14_lodb.xml')
+    plotDH(lodb,constraints=constraints,the_title="lo")
     #plotND_NH(lodb,constraints=constraints,the_title="lo")
     #plot_cont_vel(lodb,constraints=constraints,the_title="lo")
 

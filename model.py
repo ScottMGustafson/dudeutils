@@ -403,8 +403,11 @@ class ModelDB(object):
         if len(x)==0 or len(y)==0 or len(x)!=len(y):
             raise Exception("ill condittioned input: \n  x=%s\n  y=%s"%(str(x),str(y)))
 
-        return x,y
+        return x, y
             
+
+
+
 
     def best_fit(self,id,param,order,xmin=None,xmax=None, plot=True, constraints=None):
         """
@@ -521,22 +524,6 @@ class ModelDB(object):
         else:
             return self.get_locked(id, param)  #already sorted
 
-    def get_err(self, id, param_name):
-        """get 1 sigma error from chi2 = chi2min + 1
-
-        param_name is in [N,b,z]
-
-        """
-        tmp = self.get_best_lst(param=param_name+'Locked')
-        lst = [item[0] for item in tmp]
-        chi2 = [item[1] for item in tmp]
-        chi2min = float(chi2[0])
-        onesig=[]
-        for item in lst:
-            if item.chi2<chi2min+1.:
-                onesig.append(getattr(item.getabs(id),param_name))
-        return getattr(lst[0].getabs(id),param_name) ,max(onesig), min(onesig)
-
     def get_locked(self, id, tag, param):
         tmp = []
        
@@ -548,9 +535,6 @@ class ModelDB(object):
                 pass
         tmp =  sorted(tmp, key=lambda x: x.chi2)
         return [(mod.get_datum(id,tag,param), mod.chi2) for mod in tmp]
-
-    def get_min_chi2(self):
-        return np.amin(np.array([item.chi2 for item in self.models]))
 
     def get_model(self, id):
         for item in self.models:
@@ -567,14 +551,6 @@ class ModelDB(object):
         self.models.append(mod)
         return
 
-    """
-    def parse_kwargs(self,**kwargs):
-        for key, val in kwargs.items():
-            try:
-                setattr(self,key,float(val))
-            except:
-                setattr(self,key,val)
-    """
     def pop(self,i):
         return self.models.pop(i)
     

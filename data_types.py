@@ -17,19 +17,19 @@ class ObjList(object):
     #_pool=weakref.WeakValueDictionary()  
     _pool = dict()
 
-    def __new__(cls, objlist,id=None):
+    def __new__(cls, objlist, id=None):
         """implements a flyweight pattern using ObjList._pool"""
         obj = ObjList._check_list_in_list(objlist, list(ObjList._pool.values()) )
         if obj is None:  #behold, we have a new element in our midst
             obj = object.__new__(cls)
             #obj.id = ObjList.generate_id() if id==None else id
-            obj.id = str(builtins.id(obj)) if id==None else str(id)
+            obj._id = str(builtins.id(obj)) if id==None else str(id)
             try:
-                assert(obj.id not in ObjList._pool.keys())
+                assert(obj._id not in ObjList._pool.keys())
             except AssertionError:
-                obj.id = ObjList.generate_id()
+                obj._id = ObjList.generate_id()
 
-            ObjList._pool[obj.id] = obj
+            ObjList._pool[obj._id] = obj
         return obj
         
     @staticmethod
@@ -68,6 +68,9 @@ class ObjList(object):
     def __getitem__(self,i):
         return self.objlist[i]
 
+
+    
+
     @staticmethod
     def generate_id():
         iden=str(uuid.uuid4())
@@ -97,6 +100,27 @@ class ObjList(object):
     @staticmethod
     def set(value): 
         ObjList._pool[value.id] = value
+
+    @property
+    def id(self):
+        return self._id
+
+    @id.setter
+    def id(self, value):
+        """when setting a new id, changes should also be reflected in _pool"""
+        if value in ObjList._pool.keys():
+            raise KeyError(str(value)+" already in pool")
+        try:
+            old = self._id
+            assert(old in ObjList._pool.keys())
+        except AttributeError:
+            raise Exception("trying to change id of data not yet registered in pool")
+        except AssertionError:
+            raise KeyError("attempting to access data not registered in pool")
+
+        self._id = str(value)
+        ObjList._pool[self._id] = ObjList._pool.pop(old)
+        
 
     @staticmethod
     def factory(objlist,**kwargs):
