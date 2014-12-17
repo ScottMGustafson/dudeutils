@@ -402,8 +402,13 @@ class ModelDB(object):
             for item in lst:
                 abslist = Model.get(item.AbsorberList)
                 ab = abslist.get_item(id)
-                x.append(float(getattr(ab,param)))
-                y.append(float(item.chi2))
+                if ab is None:
+                    raise Exception(item.xmlfile+" has no absorber: "+id)
+                try:
+                    x.append(float(getattr(ab,param)))
+                    y.append(float(item.chi2))
+                except:
+                    pass
 
 
         if len(x)==0 or len(y)==0 or len(x)!=len(y):
@@ -586,7 +591,7 @@ class ModelDB(object):
             except:
                 raise Exception(str(kwargs))
 
-        if len(models)==0:
+        if len(model_list)==0:
             raise Exception("no models saved")
 
         if not returndb:

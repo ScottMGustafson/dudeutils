@@ -92,7 +92,9 @@ class ObjList(object):
         except KeyError:
             msg = "\n  key not found: %s"%(str(theID))
             msg+="\n\n  available keys are:\n%s\n"%(str(sorted(ObjList._pool.keys())))
-            raise KeyError(msg)
+            print("\n  key not found: %s"%(str(theID)))
+        
+            #raise KeyError(msg)
 
     @staticmethod
     def set(value): 

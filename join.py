@@ -37,4 +37,6 @@ def join(db1_name, db2_name, string='hi_', newdb="newdb.xml", outname='scratch.x
 
     db2.write(newdb)
            
-    
+2014-11-24db.xml  2014-11-28db.xml  2014-11-28hidb.xml  
+2014-11-28lodb.xml  2014-12-08db.xml  2014-12-14_hidb.xml  
+2014-12-14_lodb.xml
