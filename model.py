@@ -77,13 +77,16 @@ class Model(object):
             self.count_params()
 
     def __eq__(self,other):
-        for item in ['id','chi2','pixels','params','locked','AbsorberList']:
+        attrs = list(['id','chi2','pixels','params']+[Model.model_classes.keys()])
+        for item in attrs:
             if getattr(self,item)!=getattr(other,item):
                 return False
         return True
     
     def __neq__(self,other):
         return not self.__eq__(other)
+
+
 
 
     def __str__(self):
@@ -115,17 +118,14 @@ class Model(object):
         string+="\nchi2=%lf pixels=%lf params=%lf\n\n"%(float(self.chi2),float(self.pixels),float(self.params))
         return string
 
-    """shouldn't need this
-    def append(self,inst=None,tag=None,**kwargs):
-        if not tag: raise Exception("must specify data type")
-        if tag in Model.model_classes.values(): tag= inv_dict(tag)
-        if inst:
-            getattr(self,tag).append(inst)
-            
-        else:
-            getattr(self,tag).append(data_types.Data.factory(**kwargs))
-    """
+    @property
+    def reduced_chi2(self):
+        self._reduced_chi2 = float(self.chi2)/(float(self.pixels)-float(self.params)-1.)
+        return self._reduced_chi2
 
+    @reduced_chi2.setter
+    def reduced_chi2(self,value):
+        self._reduced_chi2 = float(value)
 
     def build_xml(self,raw_data='',spname='',sptype=''):
         """build a dude-style xml for this model"""
@@ -137,11 +137,15 @@ class Model(object):
         #add spectrum stuff
         for attr in ["AbsorberList", "ContinuumPointList"]:
             try:
-                dudespec.extend([item.node for item in Model.get(getattr(self,attr))])
+                lst = Model.get(getattr(self,attr))
             except:
                 if getattr(self,attr) is None:
-                    pass
-                else: raise
+                    raise Exception("no valid continuum points or absorbers for %s"%(self.xmlfile))
+                else: 
+                    raise
+            if lst is None:
+                raise Exception(attr+" not found for "+self.xmlfile)
+            dudespec.extend([item.node for item in lst])
                 
 
         #the view stuff
@@ -149,16 +153,9 @@ class Model(object):
             try:
                 duderoot.extend([item.node for item in Model.get(getattr(self,attr))])
             except:
-                if not getattr(self,attr):  #if the id is either '' or None
-                    pass
-                else: raise
+                pass
         return duderoot
 
-    """would be nice, but I wanna keep writing to _pool out of the picture except when instantiating new ObjList objects
-    def consolidate_regions(self):
-        self.RegionList = data_types.Region.consolidate_regions(self.RegionList)
-        self.write()
-    """
     def count_params(self):
         """get the number of params being optimized"""
         params=0
@@ -229,51 +226,6 @@ class Model(object):
         b=float(val_range[1])
         new = (b-a)*random_sample()+a
         self.set_val(id,tag,**{param:new})
-    """
-    def parse_kwargs(self,**kwargs):
-        for key, val in kwargs.items():
-            if val in data_types.ObjList.taken_names:
-                setattr(self,key,data_types.ObjList.get(val))
-            else:
-                try:
-                    setattr(self,key,float(val))
-                except:
-                    setattr(self,key,val)
-
-    def parse_node(self,node):
-        dat = self.xml.get_node_data(node=node)
-        parse_kwargs(self,**dat)
-    """
-
-    """
-    def pop(self,key,tag):
-        if tag in Model.model_classes.values(): tag=inv_dict(tag)
-        if type(key) == str:
-            return self._pop_by_id(key,tag)
-        elif type(key) == int:
-            return self._pop_by_index(key,tag)
-        else:
-            lst = getattr(self,tag)
-            for i in len(lst):
-                if lst[i]==key:
-                    ret = lst.pop(i)
-                    setattr(self,tag,lst)
-                    return ret
-        raise Exception("item not found: %s"%(str(key)))
-
-    def _pop_by_id(self,key,tag):
-        lst = getattr(self,tag)
-        for i in range(len(lst)):
-            if lst[i].id==key:
-                ret = lst.pop(i)
-                setattr(self,tag,lst)
-                return ret
-
-    def _pop_by_index(self,i,tag):
-        ret = getattr(self,tag).pop(i)
-        setattr(self,tag,getattr(self,tag))
-        return ret
-    """
 
     def read(self,filename=None):
         """read from xml fit file, apply attribs to self"""
@@ -323,20 +275,12 @@ class Model(object):
                     setattr(self,item,0.)
             
     def write(self,filename=None):
-        #for item in attr:
-            #get the node
-        #    node=xmlutils.Dudexml.get_node(item.id,item.tag)
-        #    for key in node.attrib.keys():
-        #        node.set(key, str(item.key))
         if filename is None: filename=self.xmlfile
         root = self.build_xml()
         out = prettify(root)
         out.replace('\n\n','\n')
         f = open(filename,'w')
         f.write(out)
-        
-        #tree = et.ElementTree(root)
-        #tree.write(self.xmlfile)
 
 
 class ModelDB(object):
@@ -521,6 +465,10 @@ class ModelDB(object):
         mod.check_vals()
             
         self.models.append(mod)
+
+    def get_lst_from_id(self,id,attr):
+        """get all models with a given continuum"""
+        return [item for item in self.models if getattr(item,attr)==id]
 
     def get_best_lst(self, id=None, param=None):
         """

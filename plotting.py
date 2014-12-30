@@ -94,7 +94,7 @@ if __name__ == '__main__':
     constraints = Constraint(**{"D":{"z":(2.988399,2.988424),"b":{0.,25.}}, "H2":{"z":(2.98759,2.987637), "b":(0.,10.)},"chi2":(0.,1830.)})
     #constraints = Constraint(**{"H2":{"z":(2.98759,2.987637)}})
 
-    db=dudeutils.load_from_db('db.xml')
+    db=dudeutils.load_from_db('database.xml')
     plotDH(db,constraints=constraints)
     #plotND_NH(db,constraints=constraints)
     #plot_cont_vel(db,constraints=constraints)
