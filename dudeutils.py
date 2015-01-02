@@ -22,26 +22,22 @@ def random(xmlfile,itemid,tag,param,val_range,modelid=None):
     assert(old!=new)
     print("model written to %s"%(xmlfile))
 
-def all_conts(db):
+def all_conts(db=None):
     """get the set of all continua"""
     if type(db) is str:
         db = load_from_db(db)
+    if db is None: 
+        db = load_from_db('database.xml')
     conts=[]
     for item in db:
         conts.append((item.ContinuumPointList, item.xmlfile))
     return list(set(conts))
 
-def cont_check_pipeline(reduced_chi2_limit=1.9,verbose=True):
-    db = load_from_db('database.xml')
+def cont_check_pipeline(reduced_chi2_limit=1.9,verbose=True, db=None):
+    if db is None: 
+        db = load_from_db('database.xml')
     conts = all_conts(db)
 
-#
-    _ = conts
-    for item in _:
-        if "2013-07" in item[1]:
-            del(conts[conts.index(item)])
-
-#
     ids = [item[0] for item in conts]
     for item in ids:
         assert(ids.count(item)==1)
@@ -59,6 +55,35 @@ def cont_check_pipeline(reduced_chi2_limit=1.9,verbose=True):
             print(msg)
         print('\n')
     return out
+
+def getDH(vr=(-0.5,0.5)):
+    import matplotlib.pyplot as plt
+
+    db = load_from_db('database.xml') 
+    allmods = []
+    _conts = cont_check_pipeline(db=db)
+    conts = [item[0] for item in _conts]
+    for item in db:
+        if vr[0]<=item.get_shift('D','H')<=vr[1] and item.ContinuumPointList in conts:
+            allmods.append(item)
+
+    for cont in _conts:
+        id = cont[0]
+        name=cont[1]
+        mods = []
+        for mod in db.models:
+            if vr[0]<=mod.get_shift('D','H')<=vr[1] and mod.ContinuumPointList==id:
+                mods.append(mod)
+
+        #dh = [{'dh':item.dh, 'chi2':item.chi2} for item in mods]
+        plt.plot([item.dh for item in mods], [item.chi2 for item in mods],'ko')
+        plt.title(name)
+        plt.show()
+        
+
+    plt.plot([item.dh for item in allmods], [item.chi2 for item in allmods],'ko')
+    plt.title("all continua")
+    plt.show()
 
 def check_for_cont_duplicates():
     import datetime
@@ -95,6 +120,9 @@ def check_for_cont_duplicates():
                 
     #write changes.  to avoid overwriting potentially desirable data, append date, time to fname
     db.write(str(datetime.datetime.now().isoformat()+"_db.xml"))
+
+if __name__=='__main__':
+    getDH()
         
     
     

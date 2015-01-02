@@ -86,9 +86,6 @@ class Model(object):
     def __neq__(self,other):
         return not self.__eq__(other)
 
-
-
-
     def __str__(self):
         """
         string output for a model will be like:
@@ -126,6 +123,26 @@ class Model(object):
     @reduced_chi2.setter
     def reduced_chi2(self,value):
         self._reduced_chi2 = float(value)
+
+    @property
+    def dh(self):
+        d = self.get_datum('D','Absorber',param='N')
+        h = self.get_datum('H','Absorber',param='N')
+        self._dh=float(d)-float(h)
+        return self._dh
+
+    @dh.setter
+    def dh(self,value):
+        """shouldnt need this"""
+        try:
+            self._dh=value
+        except AttributeError:
+            raise Exception("no availble D/H")
+
+    def get_shift(self,id1,id2):
+        z1 = float(self.get_datum(id1,'Absorber','z'))
+        z2 = float(self.get_datum(id2,'Absorber','z'))
+        return (z1-z2)*c/(1.+z2)
 
     def build_xml(self,raw_data='',spname='',sptype=''):
         """build a dude-style xml for this model"""
