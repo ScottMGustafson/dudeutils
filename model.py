@@ -231,6 +231,14 @@ class Model(object):
         """read from xml fit file, apply attribs to self"""
         if not filename:
             filename=self.xmlfile
+
+        for key, val in Model.model_classes.items():
+            lst = data_types.read(filename, tag=val)
+            newobj = data_types.ObjList.factory(lst)
+            assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
+            setattr(self,key,newobj.id)
+
+
         duderoot = et.parse(filename).getroot()  ##should be SpecTool
         dudespec = duderoot.find("CompositeSpectrum")
         if dudespec is None:
@@ -245,9 +253,7 @@ class Model(object):
                 #raise AssertionError
                 if item.tag == val:
                     lst.append(data_types.Data.factory(node=item))
-            newobj = data_types.ObjList.factory(lst)
-            assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
-            setattr(self,key,newobj.id)
+
 
     def set_val(self,id,tag,**kwargs):
         """set the values of a given data element in xml file.  

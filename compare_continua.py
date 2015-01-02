@@ -4,18 +4,19 @@
 import model
 import data_types
 import scipy.stats as stats
-from numpy import median
+from numpy import median, array
 import dudeutils
+import histogram
 
 dbname = 'database.xml'
 c = 299792.458
-velrange=(-.1,.1)
+velrange=(-.5,.5)
 alpha = 0.05
 
 if __name__ == '__main__':
     
     db = model.ModelDB.read(dbname)
-    continua = dudeutils.cont_check_pipeline()
+    continua = dudeutils.cont_check_pipeline(reduced_chi2_limit=1.9,verbose=False)
     #continua = list(set([item.ContinuumPointList for item in db.models]))
 
     data = []
@@ -29,6 +30,7 @@ if __name__ == '__main__':
             it['dh'] = float(item.get_datum('D','Absorber',param='N')) - float(item.get_datum('H','Absorber',param='N'))
             it['continuum'] = item.ContinuumPointList
             it['reduced_chi2'] = item.reduced_chi2
+            it['name'] = item.xmlfile 
             data.append(it)
 
     for item in data:
@@ -36,9 +38,12 @@ if __name__ == '__main__':
 
     dh = []
     chi2=[]
+    names = []
     for cont in continua:
         dh.append([item['dh'] for item in data if item['continuum']==cont[0]])
+        histogram.histogram(array([item['dh'] for item in data if item['continuum']==cont[0]]))
         chi2.append([item['reduced_chi2'] for item in data if item['continuum']==cont[0]])
+        names.append([item['name'] for item in data if item['continuum']==cont[0]])
 
     #each element of dh is a list of D/H vals for each continuum
         
@@ -47,9 +52,21 @@ if __name__ == '__main__':
     if p<=alpha:
         for i in range(len(continua)):
             ind = chi2[i].index(min(chi2[i])) #index of best fit
-            print('%20s med(dh)=%6.3f best dh=%6.3f red chi2=%6.3f datapoints=%4d'%(continua[i][-1],median(dh[i]),dh[i][ind],chi2[i][ind],len(dh[i])))  #prints range of continua
+            print('%20s med(dh)=%6.3f best dh=%6.3f red chi2=%6.3f datapoints=%4d name=%s'%(continua[i][-1],median(dh[i]),dh[i][ind],chi2[i][ind],len(dh[i]),names[i][ind]))  #prints range of continua
     else:
         print("no significant difference in DH values between chosen continua in chosen velocity range")
+        for i in range(len(continua)):
+            ind = chi2[i].index(min(chi2[i])) #index of best fit
+            print('%20s med(dh)=%6.3f best dh=%6.3f red chi2=%6.3f datapoints=%4d name=%s'%(continua[i][-1],median(dh[i]),dh[i][ind],chi2[i][ind],len(dh[i]),names[i][ind]))  #prints range of continua
+
+
+
+    _data = []
+    for item in dh:
+        _data+=list(item)
+    print(_data)
+    histogram.bootstrap_resampling(array(_data), samples=6700)
+    
         
     
         

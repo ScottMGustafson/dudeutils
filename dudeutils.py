@@ -31,19 +31,33 @@ def all_conts(db):
         conts.append((item.ContinuumPointList, item.xmlfile))
     return list(set(conts))
 
-def cont_check_pipeline(reduced_chi2_limit=2.0):
+def cont_check_pipeline(reduced_chi2_limit=1.9,verbose=True):
     db = load_from_db('database.xml')
     conts = all_conts(db)
+
+#
+    _ = conts
+    for item in _:
+        if "2013-07" in item[1]:
+            del(conts[conts.index(item)])
+
+#
+    ids = [item[0] for item in conts]
+    for item in ids:
+        assert(ids.count(item)==1)
     out=[]  #the 'good' continua
     for item in conts:
         models = db.get_lst_from_id(id=item[0],attr='ContinuumPointList')
         _min = min([float(mod.reduced_chi2) for mod in models])
         _min_chi2=min([float(mod.chi2) for mod in models])
-        if _min > reduced_chi2_limit:
-            msg="%15s, id=%15s doesn't fit very well: \n    reduced chi2 = %6.4f, chi2=%6.4f"%(item[1],item[0],_min,_min_chi2)
+        if _min <= reduced_chi2_limit:
+            out.append((item[0],item[1],_min,_min_chi2))
+    if verbose:
+        print(len(out))
+        for item in out:
+            msg="%15s, id=%15s: \n    reduced chi2 = %6.4f, chi2=%6.4f"%(item[0],item[1],item[2],item[3])
             print(msg)
-        else:
-            out.append(item)
+        print('\n')
     return out
 
 def check_for_cont_duplicates():

@@ -7,6 +7,7 @@ import collections
 import builtins
 
 tf = {"true":True, "false":False}
+c=299792.458
 
 class ObjList(object):
     """this and associated subclasses are simply extended lists which implement a flyweight"""
@@ -280,10 +281,10 @@ class Data(object):
         """constructor from file"""
         tag=kwargs.pop("tag")
         id=kwargs.pop("id")
-        #xmlfile = xmlutils.Dudexml(kwargs.pop("xmlfile"))
+        xmlfile = kwargs.pop("xmlfile")
         #node = xmlfile.get_node(id=id, tag=tag)
 
-        root = et.parse(kwargs.pop("xmlfile")).getroot()
+        root = et.parse(xmlfile).getroot()
         node = xmlutils.get_node(root.find('CompositeSpectrum'),tag,id)
             
 
@@ -307,6 +308,25 @@ class Data(object):
             if not key in cls.node_attrib:
                 del(_kwargs[key]) 
         return _kwargs
+
+    @staticmethod
+    def read(filename,tag='Absorber'):
+        import os
+        try:
+            assert(os.path.exists(filename))
+        except:
+            raise Exception(filename)
+        duderoot = et.parse(filename).getroot()  ##should be SpecTool
+        dudespec = duderoot.find("CompositeSpectrum")
+        if dudespec is None:
+            raise Exception("error reading fit file.  check %s to verify."%(filename))
+        spectrum = dudespec.find("Spectrum")
+        spec, spectype = spectrum.get("spec"), spectrum.get("spectype")
+        lst = []
+        for item in list(dudespec)+list(duderoot):
+            if item.tag == tag:
+                lst.append(Data.factory(node=item))
+        return lst
 
     def locked(self,param):
         return getattr(self,param+"Locked")
@@ -367,6 +387,17 @@ class Absorber(Data):
     def alt_init(self,**kwargs):
         self.obs=[item.get_obs(self.z) for item in atomic_data[self.ionName.replace(" ","")]]
 
+    def getShift(self, z):
+        return (float(self.z) - z)*c/(1.+z)
+
+    def get_wave(self, n=0):
+        """get observed wave.  n=transition level such that 
+            lya (n=2-->n=1)=0
+            lyb (n=3-->n=1)=1
+            and etc..
+        """
+        return (1.+self.z)*atomic_data[self.ionName][n].wave
+        
     def locked(self,param):
         param_lock = {'N':'NLocked', 'b':'bLocked', 'z':'zLocked'}
         try:
