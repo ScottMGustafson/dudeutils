@@ -33,7 +33,7 @@ def all_conts(db=None):
         conts.append((item.ContinuumPointList, item.xmlfile))
     return list(set(conts))
 
-def cont_check_pipeline(reduced_chi2_limit=1.9,verbose=True, db=None):
+def cont_check_pipeline(reduced_chi2_limit=1.8,verbose=True, db=None):
     if db is None: 
         db = load_from_db('database.xml')
     conts = all_conts(db)
@@ -76,7 +76,7 @@ def getDH(vr=(-0.5,0.5)):
                 mods.append(mod)
 
         #dh = [{'dh':item.dh, 'chi2':item.chi2} for item in mods]
-        plt.plot([item.dh for item in mods], [item.chi2 for item in mods],'ko')
+        plt.plot([item.dh for item in mods], [item.reduced_chi2 for item in mods],'ko')
         plt.title(name)
         plt.show()
         

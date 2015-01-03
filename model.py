@@ -250,7 +250,7 @@ class Model(object):
             filename=self.xmlfile
 
         for key, val in Model.model_classes.items():
-            lst = data_types.read(filename, tag=val)
+            lst = data_types.Data.read(filename, tag=val)
             newobj = data_types.ObjList.factory(lst)
             assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
             setattr(self,key,newobj.id)
