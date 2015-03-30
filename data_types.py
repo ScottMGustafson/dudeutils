@@ -132,7 +132,7 @@ class ObjList(object):
                 return None
         raise TypeError("invalid type: "+ObjList.classname(objlist[0].__class__))
 
-    classmethod
+    @classmethod
     def classname(cls):
         return cls.__name__.split('.')[-1]
 

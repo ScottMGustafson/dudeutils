@@ -7,16 +7,21 @@ pi = 3.141592654
 class FitData(object): 
     def __init__(self,dumpfile,*lst):
         if len(lst)!=5:
-            lst = np.loadtxt(dumpfile,unpack=True)
+            try:
+                lst = np.loadtxt(dumpfile,unpack=True)
+            except:
+                raise Exception(dumpfile)
             lst = np.delete(lst,0,0)  #first column is always a bunch of zeroes
         self.set_data(*lst)
+        self.name=dumpfile
+        assert(len(lst)==5)
 
     def set_data(self,*lst):  
         self.waves = lst[0]
         self.flux  = lst[1]
         self.error = lst[2]
-        self.abs  = lst[3]
-        self.cont   = lst[4]
+        self.abs   = lst[3]
+        self.cont  = lst[4]
 
     @staticmethod
     def get_ind(waves,start,end):

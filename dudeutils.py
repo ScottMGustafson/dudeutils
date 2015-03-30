@@ -26,7 +26,7 @@ def all_conts(db=None):
     """get the set of all continua"""
     if type(db) is str:
         db = load_from_db(db)
-    if db is None: 
+    elif db is None: 
         db = load_from_db('database.xml')
     conts=[]
     for item in db:
@@ -34,8 +34,8 @@ def all_conts(db=None):
     return list(set(conts))
 
 def cont_check_pipeline(reduced_chi2_limit=1.8,verbose=True, db=None):
-    if db is None: 
-        db = load_from_db('database.xml')
+    if type(db) is str:
+        db = load_from_db(db)
     conts = all_conts(db)
 
     ids = [item[0] for item in conts]

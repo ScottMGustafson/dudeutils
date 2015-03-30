@@ -58,11 +58,18 @@ class AbsConstraint(object):
 class ParameterConstraint(object):
     def __init__(self,id,rng):
         self.id=id
-        self.rng = list(map(float,rng))
+        if type(rng) in [tuple, list]:
+            self.rng = list(map(float,rng))
+        else:
+            self.rng=rng
             
     def __contains__(self,val):
         try:
-            return self.rng[0]<=float(val)<=self.rng[1]
+            if type(val) in [float, int]:
+                return self.rng[0]<=float(val)<=self.rng[1]
+            elif type(val) is bool:
+                print(val, self.rng)
+                return val==self.rng
         except IndexError:
             raise IndexError("input range must be list or tuple of length 2.  Instead got:\n  %s"%(str(self.rng)))
    

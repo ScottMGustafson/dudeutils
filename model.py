@@ -73,8 +73,9 @@ class Model(object):
                 setattr(self,attr,0.)
                 warnings.warn("%s wasn't defined.  setting to 0."%(attr))
         self.locked = {}
-        if not self.params:
-            self.count_params()
+        
+        for attr in ['chi2', 'params', 'pixels']:
+            setattr(self, attr, float(getattr(self,attr)))
 
     def __eq__(self,other):
         attrs = list(['id','chi2','pixels','params']+[Model.model_classes.keys()])
@@ -97,22 +98,11 @@ class Model(object):
         chi2=123.4 pixels=154
 
         """
-        string = "--------continuum points--------\n"
-        for item in Model.get(self.ContinuumPointList):
-            string+=str(item)+"\n"
-
-        locked = {}
         string = "-----------AbsorberList------------\n"
         for item in Model.get(self.AbsorberList):
-            string+=str(item)+"\n"
-            for param in ['NLocked','bLocked','zLocked']:
-                if getattr(item,param):
-                    locked[item.absorber_id] = param
-        string+="locked="
-        for key, val in locked.items():
-            if val:
-                string+=str(key)+":"+str(val)+" "
-        string+="\nchi2=%lf pixels=%lf params=%lf\n\n"%(float(self.chi2),float(self.pixels),float(self.params))
+            if item.id in ['D', 'H', 'H2']:
+                string+=str(item)+"\n"
+        string+="\nchi2=%lf pixels=%lf params=%lf dh=%lf\n\n"%(float(self.chi2),float(self.pixels),float(self.params), self.dh)
         return string
 
     @property
@@ -189,6 +179,8 @@ class Model(object):
         for item in Model.get(getattr(self,tag)):
             if id==item.id:
                 if param:
+                    if "Locked" in param:
+                        return bool(getattr(item,param))
                     try:
                         return float(getattr(item,param))
                     except:
@@ -252,8 +244,9 @@ class Model(object):
         for key, val in Model.model_classes.items():
             lst = data_types.Data.read(filename, tag=val)
             newobj = data_types.ObjList.factory(lst)
-            assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
-            setattr(self,key,newobj.id)
+            if not newobj is None:
+                assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
+                setattr(self,key,newobj.id)
 
 
         duderoot = et.parse(filename).getroot()  ##should be SpecTool
@@ -326,7 +319,10 @@ class ModelDB(object):
         if len(models)>0:  #instantiate new db from models
             self.models = models
             for key in Model.model_classes.keys():
-                setattr(self,key,[getattr(item,key) for item in self.models])
+                try:
+                    setattr(self,key,[getattr(item,key) for item in self.models])
+                except:
+                    setattr(self,key,[])
             
         elif name:   
             self.models = ModelDB.read(str(name), returndb=False)
@@ -385,6 +381,44 @@ class ModelDB(object):
             
 
 
+    def append_db(self,dbfile):
+        """appends another xmldb from filename to the current db"""
+        tree = et.parse(filename)
+        root = tree.getroot()
+
+        for key in Model.model_classes.keys():
+            parent = root.find(key+'s')
+            objlist=data_types.ObjList.list_from_xml(parent) #instantiate all absorber/contpoint/view/etc 
+        model_list = []
+        models = root.find('ModelDB').findall('model')
+
+        for model in models:   
+#get model data (includes an id mapping to something in objlisr)
+            kwargs = {}
+            for key, val in dict(model.attrib).items(): 
+                kwargs[key] = val
+            try:
+                model_list.append(Model(**kwargs))
+            except:
+                raise Exception(str(kwargs))
+
+
+    @staticmethod
+    def filter(inp, filters):
+        for key, val in filters.items():    
+            if key=='chi2':
+                inp=[item for item in inp if item.chi2<val]
+            else:
+                if type(val) is dict:
+                    for param, rng in val.items():
+                        if param=='shift':
+                            inp=[item for item in inp if rng[0] <= item.get_shift(key,'H') <= rng[-1]] 
+                        else:
+                            inp=[item for item in inp if rng[0] <= float(item.get_datum(key,'Absorber',param)) <= rng[-1]] 
+                else:
+                    inp=[item for item in inp if getattr(item, key)==val]
+        return inp
+                
 
 
     def best_fit(self,id,param,order,xmin=None,xmax=None, plot=True, constraints=None):
