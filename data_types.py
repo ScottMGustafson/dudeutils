@@ -69,6 +69,9 @@ class ObjList(object):
     def __getitem__(self,i):
         return self.objlist[i]
 
+    def __len__(self):
+        return len(self.objlist)
+
     @staticmethod
     def generate_id():
         iden=str(uuid.uuid4())
@@ -94,8 +97,6 @@ class ObjList(object):
             msg = "\n  key not found: %s"%(str(theID))
             msg+="\n\n  available keys are:\n%s\n"%(str(sorted(ObjList._pool.keys())))
             print("\n  key not found: %s"%(str(theID)))
-        
-            #raise KeyError(msg)
 
     @staticmethod
     def set(value): 
@@ -120,8 +121,7 @@ class ObjList(object):
 
         self._id = str(value)
         ObjList._pool[self._id] = ObjList._pool.pop(old)
-        
-
+       
     @staticmethod
     def factory(objlist,**kwargs):
         for cls in ObjList.__subclasses__():
@@ -132,7 +132,7 @@ class ObjList(object):
                 return None
         raise TypeError("invalid type: "+ObjList.classname(objlist[0].__class__))
 
-    @classmethod
+    @staticmethod
     def classname(cls):
         return cls.__name__.split('.')[-1]
 
@@ -330,14 +330,7 @@ class Data(object):
 
     def locked(self,param):
         return getattr(self,param+"Locked")
-    """
-    def parse_kwargs(self,**kwargs): #TODO get rid of this since set_data does the same thing
-        for key, val in list(kwargs.items()):  #this goes after to override any conflicts
-            if "Locked" in key:
-                val = True if val=='true' else False
-            setattr(self,key,val)
-        self.set_node(**kwargs)
-    """
+
     def parseNode(self,node=None):
         """read from node, set attribs to self"""
         try:
@@ -375,7 +368,10 @@ class Data(object):
         self.set_node(**kwargs)
 
 class Absorber(Data):
-    node_attrib=["id","N","NLocked","NError","b","bLocked","bError","z","zLocked","zError","ionName"]
+    node_attrib=["id","ionName",
+                "N","NLocked","NError",
+                "b","bLocked","bError",
+                "z","zLocked","zError"]
     
     @classmethod
     def registrar_for(cls,tag):
@@ -468,7 +464,9 @@ class SingleView(Data):
         return tag=="SingleView"
 
 class VelocityView(Data):
-    node_attrib=["id","redshift","minWave","maxWave","minFlux","maxFlux","restWaves","labels"]
+    node_attrib=["id","labels",
+                "minWave","maxWave","minFlux","maxFlux",
+                "restWaves","redshift"]
 
     @classmethod
     def registrar_for(cls,tag):
@@ -492,11 +490,22 @@ class AtomicData(object, metaclass=Singleton):
         for line in f:
             line=line.split()
             try:
-                all_lines[line[0]].append(SpectralLine(**{'wave':float(line[1]),'f':float(line[2])}))
+                all_lines[line[0]].append(
+                    SpectralLine(**{
+                        'ionName':line[0],
+                        'wave':float(line[1]),
+                        'f':float(line[2])
+                    }))
             except KeyError:
-                all_lines[line[0]]=[SpectralLine(**{'wave':float(line[1]),'f':float(line[2])})]
+                all_lines[line[0]]=[
+                    SpectralLine(**{
+                        'ionName':line[0],
+                        'wave':float(line[1]),
+                        'f':float(line[2])
+                    })]
         for k in all_lines.keys():
-            all_lines[k] = sorted(all_lines[k], key=lambda item:item.wave, reverse=True)
+            all_lines[k] = sorted(all_lines[k], 
+                                  key=lambda item:item.wave, reverse=True)
         return all_lines
 
 
