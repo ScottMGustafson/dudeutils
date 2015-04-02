@@ -10,7 +10,8 @@ tf = {"true":True, "false":False}
 c=299792.458
 
 class ObjList(object):
-    """this and associated subclasses are simply extended lists which implement a flyweight"""
+    """this and associated subclasses are simply extended lists which 
+    implement a flyweight"""
 
     #store refs in a dict used to check is inst of data already exists.  
     #dict will be used as access point for the flyweight
@@ -494,14 +495,16 @@ class AtomicData(object, metaclass=Singleton):
                     SpectralLine(**{
                         'ionName':line[0],
                         'wave':float(line[1]),
-                        'f':float(line[2])
+                        'f':float(line[2]),
+                        'gamma':float(line[3])
                     }))
             except KeyError:
                 all_lines[line[0]]=[
                     SpectralLine(**{
                         'ionName':line[0],
                         'wave':float(line[1]),
-                        'f':float(line[2])
+                        'f':float(line[2]),
+                        'gamma':float(line[3])
                     })]
         for k in all_lines.keys():
             all_lines[k] = sorted(all_lines[k], 
