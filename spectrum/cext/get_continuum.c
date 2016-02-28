@@ -2,6 +2,7 @@
 #include"spectrum.h"
 #include<string.h>
 #include<stdlib.h>
+
 double* get_continuum(  continuum_point cont_points[], 
                     const double waves[], 
                     size_t pts_size, size_t arr_size){
@@ -78,18 +79,18 @@ double splineBasis(int i, double t) {
     /*get the correct spline basis function*/
     switch (i) {
     case -1:
-      return (((-t + 3) * t - 3) * t + 1) / 6.0;
+      return (((3.-t)*t - 3)*t + 1)/6.0;
     case 0:
-      return (((3 * t - 6) * t) * t + 4) / 6.0;
+      return (((3*t - 6)*t)*t + 4)/6.0;
     case 1:
-      return (((-3 * t + 3) * t + 3) * t + 1) / 6.0;
+      return (((3.-3*t)*t + 3)*t + 1)/6.0;
     case 2:
-      return (t * t * t) / 6.0;
+      return (t*t*t)/6.0;
     }
     
 
-    fprintf(stderr,"splineBasis:  code should never reach this point.  critical error");
-    return -1000000000.  ;
+    fprintf(stderr,"spectrum/splineBasis.c was inappropriately called.  calculation has failed");
+    return -1000000000.;
 } 
 
 void setContinLine(double x1, double x2, double y1, double y2, 
@@ -100,17 +101,11 @@ void setContinLine(double x1, double x2, double y1, double y2,
     int spix = get_wave_index(waves, wave_sz, x1)+1;
     int epix = get_wave_index(waves, wave_sz, x2);
     int j;
-    double slope = (y2 - y1) / (x2 - x1);
-    double intercept = y1 - x1 * slope;
+    double slope = (y2 - y1)/(x2 - x1);
+    double intercept = y1 - x1*slope;
     
     for (j = spix; j <= epix; ++j) {
-       cont[j] = waves[j] * slope + intercept;
+       cont[j] = waves[j]*slope + intercept;
     }
 }
-
-
-
-
-
-
 

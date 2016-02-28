@@ -11,7 +11,11 @@ int sub_absorber(   const double waves[], double cont[],
                     double f, double Gamma, double restWave, 
                     bool subFlag, size_t size){
 
-    /*caller is responsible for initializing flux*/
+    /*
+    subtract absorption from continuum level given some absorber
+    caller is responsible for initializing flux
+
+    */
 
     double tau_threshold = 0.001;
 
@@ -116,12 +120,12 @@ double* get_absorption(double cont[], const double waves[], absorber abs[],
 
     double* absorption = (double*)malloc(len_arr*sizeof(double));
     for(i=0;i<len_arr;++i){
-        absorption[i]=cont[i];
+        absorption[i]=cont[i]; /*initialie absorber flux as continuum level*/
     }
 
     
 
-    for (i=0;i<num_absorbers;i++){
+    for (i=0;i<num_absorbers;i++){ // subtract absorption
         sub_absorber(  waves, absorption, 
                             abs[i].N,abs[i].b, abs[i].z, 
                             abs[i].f, abs[i].gamma, abs[i].rest, 
