@@ -54,7 +54,7 @@ def fit_absorption(dat, model):
     """
     Input:
     ------
-    dat : observed_data.ObservedData instance
+    dat : specParser.Spectrum instance
     model : model.Model instance
 
     Output:
@@ -135,7 +135,7 @@ def is_locked(param, ab, starts, ends):
 
 
 def optimize(spec, model):
-#TODO  change such that only to=otimize regions of wave, flux and err are explicitly fed into scip.optimize.curve_fit
+
     """
     calculate best fit parameters using scipy.optimize.curve_fit
 
@@ -171,7 +171,7 @@ def optimize(spec, model):
     for r in range(starts.shape[0]):
         temp=np.where(spec.waves<ends[r], spec.waves, -1.)
         indices+=np.where(temp>starts[r])[0].tolist()       
-    #should not get multiple entrie for the same value becuse we consolidated already, but nevertheless to be sure:
+    #should not get multiple entries for the same value becuse we consolidated already, but nevertheless to be sure:
     indices=list(set(indices))
 
     abs_lst = list(model.get_lst('AbsorberList'))
@@ -201,6 +201,8 @@ def optimize(spec, model):
     def absorption(waves, *params):
 
         """
+        this is our function to pass into scipy.optimize
+
         calculate the best fit for given list of *params.  Needs to be in scope 
         of optimize so that it can inherit some of its objects, while keeping 
         inputs consistent with scipy.optimize.curve_fit
@@ -253,3 +255,31 @@ def optimize(spec, model):
     
     #return curve_fit(absorption, spec.waves, spec.flux, p0=p0, sigma=spec.err, absolute_sigma=True)
     return curve_fit(absorption, spec.waves[indices], spec.flux[indices], p0=p0, sigma=spec.err[indices])
+
+if __name__ == "__main__":
+    test_xml = "/home/scott/research/test_xml.xml"
+
+    model=dudeutils.get_model(test_xml)
+    sp = spectrum.Spectrum.sniffer(model.flux)
+
+    print("testing optimizer.fit_absorption")
+    cont, ab, chi2 = optimizer.fit_absorption(sp, model)
+
+    continuum_points = sorted(model.get_lst('ContinuumPointList'),key=lambda u:u.x)
+    
+    #split x,y into lists
+    x,y = map(list,zip(*[(item.x, item.y) for item in continuum_points]))
+
+    plt.plot(src_data.waves,src_data.flux,"-k",linestyle='steps')
+    plt.plot(x,y,"co")
+    plt.plot(src_data.waves,cont,"-b",linestyle='steps')
+    plt.plot(src_data.waves,ab,"-r",linestyle='steps')
+    plt.ylim([-1E-14,1E-13])
+    plt.show()
+
+    print("optimizing spec")
+
+    popt, pcov = optimizer.optimize(sp, model)
+
+    print(str(popt))
+    print("\n"+str(pcov))

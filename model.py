@@ -36,8 +36,8 @@ class Model(object):
         self.pixels=0
         self.chi2=0.
         self.params=0
-        self.flux=None
-        self.error=None
+        self.flux=None  #fits (or text) file with flux
+        self.error=None #fits (or text) file with flux.  if test, then this is the same as flux and xml format will change a bit
         self.get_all=kwargs.pop("get_all",True)
         self.id=kwargs.pop("id",data_types.ObjList.generate_id())
         self.abs_ids=kwargs.pop("abs_ids",None)

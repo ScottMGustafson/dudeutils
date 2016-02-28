@@ -5,7 +5,8 @@ import subprocess
 import xml.etree.ElementTree as et
 from wavelength import c
 
-def run_optimize(fname,step=False, verbose=True):
+
+def run_optimize(fname,step=False, verbose=True, method='dude'):
     """
     call dude and run OptimizeXML from the command line.
 
@@ -16,12 +17,18 @@ def run_optimize(fname,step=False, verbose=True):
         dumping some number of fits for each step of the procedure, named 
         \"iteration_%d.xml\"
     """
-    commands=["java","-cp","/home/scott/programming/dude/jd/build","dude.commandline.OptimizeXML",fname]
-    if step:
-        commands.append('step')
-    if verbose:
-        print("running: %s"%(" ".join(commands)))
-    subprocess.call(commands)
+    if method=='dude':
+        #call dude from the command line and call its Levenberg-marquardt algo.
+        commands=["java","-cp","/home/scott/programming/dude/jd/build","dude.commandline.OptimizeXML",fname]
+        if step:
+            commands.append('step')
+        if verbose:
+            print("running: %s"%(" ".join(commands)))
+        subprocess.call(commands)
+    else:
+
+        popt, pcov = optimizer.optimize(src_data, model)
+        
 
 def newdb(xmlfile,dbfile=None,params=None,**kwargs):
     """get a model, append to new database"""
