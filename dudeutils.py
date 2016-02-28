@@ -1,16 +1,108 @@
 from model import Model, ModelDB
+import os
+from os.path import split, isfile, join
+import subprocess
+import xml.etree.ElementTree as et
+from wavelength import c
 
-"""a collection of helper functions"""
+def run_optimize(fname,step=False, verbose=True):
+    """
+    call dude and run OptimizeXML from the command line.
 
-def newdb(xmlfile,chi2,pixels,dbfile=None,params=None,**kwargs):
+    input:
+    ------
+    fname:  source dude xml file (string)
+    step (bool): if True, calls dude's step-iteration procedure,
+        dumping some number of fits for each step of the procedure, named 
+        \"iteration_%d.xml\"
+    """
+    commands=["java","-cp","/home/scott/programming/dude/jd/build","dude.commandline.OptimizeXML",fname]
+    if step:
+        commands.append('step')
+    if verbose:
+        print("running: %s"%(" ".join(commands)))
+    subprocess.call(commands)
+
+def newdb(xmlfile,dbfile=None,params=None,**kwargs):
     """get a model, append to new database"""
-    model = Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+    model = Model(xmlfile=xmlfile)
     return ModelDB(dbfile,[model],**kwargs)
 
+def get_model(xmlfile,chi2=0.,pixels=0.):
+    """
+    get a single model instance from an xmlfile.  This exists just to provide 
+    multiple points of entry to get a model
+
+    Input:
+    ------
+    xmlfile : a dude xml fit file
+    chi2 : chi-square.  default=0.
+    pixels : number of pixels being optimized.  default=0
+
+    Output:d
+    -------
+    model.Model instance 
+
+    """
+    return Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+
+
+def populate_database(abs_ids,keep=False,path=None,db=None,constraints=None):
+    """
+    parse all xmlfiles in a given directory and returns a ModelDB instance
+
+    Input:
+    ------
+    path : specified path to check
+
+    Output:
+    -------
+    ModelDB instance
+
+    """
+
+    if type(abs_ids)!=list:
+        raise Exception("abs_ids needs to be list")
+
+    if len(abs_ids)==0:
+        raise Exception("need at least one absorber specified.  abs_ids=[]")
+
+    files=[]
+    if not path:
+        path=os.getcwd()
+    for f in os.listdir(path):
+        if split(f)[-1].startswith('iteration') and split(f)[-1].endswith(".xml"):
+            files.append(f)
+
+    if len(files)==0 and not db:
+        raise Exception("too few files")
+
+    models=[Model( xmlfile=join(path,f), abs_ids=abs_ids ) for f in files]
+
+    if bool(db): #if None or []
+        if type(db) is str:
+            db=load_from_db(db)
+        db.append_lst(models,constraints=constraints)
+    else:
+        db = ModelDB(models=models,constraints=constraints)
+
+    if not keep:
+        for f in files:
+            os.remove(join(path,f))
+    return db
+
+
+def append_db(db,abs_ids,keep=False,path=None,constraints=None):
+    """populate existing database"""
+    populate_database(abs_ids,keep=keep,path=path,db=db,constraints=constraints)
+
+   
 def load_from_db(dbxml):
+    """alias to load a database"""
     return ModelDB.read(dbxml)
 
 def get_db(dbfile):
+    """alias to load a database"""
     return ModelDB.read(dbfile)
 
 def random(xmlfile,itemid,tag,param,val_range,modelid=None):
@@ -56,10 +148,10 @@ def cont_check_pipeline(reduced_chi2_limit=1.8,verbose=True, db=None):
         print('\n')
     return out
 
-def getDH(vr=(-0.5,0.5)):
+def getDH(vr=(-0.5,0.5), dbfile='database.xml'):
     import matplotlib.pyplot as plt
 
-    db = load_from_db('database.xml') 
+    db = load_from_db(dbfile) 
     allmods = []
     _conts = cont_check_pipeline(db=db)
     conts = [item[0] for item in _conts]
@@ -121,8 +213,44 @@ def check_for_cont_duplicates():
     #write changes.  to avoid overwriting potentially desirable data, append date, time to fname
     db.write(str(datetime.datetime.now().isoformat()+"_db.xml"))
 
+
+def parse(filename, ab_ids, path='/home/scott/research/J0744+2059/'):
+    """clear a db file of all absorbers not in ab_ids"""
+
+    tree = et.parse(join(path,filename))
+
+    root = tree.getroot()
+    parent = root.find('AbsorberLists')
+    models = root.find('ModelDB').findall('model')
+
+    for ablist in parent.findall('AbsorberList'):
+        for ab in ablist.findall('Absorber'):
+            if ab.get('id') not in ab_ids:
+                ablist.remove(ab)
+        if len(list(ablist))==0:
+            parent.remove(ablist)
+    tree.write(join(path,filename))
+
+
 if __name__=='__main__':
-    getDH()
+    #parse("FeIIdb.xml",["FeII", "FeII_1","FeII_2","FeII_3","FeII_4","FeII_5"])
+    pass
+
+    #import plot_distribution as plt
+    """path="/home/scott/research/J0744+2059/"
+    fname="test.xml"
+    abs_ids=["CIV_1","CIV_2","CIV_3"]
+    model=Model(xmlfile=os.path.join(path,fname))
+    db=random_sampling(model,"CIV_3","N",[13.2,13.7],4,abs_ids,constraints={},iden2=None)
+    print("len db: %d"%(len(db)))
+    for item in db:
+        print(item.chi2, item.get_datum("CIV_3","Absorber","N"))"""
+        
+    #db=load_from_db("testdb.xml")
+    #db=populate_database(abs_ids=["CIV_1","CIV_2","CIV_3"],path=path)
+    #db.write("testdb.xml")
+    #plt.plot_chi2(db,"N",xlabel="N column", iden="test")
+
         
     
     

@@ -6,76 +6,59 @@ SingleViewList, VelocityViewList) is written to the flyweight:
 data_types.ObjList._pool and will ONLY be accessed from there.
 
 to access data here, we use Model.get(some id) where id is the key for our 
-flyweight.
-
-There shouldn't ever be the need to alter any model data, since it will be 
-altered in dude, however, should the need arise, using Model.set_val will 
-change the values and save as a new xml fit file (blah.xml_scratch.xml).  This 
-is not written into data_types.ObjList._pool because it is expected that you 
-will edit this in dude before using it as a viable model.
-
-this will then be saved when you write it later.
-
+dict of stored objects:  data_types.ObjList._pool
 """
-
-
 
 import xmlutils
 import data_types
 import warnings
-import numpy as np
+import os.path
 import matplotlib.pyplot as plt
 import re
 from constraints import Constraint
-from numpy.random import random_sample
+from numpy.random import random_sample, randn
 import data_types
 import xml.etree.ElementTree as et
+import copy
 
-
-
-c = 299792.458
-
+c = 299792.458 #speed of light in km/s
+def tf(val):
+    return "true" if val in [True,"true"] else "false"
 class Model(object): 
     #this dict maps ObjList subclasses to their associated data type
-    model_classes = {"AbsorberList":"Absorber","ContinuumPointList":"ContinuumPoint",
-                "RegionList":"Region","SingleViewList":"SingleView",
-                "VelocityViewList":"VelocityView"}
+    model_classes = {"AbsorberList":"Absorber",
+                     "ContinuumPointList":"ContinuumPoint",
+                     "RegionList":"Region",
+                     "SingleViewList":"SingleView",
+                     "VelocityViewList":"VelocityView"}
 
     def __init__(self, **kwargs):
-        """
-        """ 
+        self.pixels=0
+        self.chi2=0.
+        self.params=0
+        self.flux=None
+        self.error=None
+        self.get_all=kwargs.pop("get_all",True)
         self.id=kwargs.pop("id",data_types.ObjList.generate_id())
-        #self.parse_kwargs(**kwargs)
+        self.abs_ids=kwargs.pop("abs_ids",None)
         for key, val in dict(kwargs).items():
             setattr(self,key,val)  #data lists will be the id needed to fetch from the data pool
-                 
+                
+
         if self.xmlfile==None:
             try:
                 self.xmlfile=Model.get(self.AbsorberList)[0].xmlfile.name
             except:
                 raise Exception("must specify either xml filename or model data")
 
-        #self.xml_fit = xmlutils.Dudexml(self.xmlfile)
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+
         if not "AbsorberList" in kwargs.keys(): #no fitting data is specified in __init__, then read
             self.read()
-        else:
-            assert(type(self.AbsorberList) is str)
-            try:
-                assert(self.AbsorberList in data_types.ObjList._pool.keys())
-            except AssertionError:
-                raise KeyError(self.AbsorberList,data_types.ObjList._pool.keys())
-        #self.test_chi2()
 
-        for attr in ["chi2","pixels","params"]:
-            try:
-                assert(attr in kwargs.keys())
-            except AssertionError:
-                setattr(self,attr,0.)
-                warnings.warn("%s wasn't defined.  setting to 0."%(attr))
-        self.locked = {}
-        
-        for attr in ['chi2', 'params', 'pixels']:
-            setattr(self, attr, float(getattr(self,attr)))
+        self.locked = {} 
+        self._dof=float(self.pixels)-float(self.params)
 
     def __eq__(self,other):
         attrs = list(['id','chi2','pixels','params']+[Model.model_classes.keys()])
@@ -95,24 +78,34 @@ class Model(object):
         id=SiI N=11.12345 b=12.345678 z=1.234567890
         id=OI N=11.12345 b=12.345678 z=1.234567890
         locked=OI:bLocked HI:zLocked
-        chi2=123.4 pixels=154
+        chi2=123.4 pixels=154 params=23
 
         """
         string = "-----------AbsorberList------------\n"
         for item in Model.get(self.AbsorberList):
-            if item.id in ['D', 'H', 'H2']:
-                string+=str(item)+"\n"
-        string+="\nchi2=%lf pixels=%lf params=%lf dh=%lf\n\n"%(float(self.chi2),float(self.pixels),float(self.params), self.dh)
+            string+=str(item)+"\n"
+        string+="\nchi2=%lf pixels=%lf params=%lf dh=%lf\n\n"%(
+                float(self.chi2),float(self.pixels),float(self.params))
         return string
 
     @property
     def reduced_chi2(self):
-        self._reduced_chi2 = float(self.chi2)/(float(self.pixels)-float(self.params)-1.)
+        self._reduced_chi2 = float(self.chi2)/(self.dof)
         return self._reduced_chi2
 
     @reduced_chi2.setter
     def reduced_chi2(self,value):
         self._reduced_chi2 = float(value)
+
+    @property
+    def dof(self):
+        self._dof=float(self.pixels-self.params)
+        return self._dof
+
+    @dof.setter
+    def dof(self,value):
+        warnings.warn("setting dof without adjusting pixels or params")
+        self._dof=value
 
     @property
     def dh(self):
@@ -129,22 +122,54 @@ class Model(object):
         except AttributeError:
             raise Exception("no availble D/H")
 
-    def get_shift(self,id1,id2):
+    def get_vel(self,id1,id2):
+        """
+        get velocity shift between two absorbers
+
+        input:
+        ------
+        id1, id2:  (string): ids of absorbers to use.  z2 will be our reference.
+                    if vel>0, then id1 is red of id2
+        output:
+        -------
+        velocity in km/s
+
+        
+
+        """
         z1 = float(self.get_datum(id1,'Absorber','z'))
         z2 = float(self.get_datum(id2,'Absorber','z'))
         return (z1-z2)*c/(1.+z2)
 
+    def get_shift(self,id1,id2):
+        """
+        an alias for get_vel(id1, id2)
+
+        """
+        return self.get_vel(id1,id2)
+
+    def copy(self):
+        mod = copy.deepcopy(self)
+        mod.id=data_types.ObjList.generate_id()
+        return mod
+
     def build_xml(self,raw_data='',spname='',sptype=''):
         """build a dude-style xml for this model"""
-        #define the boilerplate
+        if raw_data=='':
+            raw_data=self.flux
+            if not raw_data:
+                raise Exception("must specify location of fits source data")
+        if spname=='':
+            spname=raw_data
+        sptype='fits' if spname.endswith('.fits') else 'ascii1'
         duderoot = et.Element("SpecTool",{"version":"1.0"})
         dudespec = et.SubElement(duderoot,"CompositeSpectrum", {"id":raw_data})
-        et.SubElement(duderoot,"Spectrum",{"spec":spname,"spectype":sptype})
+        spec= et.SubElement(dudespec,"Spectrum",{"spec":spname,"spectype":sptype})
 
         #add spectrum stuff
-        for attr in ["AbsorberList", "ContinuumPointList"]:
+        for attr in ["ContinuumPointList","AbsorberList"]:
             try:
-                lst = Model.get(getattr(self,attr))
+                lst = self.get_lst(attr)
             except:
                 if getattr(self,attr) is None:
                     raise Exception("no valid continuum points or absorbers for %s"%(self.xmlfile))
@@ -158,26 +183,16 @@ class Model(object):
         #the view stuff
         for attr in ["SingleViewList", "VelocityViewList", "RegionList"]:
             try:
-                duderoot.extend([item.node for item in Model.get(getattr(self,attr))])
+                duderoot.extend([item.node for item in self.get_lst(attr)])
             except:
                 pass
         return duderoot
 
-    def count_params(self):
-        """get the number of params being optimized"""
-        params=0
-        for ab in Model.get(self.AbsorberList):
-            if ab.in_region(Model.get(self.RegionList)):
-                for lock in ["bLocked","zLocked","NLocked"]:
-                    if getattr(ab,lock)==True:
-                        params+=1
-        self.params = params
-
-    def get_datum(self,id,tag,param=None):
-        """get an individual datum from model's data list.  (ex: an individual absorber)"""
+    def get_datum(self,iden,tag,param=None):
+        """get an individual datum from model's data list."""
         if tag in Model.model_classes.values(): tag=inv_dict(tag)
-        for item in Model.get(getattr(self,tag)):
-            if id==item.id:
+        for item in self.get_lst(tag):
+            if iden==item.id:
                 if param:
                     if "Locked" in param:
                         return bool(getattr(item,param))
@@ -187,12 +202,34 @@ class Model(object):
                         return getattr(item,param)
                 else:
                     return item
-        raise Exception("item not found: %s"%(id))
+        raise Exception("item not found: %s"%(iden))
         
     @staticmethod
-    def get(id):
-        """just an alias for:"""
-        return data_types.ObjList.get(id)
+    def get(iden):
+        """
+        an alias for data_types.ObjList.get
+        note that getting model_instance.*List only returns the id associated 
+        with that particular object. to get the actual object, need to use
+            Model.get(model.*List)
+
+        further note that this is a staticmethod.
+
+
+        input:
+        ------
+        iden: id (string) of object of interest
+
+        output:
+        -------
+        an element from data_types.ObjList._pool, so a list of absorbers,
+        continuumpoints, velocity views, region lists or single views
+
+        raises:
+        -------
+        None
+
+        """
+        return data_types.ObjList.get(iden)
 
     def get_lst(self,attr):
         """just an alias for:"""
@@ -201,8 +238,6 @@ class Model(object):
     def check_vals(self):
         unphysical={"b":[1.0,50.],"N":[10.00,25.00]} 
 
-#<10 is unphysical bc it likely cannot be measured
-#b<50.km/s because it would be very unlikely to see something so hot (but not impossible)
         abslist = self.get(self.AbsorberList)
         for item in abslist:
             assert(isinstance(item,data_types.Absorber))
@@ -212,91 +247,152 @@ class Model(object):
                 except: 
                     raise Exception("%s %s: %s has unphysical value of %lf"%(item.ionName,item.id,key,(getattr(item,key))))
 
+    def monte_carlo_set(self,iden, tag, val_range, param, gaussian=False):
+        """set a param for Data `id` to a random value in val_range
+        params:
+        -------
+        iden:  id of the item to be changed
+        tag:   absorber, continuum point, etc..  see data_types.py
+        val_range:  list or tuple of [min, max].  if gaussian=true, this will be 95% limits
+        gaussian:  return random value on gaussian distribution?
+        param: which param to alter?
 
-    def get_model(self,**kwargs):  
-        """get all model data from xml and set attribs for self"""
-        for key, val in Model.model_classes.items():
-            lst=[]
-            for item in data_types.ObjList.get_all(val):
-                assert(item.tag==val)
-                inp = {"xmlfile":self.xmlfile,"node":item,"tag":item.tag}
-                lst.append(data_types.Data.factory(**inp))  #creates list of absorbers, cont points, etc.
-            if len(lst)>0:
-                data=data_types.ObjList.factory(lst)  #store as objlist.  if already exists, does nothing by default
-                setattr(self,key,data.id) #store key for flyweight
-            else:
-                setattr(self,key,None)  #else, store as none
-        #self.parse_kwargs(**kwargs)
-        self.test_chi2()
-
-    def monte_carlo_set(self,id,tag,param,val_range):
-        """set a param for Data `id` to a random value in val_range"""
+        """
         a=float(val_range[0])
         b=float(val_range[1])
-        new = (b-a)*random_sample()+a
-        self.set_val(id,tag,**{param:new})
+        if gaussian:
+            twosigma=(val_range[1]-val_range[0])/2.
+            sigma=twosigma/2.
+            new = sigma*randn()+(a+b)/2.
+        else:
+            new = (b-a)*random_sample()+a
+        self.set_val(iden,tag,**{param:new})
 
     def read(self,filename=None):
-        """read from xml fit file, apply attribs to self"""
+        """read from xml fit file, apply attribs to self
+
+        input:
+        ------
+        filename (default None)  filename to read.  if None, reads self.xmlfile
+
+        output:
+        -------
+        None
+
+        raises:
+        -------
+        Exception:  when xml parsing fails
+
+
+        """
         if not filename:
             filename=self.xmlfile
 
+
+        #read through the data:  
+        #  if data is new, then create the new class instances and store data in
+        #  ObjList._pool and point the model to the correct pool key. Otherwise,
+        #  just point the model instance to the appropriate pool key
+
         for key, val in Model.model_classes.items():
-            lst = data_types.Data.read(filename, tag=val)
+            ids=self.abs_ids if val=="Absorber" else None #and not self.get_all else None  #if looking at absorbers, can specify which absorbers to include
+            lst = data_types.Data.read(filename, tag=val, ids=ids)
+            if key=='AbsorberList': assert(len(lst)>0)
             newobj = data_types.ObjList.factory(lst)
-            if not newobj is None:
+            if newobj:
                 assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
                 setattr(self,key,newobj.id)
 
 
-        duderoot = et.parse(filename).getroot()  ##should be SpecTool
-        dudespec = duderoot.find("CompositeSpectrum")
-        if dudespec is None:
-            raise Exception("error reading fit file.  check %s to verify."%(filename))
-        spectrum = dudespec.find("Spectrum")
-        spec, spectype = spectrum.get("spec"), spectrum.get("spectype")
+        # read thorugh xml file for source data files
+        try:
+            duderoot = et.parse(filename).getroot()  ##should be SpecTool
+        except:
+            raise Exception(filename+" failed to parse.")
+        compositespec = duderoot.find("CompositeSpectrum")
+        path=os.path.split(compositespec.get("id"))[0]
 
-        for key, val in Model.model_classes.items():
-            lst = []
-            for item in list(dudespec)+list(duderoot):
-                #print(str(list(dudespec)+list(duderoot)))
-                #raise AssertionError
-                if item.tag == val:
-                    lst.append(data_types.Data.factory(node=item))
+        #find the source data
+        spectrum = compositespec.find("Spectrum")
+
+        try:
+            self.flux=spectrum.get('spec')
+        except:
+            self.flux=compositespec.get('id')
+
+        try:
+            self.error=spectrum.get('error')
+            self.chi2=float(spectrum.get("chi2"))
+            self.params=float(spectrum.get("params"))
+            self.pixels=float(spectrum.get("pixels"))
+        except:
+            self.chi2=0.
+            self.params=0.
+            self.pixels=0.
+            self.error=None
+        try:
+            self.flux  = os.path.join(path,spectrum.get("spec"))
+            self.error = os.path.join(path,spectrum.get("error"))
+        except:
+            self.flux  = os.path.join(path,spectrum.get("spec"))
+ 
+        #read through all data in xml.  create relevant classes
+        # enable this if you want each model to store its own data
+
+        #for key, val in Model.model_classes.items():
+        #    lst = []
+        #    for item in list(dudespec)+list(duderoot):
+        #        if item.tag == val:
+        #            lst.append(data_types.Data.factory(node=item))
+        #    setattr(self,key,data_types.ObjList.factory(lst))
 
 
-    def set_val(self,id,tag,**kwargs):
+    def set_val(self,iden,tag,**kwargs):
         """set the values of a given data element in xml file.  
            don't need to reset value in pool since data will be gotten
            later in get
         """
-        if tag in Model.model_classes.values(): tag=inv_dict(tag)
-        for item in getattr(self,tag):  #for item in abslist
-            if item.id==id:  #if the id of the absorber matches
-                item.set_data(**kwargs)
-                print("setting to %s"%(str(kwargs)))
-        new_lst= data_types.ObjList.factory(getattr(self,tag))  #dont need to return this, since being automatically written to _pool
-        assert(new_lst.id in data_types.ObjList._pool.keys())  #test that data was added to pool
-        self.write(kwargs.get("filename", self.xmlfile+"_scratch.xml"))
+        if tag in Model.model_classes.values(): 
+            tag=inv_dict(tag)
+        else:
+            raise Exception("no datatype called %s"%tag)
 
-    def test_chi2(self):
-        for item in ["chi2", "pixels", "params"]:
-            try:
-                float(getattr(self,item))
-            except:
-                if item=="params":
-                    self.count_params()
-                else:
-                    warnings.warn(item+" not present...")
-                    setattr(self,item,0.)
+        ab_lst=data_types.ObjList.get(getattr(self,tag))
+
+        for item in ab_lst:  #for item in abslist
+            if item.id==iden:  #if the id of the absorber matches
+                item.set_data(**kwargs)
+                print("setting to %s %s"%(iden, str(kwargs)))
+        #new_lst= data_types.ObjList.factory(ab_lst)  #dont need to return this, since being automatically written to _pool
+        #assert(new_lst.id in data_types.ObjList._pool.keys())  #test that data was added to pool
+        #self.write(kwargs.get("filename", self.xmlfile+"_scratch.xml"))
             
     def write(self,filename=None):
-        if filename is None: filename=self.xmlfile
-        root = self.build_xml()
-        out = prettify(root)
-        out.replace('\n\n','\n')
-        f = open(filename,'w')
-        f.write(out)
+        if filename is None: 
+            filename=self.xmlfile
+
+
+        with open(filename,"w") as f:
+            f.write("<?xml version=\"1.0\"?>\n")
+            f.write("<SpecTool version=\"1.0\">\n")
+            f.write("<CompositeSpectrum id=\"%s\"><Spectrum spec=\"%s\" error=\"%s\" chi2=\"%lf\" pixels=\"%lf\" params=\"%d\"/>\n"%(
+                      self.flux,os.path.split(self.flux)[-1],os.path.split(self.error)[-1],self.chi2,self.pixels,self.params
+                   ))
+            for item in data_types.ObjList.get(getattr(self,"ContinuumPointList")):
+                if not item.id: item.id="null"
+                f.write("<ContinuumPoint x=\"%lf\" y=\"%E\" xError=\"0.0\" yError=\"0.0\" xLocked=\"%s\" yLocked=\"%s\" id=\"%s\"/>\n"%(
+                    item.x,item.y,tf(item.xLocked),tf(item.yLocked),item.id
+                ))
+
+            for item in data_types.ObjList.get(getattr(self,"AbsorberList")):
+                f.write("<Absorber ionName=\"%s\" N=\"%lf\" b=\"%lf\" z=\"%lf\" NError=\"0.0\" bError=\"0.0\" zError=\"0.0\" NLocked=\"%s\" bLocked=\"%s\" zLocked=\"%s\" id=\"%s\"/>\n"%(
+                        item.ionName, item.N, item.b,item.z,tf(item.NLocked),tf(item.bLocked),tf(item.zLocked),item.id
+                        ))
+            f.write("</CompositeSpectrum>\n")
+
+            for item in data_types.ObjList.get(getattr(self,"RegionList")):
+                f.write("<Region start=\"%lf\" end=\"%lf\"/>\n"%(item.start, item.end))
+            f.write("</SpecTool>")
 
 
 class ModelDB(object):
@@ -334,7 +430,10 @@ class ModelDB(object):
 
     def __iter__(self):
         for i in range(len(self.models)):
-            yield self.models[i]               
+            yield self.models[i]  
+
+    def __len__(self):
+        return len(self.models)             
 
     def __getitem__(self,i):
         return self.models[i]
@@ -342,7 +441,13 @@ class ModelDB(object):
     def append(self, model):
         self.models.append(model)
 
-    def get_all_abs(self,id,param,locked=False,constraints=None):
+    def append_lst(self, lst,constraints=None):
+        if constraints:
+            lst=ModelDB.constrain(lst, constraints)
+        for item in lst:
+            self.models.append(item)
+
+    def get_all_abs(self,iden,param,locked=False,constraints=None):
         """return a list of desired param values from all models"""
         x = []
         y = []
@@ -357,16 +462,16 @@ class ModelDB(object):
         if locked:
             for item in lst:
                 abslist = Model.get(item.AbsorberList)
-                ab = abslist.get_item(id)
+                ab = abslist.get_item(iden)
                 if ab.locked(param):
                     x.append(float(getattr(ab,param)))
                     y.append(float(item.chi2))
         else:
             for item in lst:
                 abslist = Model.get(item.AbsorberList)
-                ab = abslist.get_item(id)
+                ab = abslist.get_item(iden)
                 if ab is None:
-                    raise Exception(item.xmlfile+" has no absorber: "+id)
+                    raise Exception(item.xmlfile+" has no absorber: "+iden)
                 try:
                     x.append(float(getattr(ab,param)))
                     y.append(float(item.chi2))
@@ -413,6 +518,8 @@ class ModelDB(object):
                     for param, rng in val.items():
                         if param=='shift':
                             inp=[item for item in inp if rng[0] <= item.get_shift(key,'H') <= rng[-1]] 
+                        elif type(rng) in [str, bool]:
+                            inp=[item for item in inp if item.get_datum(key,'Absorber',param)==rng] 
                         else:
                             inp=[item for item in inp if rng[0] <= float(item.get_datum(key,'Absorber',param)) <= rng[-1]] 
                 else:
@@ -421,37 +528,7 @@ class ModelDB(object):
                 
 
 
-    def best_fit(self,id,param,order,xmin=None,xmax=None, plot=True, constraints=None):
-        """
-        get a best fit of data with respect to `param'
 
-        id: id of absorber
-        param:  parameter name (N,b,z)
-        order:  order of polynomial to fit
-        xmax, xmin: range of values to consider
-        locked:  get only locked parameters?
-        plot:   plot the data?  otherwise return function, x, y
-        """
-        x, y = self.get_all_abs(self,id,param,locked=True,constraints=constraints)
-
-        if xmin==None and xmax==None:
-            xmax = max(x)
-            xmin = min(x)
-
-        x=np.array(x)
-        y=np.array(y)
-
-        coeffs=np.polyfit(x-x.mean(),y,int(order))
-        f = np.poly1d(coeffs)
-
-        if plot:
-            xx = np.arange(xmin,xmax, np.abs(xmax-xmin)/100.)
-            yy = f(xx-x.mean())
-            plt.xlim(xmin,xmax)
-            plt.plot(xx,yy,'b-')
-            plt.plot(x,y,'ro')
-            plt.show()
-        return f, x, y
 
     @staticmethod
     def build_xml(models):
@@ -476,10 +553,14 @@ class ModelDB(object):
                 data = {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),
                     'pixels':str(item.pixels),'params':str(item.params)}
                 for attr in Model.model_classes.keys():
-                    inst = getattr(item,attr)
-                    if not inst: continue
-                    assert(type(inst) is str)
-                    data[attr]=inst
+                    try:
+                        inst = getattr(item,attr)
+                        assert(type(inst) is str)
+                        data[attr]=inst
+                    except: 
+                        warnings.warn("model "+group_name+"has no attribute "+attr)
+                        data[attr]="None"
+
                 current_group = et.SubElement(modeldb, 'model', data)
 
         #build the actuall fitting data
@@ -523,11 +604,11 @@ class ModelDB(object):
             
         self.models.append(mod)
 
-    def get_lst_from_id(self,id,attr):
+    def get_lst_from_id(self,iden,attr):
         """get all models with a given continuum"""
-        return [item for item in self.models if getattr(item,attr)==id]
+        return [item for item in self.models if getattr(item,attr)==iden]
 
-    def get_best_lst(self, id=None, param=None):
+    def get_best_lst(self, iden=None, param=None):
         """
         gets best fit.
 
@@ -538,26 +619,26 @@ class ModelDB(object):
             self.models=sorted(self.models, key=lambda x: x.chi2)
             return [(mod, mod.chi2) for mod in self.models]
         else:
-            return self.get_locked(id, param)  #already sorted
+            return self.get_locked(iden, param)  #already sorted
 
-    def get_locked(self, id, tag, param):
+    def get_locked(self, iden, tag, param):
         tmp = []
        
         for mod in self.models:
             try:
-                if to_bool(mod.get_datum(id,tag,param+"Locked")):
+                if to_bool(mod.get_datum(iden,tag,param+"Locked")):
                     tmp.append(mod)
             except:
                 pass
         tmp =  sorted(tmp, key=lambda x: x.chi2)
-        return [(mod.get_datum(id,tag,param), mod.chi2) for mod in tmp]
+        return [(mod.get_datum(iden,tag,param), mod.chi2) for mod in tmp]
 
-    def get_model(self, id):
+    def get_model(self, iden):
         for item in self.models:
-            if item.id==id: 
+            if item.id==iden: 
                 return item
 
-    def get_vel_shift(self,id1,id2):
+    def get_vel(self,id1,id2):
         return [item.get_vel(id1,id2) for item in self.models]
 
     def grab(self,xmlfile,chi2,pixels,params,**kwargs):
@@ -569,20 +650,35 @@ class ModelDB(object):
 
     def pop(self,i):
         return self.models.pop(i)
+        
     
     @staticmethod 
-    def read(filename, returndb=True):
+    def read(filename, returndb=True, verbose=False):
         """read from xml db, return inputs for Model"""
-        
+        import time 
+
+        t=time.time()
+
         tree = et.parse(filename)
+
+        t0=time.time()
+        print("time to parse file: %lf"%(t0-t))
+
         root = tree.getroot()
+
         #root=xmlutils.Model_xml.get_root(filename)
         data_types.ObjList._pool = {}  #clear out cache of data
         #build all data first before instantiating individual models
         for key in Model.model_classes.keys():
+            if verbose:
+                print('reading '+key+'s instances...')
             parent = root.find(key+'s')
-            objlist=data_types.ObjList.list_from_xml(parent) #instantiate all absorber/contpoint/view/etc data. data stored in data_types.ObjList._pool
+            objlist=data_types.ObjList.list_from_xml(parent,verbose) #instantiate all absorber/contpoint/view/etc data. data stored in data_types.ObjList._pool
         #print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
+
+        t1=time.time()
+        print("time to get objlist: %lf"%(t1-t0))
+
         model_list = []
         models = root.find('ModelDB').findall('model')
 
@@ -596,24 +692,32 @@ class ModelDB(object):
             except:
                 raise Exception(str(kwargs))
 
+        t2=time.time()
+        print("instantiate models: %lf"%(t2-t1))
+
         if len(model_list)==0:
             raise Exception("no models saved")
 
         if not returndb:
             return model_list
         else:
-            return ModelDB(filename, models=model_list)
+            return ModelDB(models=model_list)
         
 
-    def set_val(self,id,**kwargs):
+    def set_val(self,iden,**kwargs):
         """set the values of a given data element"""
-        new = self.models.pop(id)
+        new = self.models.pop(iden)
         new.set_val(**kwargs)
         self.models.append(new)
 
     def write(self,filename=None):
         if filename==None:
-            filename=self.name 
+            if self.name == None:
+                filename=input("name of database file to write: ")
+            else:
+                filename=self.name
+                if not filename.endswith('.xml'):
+                    filename=filename+'.xml'
         root = ModelDB.build_xml(self.models)
         out = prettify(root)
         out.replace('\n\n','\n')
@@ -622,12 +726,6 @@ class ModelDB(object):
         #tree = et.ElementTree(root)
         #tree.write(filename)
         #self.dbxml.write(filename,root)
-
-    @staticmethod
-    def xml_in(**kwargs):
-        """xml shorthand for an individual model"""
-        pass
-        
 
 #    some helper functions:
 #------------------------------
@@ -652,8 +750,8 @@ def check_for_conflicts(root):
     ids = []
     for item in root:
         try:
-            id = item.get("id")
-            assert(id not in ids)
+            iden = item.get("id")
+            assert(iden not in ids)
         except AssertionError:
             #code
             pass

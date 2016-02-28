@@ -1,3 +1,6 @@
+import warnings
+import xml.etree.ElementTree as et
+
 def get_keys(root, tag):
     children = root.find('CompositeSpectrum').findall(tag)
     if children==[]:
@@ -16,6 +19,3 @@ def get_node(parent,tag,id):
         return results[0]
     else:
         raise Exception('id '+id+' not found')
-
-
-
