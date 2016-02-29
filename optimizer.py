@@ -1,4 +1,3 @@
-import xmlutils as dude
 import numpy as np
 import _spectrum
 from scipy.optimize import curve_fit
@@ -18,9 +17,6 @@ class Param(object):
             self.guess=Param.random_initial_cond(bounds)
         else:
             self.guess=float(value)     
-
-    def write(self,model):
-        
 
     @staticmethod
     def random_initial_cond(bounds):
@@ -103,7 +99,7 @@ def fit_absorption(dat, model):
                                                  starts,ends )
 
     for i in range(len(absorbers)):
-        model.set_val(absorbers[i],"N"=N[i],"b"=b[i],"z"=z[i]) #this propagates all the way down
+        model.set_val(absorbers[i],**{"N":N[i],"b":b[i],"z":z[i]}) #this propagates all the way down
     return cont, absorption, chi2
 
 
@@ -280,6 +276,7 @@ def optimize(spec, model):
     #rewrite new values to model
 
 if __name__ == "__main__":
+    import dudeutils
     test_xml = "/home/scott/research/test_xml.xml"
 
     model=dudeutils.get_model(test_xml)

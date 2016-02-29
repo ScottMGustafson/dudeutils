@@ -17,10 +17,19 @@ static PyMethodDef module_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
+static struct PyModuleDef _spectrum ={
+    PyModuleDef_HEAD_INIT,
+    "spectrum",
+    module_docstring,
+    -1,  
+    module_methods
+};
+
 /* Initialize the module */
-PyMODINIT_FUNC init_spectrum(void)
+PyMODINIT_FUNC PyInit__spectrum(void)
 {
-    PyObject *m = Py_InitModule3("_spectrum", module_methods, module_docstring);
+    PyObject *m = PyModule_Create(&_spectrum);
+    //PyObject *m = Py_InitModule3("_spectrum", module_methods, module_docstring);
     if (m == NULL)
         return;
 

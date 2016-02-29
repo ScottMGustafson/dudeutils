@@ -27,6 +27,7 @@ def run_optimize(fname,step=False, verbose=True, method='dude'):
             print("running: %s"%(" ".join(commands)))
         subprocess.call(commands)
     else: #use code from this project
+        raise Exception("Not yet fully implemented (2016-02-29)")
         model=model.Model(xmlfile=fname)
         src_data=model.flux
         popt, pcov = optimizer.optimize(src_data, model)
