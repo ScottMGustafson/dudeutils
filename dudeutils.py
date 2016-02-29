@@ -4,6 +4,7 @@ from os.path import split, isfile, join
 import subprocess
 import xml.etree.ElementTree as et
 from wavelength import c
+import spec_parser
 
 
 def run_optimize(fname,step=False, verbose=True, method='dude'):
@@ -25,10 +26,11 @@ def run_optimize(fname,step=False, verbose=True, method='dude'):
         if verbose:
             print("running: %s"%(" ".join(commands)))
         subprocess.call(commands)
-    else:
-
+    else: #use code from this project
+        model=model.Model(xmlfile=fname)
+        src_data=model.flux
         popt, pcov = optimizer.optimize(src_data, model)
-        
+        return popt,pcov
 
 def newdb(xmlfile,dbfile=None,params=None,**kwargs):
     """get a model, append to new database"""

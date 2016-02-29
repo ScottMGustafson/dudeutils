@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 class Param(object):
     """
     class for the manipulation of individual absorption parameters, N,b and z"""
-    def __init__(self,param_name,value, locked, error, parent, index=None, bounds=None):
+    def __init__(self,param_name,value, locked, error=0., parent=None, index=None, bounds=None):
         self.name=param_name
         self.absorber=parent
         self.locked=locked
@@ -18,6 +18,9 @@ class Param(object):
             self.guess=Param.random_initial_cond(bounds)
         else:
             self.guess=float(value)     
+
+    def write(self,model):
+        
 
     @staticmethod
     def random_initial_cond(bounds):
@@ -98,6 +101,9 @@ def fit_absorption(dat, model):
                                                  x,y,
                                                  N,b,z,rest,gamma,f,
                                                  starts,ends )
+
+    for i in range(len(absorbers)):
+        model.set_val(absorbers[i],"N"=N[i],"b"=b[i],"z"=z[i]) #this propagates all the way down
     return cont, absorption, chi2
 
 
@@ -197,6 +203,7 @@ def optimize(spec, model):
     #values of the params to vary this gets passed as an argument to the 
     #function to optimize
     params = [item.value for item in unlocked] 
+    #unlocked_indices = [item.index for item in unlocked] #index mapping to all_params
 
     def absorption(waves, *params):
 
@@ -217,19 +224,19 @@ def optimize(spec, model):
         chi2 : chi-square calculated from regions specified in model.RegionList
         """
      
-        #load for params in params
+        #update params to locked
         for i in range(len(unlocked)):
-            unlocked[i].value=params[i]
-
+            unlocked[i].value=params[i]  #set param value
+            all_params[unlocked[i].index] = unlocked[i]  #write back to all_params
         #now consolidate locked and unlocked parameters into lists for N,b,z
-        all_params=sorted(unlocked+locked,key=lambda x:x.i)  #needs to be here to make sure that index-absorber mapping is correct
-        N=[item.value for item in all_params if item.name=='N']
-        b=[item.value for item in all_params if item.name=='b']
-        z=[item.value for item in all_params if item.name=='z']
+
+        #N=[item.value for item in all_params if item.name=='N']
+        #b=[item.value for item in all_params if item.name=='b']
+        #z=[item.value for item in all_params if item.name=='z']
 
         _N,_b,_z=[],[],[]
         rest,gamma,f=[],[],[]
-        for i in range(len(N)):
+        for i in range(len(all_params)):
             lines=all_params[i].absorber.get_lines()
             for line in lines:
                 if waves[4]<(1.+z[i])*line.wave<waves[-4]:
@@ -241,20 +248,36 @@ def optimize(spec, model):
                     f.append(float(line.f))
 
         N,b,z,rest,gamma,f= tuple(map(np.array,(_N,_b,_z,rest,gamma,f)))
-        cont, absorption_sp, chi2 = _spectrum.spectrum( spec.waves,spec.flux,spec.err,
+        #there is an entry of N, b, z for each individual absorption line
+        #so if an absorber has multiple lines in atom.dat, the number will 
+        #appear multiple times
+        cont, absorption_sp, chi2, N,b,z = _spectrum.spectrum( spec.waves,spec.flux,spec.err,
                                                      x,y,
                                                      N,b,z,rest,gamma,f,
                                                      starts,ends )
-        #if you want to keep the values:
-        model.chi2=chi2
-        #TODO rewrite new values back to model
 
         return absorption_sp[indices]
 
     p0=[item.guess for item in unlocked]
+
+    popt, pcov = curve_fit(absorption, spec.waves[indices], spec.flux[indices], p0=p0, sigma=spec.err[indices])
+    assert(len(popt)==len(unlocked))
+
     
-    #return curve_fit(absorption, spec.waves, spec.flux, p0=p0, sigma=spec.err, absolute_sigma=True)
-    return curve_fit(absorption, spec.waves[indices], spec.flux[indices], p0=p0, sigma=spec.err[indices])
+    j=0
+    for i in [item.index for item in unlocked]:
+        all_params[i].value=popt[j]  #do;t know, dont care identity, since will be in same order as before 
+        all_params[i].error=pcov[j][j]
+        j+=1
+
+    #changes should also propagate to unlocked, bc all_params inlcudes unlocked
+
+    for item in all_params:
+        model.set_val(item.absorber,**{item.name:item.value, item.name+"Error":item.error})
+
+    return unlocked, popt, pcov
+        
+    #rewrite new values to model
 
 if __name__ == "__main__":
     test_xml = "/home/scott/research/test_xml.xml"
@@ -279,7 +302,7 @@ if __name__ == "__main__":
 
     print("optimizing spec")
 
-    popt, pcov = optimizer.optimize(sp, model)
+    params, popt, pcov = optimizer.optimize(sp, model)
 
     print(str(popt))
     print("\n"+str(pcov))

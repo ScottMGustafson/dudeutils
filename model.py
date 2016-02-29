@@ -20,6 +20,7 @@ from numpy.random import random_sample, randn
 import data_types
 import xml.etree.ElementTree as et
 import copy
+import observer
 
 c = 299792.458 #speed of light in km/s
 def tf(val):
@@ -251,7 +252,7 @@ class Model(object):
         """set a param for Data `id` to a random value in val_range
         params:
         -------
-        iden:  id of the item to be changed
+        iden:  id or object instance of the item to be changed
         tag:   absorber, continuum point, etc..  see data_types.py
         val_range:  list or tuple of [min, max].  if gaussian=true, this will be 95% limits
         gaussian:  return random value on gaussian distribution?
@@ -347,22 +348,49 @@ class Model(object):
         #    setattr(self,key,data_types.ObjList.factory(lst))
 
 
-    def set_val(self,iden,tag,**kwargs):
-        """set the values of a given data element in xml file.  
-           don't need to reset value in pool since data will be gotten
-           later in get
+    def set_val(self,iden,tag="Absorber",**kwargs):
         """
-        if tag in Model.model_classes.values(): 
-            tag=inv_dict(tag)
+        set value of item in model
+
+        input:
+        ------
+        iden (unspecified type):  the item or the id of the item to set
+        tag (string, optional):  the type of iden
+
+        output:
+        -------
+        None
+
+        raises:
+        -------
+        TypeError when type of iden or tag is not recognized
+
+        """
+
+        if type(iden)==str:
+            if tag in Model.model_classes.values(): 
+                tag=inv_dict(tag)
+            else:
+                raise TypeError("model.Model.set_val(): unrecognized type: %s"%(tag))
+
+            ab_lst=data_types.ObjList.get(getattr(self,tag))
+
+            for item in ab_lst:  #for item in abslist
+                if item.id==iden:  #if the id of the absorber matches
+                    item.set_data(**kwargs)
+                    print("setting to %s %s"%(iden, str(kwargs)))
+
         else:
-            raise Exception("no datatype called %s"%tag)
+            tag=iden.__class__.__name__.split('.')[-1]
+            if tag in Model.class_names.values():
+                iden.set_data(**kwargs)
+            elif tag in Model.class_names.keys():
+                for key, val in dict(kwargs).items:
+                    setattr(iden,key,val)
+            else:
+                raise TypeError("model.Model.set_val(): unrecognized type: %s"%(tag))
 
-        ab_lst=data_types.ObjList.get(getattr(self,tag))
 
-        for item in ab_lst:  #for item in abslist
-            if item.id==iden:  #if the id of the absorber matches
-                item.set_data(**kwargs)
-                print("setting to %s %s"%(iden, str(kwargs)))
         #new_lst= data_types.ObjList.factory(ab_lst)  #dont need to return this, since being automatically written to _pool
         #assert(new_lst.id in data_types.ObjList._pool.keys())  #test that data was added to pool
         #self.write(kwargs.get("filename", self.xmlfile+"_scratch.xml"))
@@ -704,11 +732,16 @@ class ModelDB(object):
             return ModelDB(models=model_list)
         
 
-    def set_val(self,iden,**kwargs):
+    def set_val(self,model,**kwargs):
         """set the values of a given data element"""
-        new = self.models.pop(iden)
-        new.set_val(**kwargs)
-        self.models.append(new)
+        if type(model) is Model:
+            for item in self.models:
+                if item is model:
+                    item.set_val(**kwargs)
+            raise Exception("model.ModelDB.set_val:  model not found")
+        elif type(model) is str:
+            model = self.get_model(iden)
+            model.set_val(**kwargs)
 
     def write(self,filename=None):
         if filename==None:

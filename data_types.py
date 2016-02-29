@@ -7,8 +7,10 @@ import os
 from scipy import constants
 
 tf = {"true":True, "false":False}
-c=constants.c/1000.
+c=constants.c/1000.  #speed of light in km/s
 
+#TODO add functionality to directly change from absorber and have
+#that propagate to all relevant entities...basically an observer pattern
 
 class ObjList(object):
 
@@ -54,16 +56,29 @@ class ObjList(object):
         #ObjList.taken_names.append(iden)
         return iden
 
-    def get_item(self,id):
+    def get_item(self,iden):
         """get element from objlist.  
         if AbsList, this will be the user assigned id, not the _pool key"""
         for item in self.objlist:
-            if id==item.id:
+            if iden==item.id:
                 return item
 
     @staticmethod
     def get(theID):
-        """retrieve from _pool"""
+        """retrieve from _pool
+        input:
+        ------
+        theID:  the objList's assigned ID
+
+        output:
+        -------
+        Objlist or subclass of Objlist instance 
+
+        raises:
+        -------
+        KeyError: when theID isn't recognized
+
+        """
         try:
             return ObjList._pool[theID]
         except KeyError:
@@ -73,10 +88,6 @@ class ObjList(object):
 
     @staticmethod
     def set(value): 
-        """
-        user should explicitly set new value instead of automatically entering 
-        new values in getters and setters to avoid unnecessarily altering data
-        """
         ObjList._pool[value.id] = value
 
     @property
@@ -461,12 +472,15 @@ class Data(object):
 
     def set_node(self,**kwargs):  
         """set values from self to node"""
-        #kwargs=Data.get_node_attrib(kwargs)      
-        for key, val in list(kwargs.items()):
+        #kwargs=Data.get_node_attrib(kwargs)  
+        old=self.node  
+        dct=dict(old.attrib)
+        for key, val in kwargs.items():
+            dct[key]=val
+
+        for key, val in dct.items():
             if key in self.node.attrib.keys():
-                old=self.node.get(key)
                 self.node.set(key, str(val))
-                new=self.node.get(key)
 
     def set_data(self,**kwargs):
         """set kwargs to self and apply to node"""

@@ -10,7 +10,6 @@ def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
     dct={}
     for item in list(config.sections()):
         dct[item]=dict(config.items(item))
-    
     return dct
 
 def perturb_absorbers(dct, model):
