@@ -97,7 +97,7 @@ def fit_absorption(dat, model):
     f=np.array([item.f for item in absorbers], dtype=np.float)
 
 
-    cont, absorption, chi2 = _spectrum.spectrum( dat.waves,dat.flux,dat.err,
+    cont, absorption, chi2= _spectrum.spectrum( dat.waves,dat.flux,dat.err,
                                                  x,y,
                                                  N,b,z,rest,gamma,f,
                                                  starts,ends )
@@ -115,7 +115,7 @@ def is_big_enough(line):
     alpha = line.gamma/(4.0*np.pi*vdopp)/(1.0+line.z);    
     factor = (10.0**line.N) * 2.647E-2 * line.f/(sqrt(np.pi)*vdopp) * 1.0/(1.0+line.z);
     """
-    #thresh hold set at when N=11.25 for HI-alpha, any b, any z
+    #thresh hold set at when N=11.25 for lyman alpha, any b, any z
     return line.f*10.0**line.N > (10.0**11.25) * 0.416
 
 def is_locked(param, ab, starts, ends):
@@ -251,7 +251,7 @@ def optimize(spec, model):
         #there is an entry of N, b, z for each individual absorption line
         #so if an absorber has multiple lines in atom.dat, the number will 
         #appear multiple times
-        cont, absorption_sp, chi2, N,b,z = _spectrum.spectrum( spec.waves,spec.flux,spec.err,
+        cont, absorption_sp, chi2= _spectrum.spectrum( spec.waves,spec.flux,spec.err,
                                                      x,y,
                                                      N,b,z,rest,gamma,f,
                                                      starts,ends )

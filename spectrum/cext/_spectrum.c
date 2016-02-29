@@ -105,13 +105,23 @@ static PyObject *spectrum_spectrum(PyObject *self, PyObject *args)
     double *starts   = (double*)PyArray_DATA(starts_arr);
     double *ends      = (double*)PyArray_DATA(ends_arr);
 
-    int dims[1],i;
+    int dims[1],i;//abs_dims[1],i;
     dims[0]=len_arr;
+    //abs_dims[0]=len_abs;
 
     PyArrayObject* contin_out=(PyArrayObject*) PyArray_FromDims(1,dims, NPY_DOUBLE);
     PyArrayObject* abs_out=(PyArrayObject*) PyArray_FromDims(1,dims, NPY_DOUBLE);
+    //PyArrayObject* N_out=(PyArrayObject*) PyArray_FromDims(1,len_dims, NPY_DOUBLE);
+    //PyArrayObject* b_out=(PyArrayObject*) PyArray_FromDims(1,len_dims, NPY_DOUBLE);
+    //PyArrayObject* z_out=(PyArrayObject*) PyArray_FromDims(1,len_dims, NPY_DOUBLE);
+
+/*TODO:  output N,b,z.  implement as outputing a struct of N,b,z*/
+
     double* cont_data=(double*)contin_out->data;
     double* abs_data=(double*)abs_out->data;
+    //double* N_data=(double*)N_out->data;
+    //double* b_data=(double*)b_out->data;
+    //double* z_data=(double*)z_out->data;
 
     /*double* value = (double*)spectrum(wave,flux, err,continuum,x, y,N,b,z,rest,gamma,f, starts, ends,len_cont_points,len_arr,len_abs,len_pairs)
     for(i=0;i<len_arr;++i){

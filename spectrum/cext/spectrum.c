@@ -9,7 +9,6 @@ double* spectrum(   const double waves[], const double flux[], const double err[
                     double restwv[], double gmma[], double osc_strn[],
                     int starts[], int ends[],
                     int len_cont_points, int len_arr, int len_abs, int len_pairs){
-
     /*
     int i=0;
     continuum_point cont_points[len_cont_points];
