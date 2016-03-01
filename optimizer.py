@@ -282,7 +282,7 @@ def optimize(spec, model):
 
 if __name__ == "__main__":
     import dudeutils
-    test_xml = "/home/scott/research/J0744+2059/J0744+2059.xml"
+    test_xml = "/home/scott/research/test.xml"
 
     model=dudeutils.get_model(test_xml)
     sp = spectrum.Spectrum.sniffer(model.flux, model.error)
