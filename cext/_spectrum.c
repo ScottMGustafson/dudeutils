@@ -1,26 +1,21 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include "spectrum.h"
-
-/* Docstrings */
-static char module_docstring[] =
-    "";
-static char spectrum_docstring[] =
-    "";
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 /* Available functions */
 static PyObject *spectrum_spectrum(PyObject *self, PyObject *args);
 
 /* Module specification */
 static PyMethodDef module_methods[] = {
-    {"spectrum", spectrum_spectrum, METH_VARARGS, spectrum_docstring},
+    {"spectrum", spectrum_spectrum, METH_VARARGS, NULL},
     {NULL, NULL, 0, NULL}
 };
 
 static struct PyModuleDef _spectrum ={
     PyModuleDef_HEAD_INIT,
     "spectrum",
-    module_docstring,
+    NULL,
     -1,  
     module_methods
 };
@@ -28,13 +23,10 @@ static struct PyModuleDef _spectrum ={
 /* Initialize the module */
 PyMODINIT_FUNC PyInit__spectrum(void)
 {
-    PyObject *m = PyModule_Create(&_spectrum);
-    //PyObject *m = Py_InitModule3("_spectrum", module_methods, module_docstring);
-    if (m == NULL)
-        return;
-
-    /* Load `numpy` functionality. */
     import_array();
+    return PyModule_Create(&_spectrum);
+
+    
 }
 
 static PyObject *spectrum_spectrum(PyObject *self, PyObject *args)
@@ -50,9 +42,9 @@ static PyObject *spectrum_spectrum(PyObject *self, PyObject *args)
                                                 &x_obj, &y_obj, 
                                                 &N_obj, &b_obj,&z_obj,
                                                 &rest_obj,&gamma_obj,&f_obj,
-                                                &starts_obj, &ends_obj))
+                                                &starts_obj, &ends_obj)){
         return NULL;
-
+    }
     /* Interpret the input objects as numpy arrays. */
     PyObject *wave_arr = PyArray_FROM_OTF(wave_obj, NPY_DOUBLE, NPY_IN_ARRAY);
     PyObject *flux_arr = PyArray_FROM_OTF(flux_obj, NPY_DOUBLE, NPY_IN_ARRAY);
@@ -99,8 +91,8 @@ static PyObject *spectrum_spectrum(PyObject *self, PyObject *args)
 
 
     /* Get pointers to the data as C-types. */
-    const double *wave    = (double*)PyArray_DATA(wave_arr);
-    const double *flux    = (double*)PyArray_DATA(flux_arr);
+    const double *wave   = (double*)PyArray_DATA(wave_arr);
+    const double *flux   = (double*)PyArray_DATA(flux_arr);
     const double *err    = (double*)PyArray_DATA(err_arr);
     //double *continuum = (double*)PyArray_DATA(cont_arr);
     double *x       = (double*)PyArray_DATA(x_arr);
@@ -111,26 +103,19 @@ static PyObject *spectrum_spectrum(PyObject *self, PyObject *args)
     double *rest    = (double*)PyArray_DATA(rest_arr);
     double *gamma   = (double*)PyArray_DATA(gamma_arr);
     double *f       = (double*)PyArray_DATA(f_arr);
-    double *starts   = (double*)PyArray_DATA(starts_arr);
-    double *ends      = (double*)PyArray_DATA(ends_arr);
+    double *starts  = (double*)PyArray_DATA(starts_arr);
+    double *ends    = (double*)PyArray_DATA(ends_arr);
 
-    int dims[1],i;//abs_dims[1],i;
+    int dims[1],i;
     dims[0]=len_arr;
-    //abs_dims[0]=len_abs;
+
 
     PyArrayObject* contin_out=(PyArrayObject*) PyArray_FromDims(1,dims, NPY_DOUBLE);
     PyArrayObject* abs_out=(PyArrayObject*) PyArray_FromDims(1,dims, NPY_DOUBLE);
-    //PyArrayObject* N_out=(PyArrayObject*) PyArray_FromDims(1,len_dims, NPY_DOUBLE);
-    //PyArrayObject* b_out=(PyArrayObject*) PyArray_FromDims(1,len_dims, NPY_DOUBLE);
-    //PyArrayObject* z_out=(PyArrayObject*) PyArray_FromDims(1,len_dims, NPY_DOUBLE);
 
-/*TODO:  output N,b,z.  implement as outputing a struct of N,b,z*/
 
     double* cont_data=(double*)contin_out->data;
     double* abs_data=(double*)abs_out->data;
-    //double* N_data=(double*)N_out->data;
-    //double* b_data=(double*)b_out->data;
-    //double* z_data=(double*)z_out->data;
 
     /*double* value = (double*)spectrum(wave,flux, err,continuum,x, y,N,b,z,rest,gamma,f, starts, ends,len_cont_points,len_arr,len_abs,len_pairs)
     for(i=0;i<len_arr;++i){
@@ -181,8 +166,6 @@ static PyObject *spectrum_spectrum(PyObject *self, PyObject *args)
 
     return Py_BuildValue("OOd", contin_out, abs_out, chi2);
 }
-
-
 
 
 

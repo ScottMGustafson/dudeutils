@@ -352,7 +352,7 @@ class Data(object):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return builtins.id(self)
+        return id(self)
 
     @staticmethod
     def factory(**kwargs):
@@ -699,8 +699,10 @@ class SpectralLine(object):
         for key, val in kwargs.items():
             setattr(self,key,val)
 
-    def get_obs(self,z):
+    def get_obs(self,z=None):
         try:
+            if not z:
+                z=self.z
             return (1.+z)*self.wave
         except:
             raise Exception(str(self.__dict__))

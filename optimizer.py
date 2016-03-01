@@ -1,7 +1,8 @@
 import numpy as np
-import _spectrum
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+import _spectrum
+from spec_parser import Spectrum
 
 class Param(object):
     """
@@ -12,7 +13,7 @@ class Param(object):
         self.locked=locked
         self.error=float(error)
         self.value=float(value)
-        self.i=int(index)
+        self.index=int(index)
         if bounds:
             self.guess=Param.random_initial_cond(bounds)
         else:
@@ -83,7 +84,7 @@ def fit_absorption(dat, model):
 
     assert(starts.shape[0]==ends.shape[0])
     assert(x.shape==y.shape)
-    assert(dat.waves.shape==dat.flux.shape==dat.err.shape)
+    assert(dat.waves.shape==dat.flux.shape==dat.error.shape)
     
     N=np.array([item.N for item in absorbers], dtype=np.float)
     b=np.array([item.b for item in absorbers], dtype=np.float)
@@ -93,7 +94,7 @@ def fit_absorption(dat, model):
     f=np.array([item.f for item in absorbers], dtype=np.float)
 
 
-    cont, absorption, chi2= _spectrum.spectrum( dat.waves,dat.flux,dat.err,
+    cont, absorption, chi2= _spectrum.spectrum( dat.waves,dat.flux,dat.error,
                                                  x,y,
                                                  N,b,z,rest,gamma,f,
                                                  starts,ends )
@@ -159,22 +160,18 @@ def optimize(spec, model):
     starts=np.array([item[0] for item in regions],dtype=np.float)
     ends=np.array([item[1] for item in regions],dtype=np.float)
 
-
-
-
     #check that arrays are equaly sized
     assert(starts.shape==ends.shape)
     assert(x.shape==y.shape)
-    assert(spec.waves.shape==spec.flux.shape==spec.err.shape)
+    assert(spec.waves.shape==spec.flux.shape==spec.error.shape)
 
 
     #get indices relevant for optimization
     indices=[]
     for r in range(starts.shape[0]):
-        temp=np.where(spec.waves<ends[r], spec.waves, -1.)
-        indices+=np.where(temp>starts[r])[0].tolist()       
-    #should not get multiple entries for the same value becuse we consolidated already, but nevertheless to be sure:
-    indices=list(set(indices))
+        indices+=Spectrum.get_indices(spec.waves,[starts[r],ends[r]])   
+
+    assert(len(indices)<spec.waves.shape[0])
 
     abs_lst = list(model.get_lst('AbsorberList'))
 
@@ -196,10 +193,15 @@ def optimize(spec, model):
         else:
             unlocked.append(item)
 
+    all_params=list(unlocked)+list(locked)
     #values of the params to vary this gets passed as an argument to the 
     #function to optimize
     params = [item.value for item in unlocked] 
     #unlocked_indices = [item.index for item in unlocked] #index mapping to all_params
+
+    absorbers = list(set([item.absorber for item in all_params]))
+
+    assert(spec.waves[indices].shape[0]<spec.waves.shape[0])
 
     def absorption(waves, *params):
 
@@ -226,44 +228,47 @@ def optimize(spec, model):
             all_params[unlocked[i].index] = unlocked[i]  #write back to all_params
         #now consolidate locked and unlocked parameters into lists for N,b,z
 
-        #N=[item.value for item in all_params if item.name=='N']
-        #b=[item.value for item in all_params if item.name=='b']
-        #z=[item.value for item in all_params if item.name=='z']
-
         _N,_b,_z=[],[],[]
         rest,gamma,f=[],[],[]
-        for i in range(len(all_params)):
-            lines=all_params[i].absorber.get_lines()
+        for ab in absorbers:
+            lines=ab.get_lines()
             for line in lines:
-                if waves[4]<(1.+z[i])*line.wave<waves[-4]:
-                    _N.append(N[i])
-                    _b.append(b[i])
-                    _z.append(z[i])
+                if waves[4]<line.get_obs()<waves[-4]:
+                    _N.append(line.N)
+                    _b.append(line.b)
+                    _z.append(line.z)
                     rest.append(float(line.wave))
                     gamma.append(float(line.gamma))
                     f.append(float(line.f))
-
         N,b,z,rest,gamma,f= tuple(map(np.array,(_N,_b,_z,rest,gamma,f)))
         #there is an entry of N, b, z for each individual absorption line
         #so if an absorber has multiple lines in atom.dat, the number will 
         #appear multiple times
-        cont, absorption_sp, chi2= _spectrum.spectrum( spec.waves,spec.flux,spec.err,
+
+        cont, absorption_sp, chi2= _spectrum.spectrum(spec.waves,
+                                                     spec.flux,
+                                                     spec.error,
                                                      x,y,
                                                      N,b,z,rest,gamma,f,
-                                                     starts,ends )
+                                                     starts,ends)
 
+        assert(absorption_sp[indices].shape[0] == waves.shape[0])
         return absorption_sp[indices]
 
     p0=[item.guess for item in unlocked]
 
-    popt, pcov = curve_fit(absorption, spec.waves[indices], spec.flux[indices], p0=p0, sigma=spec.err[indices])
+    popt, pcov = curve_fit(absorption, 
+                           spec.waves[indices], 
+                           spec.flux[indices], 
+                           p0=p0, 
+                           sigma=spec.error[indices])
     assert(len(popt)==len(unlocked))
 
     
     j=0
     for i in [item.index for item in unlocked]:
-        all_params[i].value=popt[j]  #do;t know, dont care identity, since will be in same order as before 
-        all_params[i].error=pcov[j][j]
+        all_params[i].value=popt[j] 
+        all_params[i].error=np.sqrt(pcov[j][j]) #one stdev
         j+=1
 
     #changes should also propagate to unlocked, bc all_params inlcudes unlocked
@@ -277,10 +282,10 @@ def optimize(spec, model):
 
 if __name__ == "__main__":
     import dudeutils
-    test_xml = "/home/scott/research/test_xml.xml"
+    test_xml = "/home/scott/research/J0744+2059/J0744+2059.xml"
 
     model=dudeutils.get_model(test_xml)
-    sp = spectrum.Spectrum.sniffer(model.flux)
+    sp = spectrum.Spectrum.sniffer(model.flux, model.error)
 
     print("testing optimizer.fit_absorption")
     cont, ab, chi2 = optimizer.fit_absorption(sp, model)

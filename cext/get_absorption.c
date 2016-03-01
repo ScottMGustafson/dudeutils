@@ -27,11 +27,11 @@ int sub_absorber(   const double waves[], double cont[],
     int cpix = get_wave_index(waves, size, cwave);
 
     if (cpix >= size-3){
-        fprintf(stderr,"center pix too big: %d out of %d pixels for %5.1lf\n",(int)cpix,(int)size,cwave);
+        fprintf(stderr,"cext/get_absorption.c: center pix too big: %d out of %d pixels for %5.1lf\n",(int)cpix,(int)size,cwave);
         return 0;
     }
     if (cpix < 1){
-        fprintf(stderr,"center pix too small: %d out of %d pixelsfor %5.1lf\n",(int)cpix,(int)size,cwave);
+        fprintf(stderr,"cext/get_absorption.c: center pix too small: %d out of %d pixelsfor %5.1lf\n",(int)cpix,(int)size,cwave);
         return 0;
     }
 

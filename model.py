@@ -336,6 +336,7 @@ class Model(object):
             self.error = os.path.join(path,spectrum.get("error"))
         except:
             self.flux  = os.path.join(path,spectrum.get("spec"))
+            self.error = self.flux
  
         #read through all data in xml.  create relevant classes
         # enable this if you want each model to store its own data

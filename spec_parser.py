@@ -7,7 +7,7 @@ class Spectrum(object):
     def sniffer(filename, *args, **kwargs):
         """detects raw text format, returns num columns"""
         if filename.endswith('.fits'):
-            return FitsSpectrum(filename, *args, **kwargs)
+            return FitsSpectrum(filename, error=kwargs.pop('error',None), *args, **kwargs)
         with open(filename) as f:
             if len(f.readline().split())==5:
                 return TextSpectrum(filename, *args, **kwargs)
@@ -24,7 +24,7 @@ class Spectrum(object):
         start, end = xr[0], xr[-1]
         lst1 = list(np.where(start<=lst)[0])
         lst2 = list(np.where(end>=lst)[0])
-        ind = list(set(lst1+lst2))
+        ind = list(set(lst1) & set(lst2))
         return ind
 
     @staticmethod
@@ -43,11 +43,15 @@ class Spectrum(object):
         return np.array(arr)
 
 class FitsSpectrum(Spectrum):
-    def __init__(self, filename):
+    def __init__(self, filename, error=None):
         self.hdu=fits.open(filename)
-        if self.hdu.header['NAXIS']!=1:
+        if self.hdu[0].header['NAXIS']!=1:
             raise Exception("multidim spec not yet supported")
         self.waves, self.flux = wavelength.xy(filename)
+        if error:
+            _, self.error=wavelength.xy(error)
+        else:
+            self.error=None
             
 class TextSpectrum(Spectrum): 
     def __init__(self,dumpfile,*lst):

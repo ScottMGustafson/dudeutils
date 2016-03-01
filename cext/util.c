@@ -13,11 +13,13 @@ double pix_to_wave(double crval, double cdelt, double crpix, double pix, bool lo
 int get_wave_index(const double wave_arr[], size_t size, double wave){
     /*assumes that double[] waves is sorted alread*/
     int i=0;  
+    double vdisp=2.14  //velocity dispersion for HIRES in kms
+    double c=2.99792458E5 //c in km/s
 
     //double tol=0.02;
 
     //with a loglin scale:
-    double tol=wave*2.1/2.99792458E5;
+    double tol=wave*vdisp/c;   //one pixel in wavlength
 
     while ( i < size && fabs(wave_arr[i]-wave)>tol ){
         //printf("diff=%lf \n",fabs(wave_arr[i]-wave));
