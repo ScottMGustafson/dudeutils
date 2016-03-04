@@ -2,6 +2,8 @@ from dudeutils import *
 from model import *
 from plot_distribution import plot_chi2
 from configparser import ConfigParser
+from scipy.constants import c
+c*=0.001   #convert to km/s
 
 def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
     """
@@ -48,15 +50,62 @@ def perturb_absorbers(dct, model):
     None
 
     """
+
+
+    val_old = model.get_datum("FeII3","Absorber","N")
     for key, val in dct.items():
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",rng,param,False)
     model.write(model.xmlfile)
+    
+    
+    tmp=model.read()
+    val_new = model.get_datum("FeII3","Absorber","N")
+    assert(val_old!=val_new)
     return model
 
-def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints, step=False, iden2=None):
+
+def filter_bad_models(models, dct):
+    def _filter(model):
+        for iden, params in dct.items():
+            for param_name, param_range in params.items():
+                val=model.get_datum(iden,"Absorber",param_name)
+                if val==-1.:
+                    return False 
+
+                if param_name == "b":
+                    if val<0.5:
+                        return False
+                    elif model.get_datum(iden,"Absorber","ionName")!="H I":
+                        if val>60:   #a metal line with an extremely large b-value: not 
+                                     # likely for our line of work
+                            return False
+                elif param_name == "N":
+                    if val<10.5:  #this means dude tried to throw it out.
+                                  #if you are running this, then you've already decided that 
+                                  #this absorber was needed, so will this is a bad model
+                        return False
+
+                elif param_name == "z":
+                    vel_range=[c*(val-param_range[0])/(1.+param_range[-1]),
+                               c*(val-param_range[-1])/(1.+param_range[-1])]
+                    if (val>param_range[-1] and vel_range[-1]>5.) or \
+                       (val<param_range[0] and vel_range[0]<-5.):
+                        return False
+        return True
+    return [item for item in models if _filter(item)]
+            
+        
+        
+        
+
+def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints, 
+                    method='dude',step=False, verbose=False, iden2=None):
     """
-    runs simmulated annealing algorithm on dude models
+    runs simmulated annealing algorithm on dude models.  This works best under 
+    a small number of parameters and parameter-space to explore.  Do this when 
+    you ALREADY have an idea of what the result should be.  This can then be
+    used to get an estimate of the errors.
 
     input:
     ------
@@ -118,12 +167,15 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints, step
         #set value to random number within range
         perturb_absorbers(dct,model)
         #call dude to optimize
-        run_optimize(model.xmlfile,step)
+        run_optimize(model.xmlfile,step=step,verbose=verbose,method=method)
         #add to ModelDB database
         if step:
-            db=populate_database(abs_ids, keep=False,
+            newdb=populate_database(abs_ids, keep=False,
                                  path=os.path.split(model.xmlfile)[0],
-                                 db=db, constraints=constraints)
+                                 db=None, constraints=constraints)
+
+
+            db.append_lst(filter_bad_models(newdb.models, dct))
         else:
             model.read(model.xmlfile) #model.xmlfile is rewritten by OptimizeXML
             db.append(model.copy())
@@ -174,6 +226,7 @@ if __name__=="__main__":
     plot=True if glob['plot'].lower()=='true' else False
     append=True if glob['append'].lower()=='true' else False
     step=True if glob['step'].lower()=='true' else False
+    step='dude' if glob['method'].lower()=='dude' else None
     n=int(glob['n'])
 
     model=Model(xmlfile=source)
@@ -181,16 +234,22 @@ if __name__=="__main__":
 
     all_db=ModelDB(models=[])
 
+
+
     for key, val in dct.items():
         for attr,rng in val.items():
             iden2=dct[iden]["iden2"] if attr=="vel" else None
             db=random_sampling( model, key, attr, rng, n,
                                     abs_ids=list(dct.keys()),dct=dct,
                                     constraints=constraints,
-                                    iden2=iden2, step=step)
+                                    iden2=iden2, step=step, verbose=True)
 
             if append:
-                all_db.append_lst(db.models)
+                min_chi2=min([item.chi2 for item in db.models])
+                #added if item.chi2<5.*min_chi2 to prevent adding too many 
+                #irrelevant models.  This is a problem for pathological cases 
+                #like chi2min=1.
+                all_db.append_lst([item for item in db.models if item.chi2<5.*min_chi2])
     if plot:
         for key, val in dct.items():
             for attr,rng in val.items():

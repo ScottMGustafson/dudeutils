@@ -7,7 +7,7 @@ from wavelength import c
 import spec_parser
 
 
-def run_optimize(fname,step=False, verbose=True, method='dude'):
+def run_optimize(fname,step=False, verbose=False, method='dude'):
     """
     call dude and run OptimizeXML from the command line.
 
