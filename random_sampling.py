@@ -4,6 +4,24 @@ from plot_distribution import plot_chi2
 from configparser import ConfigParser
 
 def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
+    """
+    parse the config file to produce a dict of absorbers, parameters and 
+    allowed ranges
+
+    Input:
+    ------
+    config_file: config file to use.  data/random_sampling_config.cfg by default
+    
+
+    Output:
+    -------
+    dict of parameters and allowed ranges
+
+    Raises:
+    -------
+    None
+
+    """
     config = ConfigParser()
     config.optionxform=str
     config.read(config_file)
@@ -13,6 +31,23 @@ def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
     return dct
 
 def perturb_absorbers(dct, model):
+    """
+    randomly perturb absorbers to explore the parameter-space
+
+    Input:
+    ------
+    dct: (dict) a dict of parameters and ranges, output from parse_config
+    model: a model.Model instance
+
+    Output:
+    -------
+    a model.Model instance with perturbed absorbers
+
+    Raises:
+    -------
+    None
+
+    """
     for key, val in dct.items():
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",rng,param,False)
@@ -37,6 +72,10 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints, step
     output:
     -------
     db: model.ModelDB instance.  list of models
+
+    Raises:
+    -------
+    AssertionError
 
     """
 
@@ -97,6 +136,24 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints, step
 
 
 def get_nsigma(db,n=1):
+    """
+    returns database of all models within n*sigma of best fitting model
+
+    input:
+    ------
+    db: model.ModeDB database of models
+    n: number of standard deviations.  n=1 (68% CI) by default
+
+    output:
+    -------
+    db: model.ModelDB database of models containing only models within n*sigma
+        of best fitting model
+
+    Raises:
+    -------
+    None
+
+    """
     def delta(): return float(n**2)
     lst=sorted(db.models, key=lambda x: x.chi2)
 

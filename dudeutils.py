@@ -20,14 +20,17 @@ def run_optimize(fname,step=False, verbose=True, method='dude'):
     """
     if method=='dude':
         #call dude from the command line and call its Levenberg-marquardt algo.
-        commands=["java","-cp","/home/scott/programming/dude/jd/build","dude.commandline.OptimizeXML",fname]
+        commands=["java","-cp",
+                  "/home/scott/programming/dude/jd/build", 
+                  "dude.commandline.OptimizeXML", 
+                  fname]
         if step:
             commands.append('step')
         if verbose:
             print("running: %s"%(" ".join(commands)))
         subprocess.call(commands)
     else: #use code from this project
-        raise Exception("Not yet fully implemented (2016-02-29)")
+        raise Exception("doesn't yet work as of 2016-02-29")
         model=model.Model(xmlfile=fname)
         src_data=model.flux
         popt, pcov = optimizer.optimize(src_data, model)

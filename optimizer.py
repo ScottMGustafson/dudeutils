@@ -21,6 +21,21 @@ class Param(object):
 
     @staticmethod
     def random_initial_cond(bounds):
+        """
+        provide randomized initial conditions given some set of bounds
+
+        Input:
+        ------
+        bounds: length=2 list of floats
+
+        Output:
+        -------
+        (float)
+
+        Raises:
+        -------
+        None
+        """
         return(bounds[1]-bounds[0]) * np.random.random_sample()+bounds[0]
             
     def __str__(self):
@@ -31,6 +46,22 @@ class Param(object):
          
 
 def consolidate(ranges):
+    """
+    consolidate list of ranges to combine overlapping ranges as one.
+
+    Input:
+    ------
+    ranges:  list of ranges  (list of length=2 lists of floats)
+
+    Output:
+    -------
+    result: list of consolidated ranges  (list of length=2 lists of floats)
+
+    Raises:
+    -------
+    None
+
+    """
     result = []
     current_start = -1
     current_stop = -1 
@@ -62,6 +93,10 @@ def fit_absorption(dat, model):
     cont : the continuum of the spectrum
     absorption : absorption of the spectrum
     chi2 : chi-square calculated for spectral regions specified in model.RegionList 
+
+    Raises:
+    -------
+    AssertionError
 
     """
     cont_points=model.get_lst("ContinuumPointList")
@@ -105,15 +140,33 @@ def fit_absorption(dat, model):
 
 
 
-def is_big_enough(line):
+def is_big_enough(line, lya_min=11.25, f_lya=0.416):
     """
-    cwave = (1.0+line.z)*line.rest;
-    vdopp = line.b/cwave*1.0e13;
-    alpha = line.gamma/(4.0*np.pi*vdopp)/(1.0+line.z);    
-    factor = (10.0**line.N) * 2.647E-2 * line.f/(sqrt(np.pi)*vdopp) * 1.0/(1.0+line.z);
+    Tests whether a given line is optically thick enough to matter for the fit
+    by comparing oscillator strength and column density to lyman-alpha . The
+    limit is 11.25 for lyman-alpha at f=0.416 by default.
+
+    cwave = (1.0+line.z)*line.rest
+    vdopp = line.b/cwave*1.0e13
+    alpha = line.gamma/(4.0*np.pi*vdopp)/(1.0+line.z)
+    factor = (10.0**line.N)*2.647E-2*line.f/(sqrt(np.pi)*vdopp)*1.0/(1.0+line.z)
+
+    Input:
+    ------
+    line: data_types.Absober instance.
+    lya_min: minimum column for lya to matter.  (float)
+    f_lya: oscillator strength of lya (float)
+    
+    Output:
+    -------
+    bool: True if given line is optically thick enough to be included.
+
+    Raises:
+    -------
+    None
     """
-    #thresh hold set at when N=11.25 for lyman alpha, any b, any z
-    return line.f*10.0**line.N > (10.0**11.25) * 0.416
+
+    return line.f*10.0**line.N > (10.0**lya_min) * f_lya
 
 def is_locked(param, ab, starts, ends):
     """
@@ -149,6 +202,10 @@ def optimize(spec, model):
     Output:
     -------
     results from scipy.optimize.curve_fit.  uses levenberg marquardt optimization
+
+    Raises:
+    -------
+    AssertionError
     """
     cont_points=model.get_lst("ContinuumPointList")
     cont_points = sorted(cont_points, key=lambda pt: pt.x)
@@ -220,6 +277,10 @@ def optimize(spec, model):
         Output:
         -------
         chi2 : chi-square calculated from regions specified in model.RegionList
+
+        Raises:
+        -------
+        AssertionError
         """
      
         #update params to locked
