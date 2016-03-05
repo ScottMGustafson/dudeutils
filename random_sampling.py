@@ -51,21 +51,15 @@ def perturb_absorbers(dct, model):
 
     """
 
-
-    val_old = model.get_datum("FeII3","Absorber","N")
     for key, val in dct.items():
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",rng,param,False)
     model.write(model.xmlfile)
-    
-    
-    tmp=model.read()
-    val_new = model.get_datum("FeII3","Absorber","N")
-    assert(val_old!=val_new)
+
     return model
 
 
-def filter_bad_models(models, dct):
+def filter_bad_models(models, dct, vel_pad=5.):
     def _filter(model):
         for iden, params in dct.items():
             for param_name, param_range in params.items():
@@ -89,8 +83,8 @@ def filter_bad_models(models, dct):
                 elif param_name == "z":
                     vel_range=[c*(val-param_range[0])/(1.+param_range[-1]),
                                c*(val-param_range[-1])/(1.+param_range[-1])]
-                    if (val>param_range[-1] and vel_range[-1]>5.) or \
-                       (val<param_range[0] and vel_range[0]<-5.):
+                    if (val>param_range[-1] and vel_range[-1]>vel_pad) or \
+                       (val<param_range[0] and vel_range[0]<-1.*vel_pad):
                         return False
         return True
     return [item for item in models if _filter(item)]
@@ -130,7 +124,7 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
 
     def convert_to_vel():
         """
-        if if user instead specifies velocity from some other absorber, 
+        if user instead specifies velocity from some other absorber, 
         convert to redshift, assuming the other is locked
         """
         zref=model.get_datum(iden2,"Absorber","z")
@@ -148,7 +142,8 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
     db=ModelDB(models=[]) 
     if type(model) is str:
         if step:
-            model=Model(xmlfile=model, abs_ids=abs_ids)   #if stepping iteration, do not store all absorbers
+            model=Model(xmlfile=model, abs_ids=abs_ids)   
+            #if stepping iteration, do not store all absorbers to conserve memory
         else:
             model=Model(xmlfile=model)
     
@@ -156,12 +151,11 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
         param, param_range=convert_to_vel()
 
     #a flag to determine whether or not to unlock our param after optimization
-    if model.get_datum(iden,'Absorber',param+"Locked")=='true':
-        already_locked=True  
-    else: 
-        already_locked=False
+    already_locked = bool(model.get_datum(iden,'Absorber',param+"Locked"))
 
-    model.set_val(iden,"Absorber",**{param+"Locked":"true"})
+    #set parameter of interest to be locked during optimization
+    model.set_val(iden,"Absorber",**{param+"Locked":True})
+    assert(model.get_datum(iden,'Absorber',param+"Locked"))
 
     for i in range(n):
         #set value to random number within range
@@ -173,16 +167,27 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
             newdb=populate_database(abs_ids, keep=False,
                                  path=os.path.split(model.xmlfile)[0],
                                  db=None, constraints=constraints)
+            if len(newdb.models)==1:
+                is_locked=[]
+                for key, val in dct.items():
+                    for param in val.keys():
+                        if model.get_datum(key,"Absorber",param+"Locked"):
+                            is_locked.append("%s: %s is locked"%(key,param))  
 
+                if len(is_locked)>2:
+                    msg="random_sampling.py: random_sampling():\n"
+                    msg+="optimization procedure didn't run.\n"
+                    msg+=str(is_locked)
+                    raise Exception(msg)
 
             db.append_lst(filter_bad_models(newdb.models, dct))
         else:
             model.read(model.xmlfile) #model.xmlfile is rewritten by OptimizeXML
             db.append(model.copy())
 
-    if not already_locked:
-        model.set_val(iden,"Absorber",**{param+"Locked":"false"})
-        model.write(model.xmlfile)
+    model.set_val(iden,"Absorber",**{param+"Locked":False}) 
+    assert(not model.get_datum(iden,'Absorber',param+"Locked"))  
+
 
     return db
 
@@ -244,12 +249,10 @@ if __name__=="__main__":
                                     constraints=constraints,
                                     iden2=iden2, step=step, verbose=True)
 
-            if append:
-                min_chi2=min([item.chi2 for item in db.models])
-                #added if item.chi2<5.*min_chi2 to prevent adding too many 
-                #irrelevant models.  This is a problem for pathological cases 
-                #like chi2min=1.
-                all_db.append_lst([item for item in db.models if item.chi2<5.*min_chi2])
+            if append: pass
+            min_chi2=min([item.chi2 for item in db.models])
+            #added to remove irrelevant models more than like 10 sigma away                 
+            all_db.append_lst([item for item in db.models if item.chi2<min_chi2+100.])
     if plot:
         for key, val in dct.items():
             for attr,rng in val.items():

@@ -473,20 +473,29 @@ class Data(object):
     def set_node(self,**kwargs):  
         """set values from self to node"""
         #kwargs=Data.get_node_attrib(kwargs)  
-        old=self.node  
-        dct=dict(old.attrib)
+        for key, val in dict(kwargs).items():
+            self.node.set(key, str(val))
+        """
+        old=self.node.copy()  
+        dct=dict(old.attrib) #copy old attribs
         for key, val in kwargs.items():
-            dct[key]=val
+            dct[key]=val #update with values specified in kwargs
+
+        
 
         for key, val in dct.items():
             if key in self.node.attrib.keys():
                 self.node.set(key, str(val))
-
+        """
     def set_data(self,**kwargs):
         """set kwargs to self and apply to node"""
         for key, val in list(kwargs.items()): 
             if "Locked" in key:
-                val="true" if val else "false" 
+                if type(val)==bool:
+                    val="true" if val else "false" 
+                else:
+                    assert(type(val) in [str, unicode])
+                    assert(val in tf.keys())
             setattr(self,key,val)
         self.set_node(**kwargs)
 

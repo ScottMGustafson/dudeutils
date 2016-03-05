@@ -374,19 +374,33 @@ class Model(object):
             else:
                 raise TypeError("model.Model.set_val(): unrecognized type: %s"%(tag))
 
+            #get the model's absorber list
             ab_lst=data_types.ObjList.get(getattr(self,tag))
 
             for item in ab_lst:  #for item in abslist
                 if item.id==iden:  #if the id of the absorber matches
                     item.set_data(**kwargs)
                     print("setting to %s %s"%(iden, str(kwargs)))
-
-        else:
+                    """for key, val in dict(kwargs).items():
+                        try:
+                            assert(key in item.node.attrib.keys())
+                            assert(self.get_datum(iden,"Absorber",key)==val)
+                        except AssertionError:
+                            print("\n\n%s %s %s: %s != %s\nkeys=%s\n\n"%(
+                                    self.xmlfile,iden,key,str(val),
+                                    str(self.get_datum(iden,"Absorber",key)), 
+                                    str(item.node.attrib.keys())))
+                            raise"""
+        else: #iden was the object, not just the id
             tag=iden.__class__.__name__.split('.')[-1]
             if tag in Model.class_names.values():
+                print(tag,iden.id, str(kwargs))
+                raise Exception("break")
                 iden.set_data(**kwargs)
             elif tag in Model.class_names.keys():
                 for key, val in dict(kwargs).items:
+                    print(tag,iden.id, str(kwargs))
+                    raise Exception("break")
                     setattr(iden,key,val)
             else:
                 raise TypeError("model.Model.set_val(): unrecognized type: %s"%(tag))
