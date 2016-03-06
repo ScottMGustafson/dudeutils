@@ -472,32 +472,20 @@ class Data(object):
 
     def set_node(self,**kwargs):  
         """set values from self to node"""
-        #kwargs=Data.get_node_attrib(kwargs)  
         for key, val in dict(kwargs).items():
             self.node.set(key, str(val))
-        """
-        old=self.node.copy()  
-        dct=dict(old.attrib) #copy old attribs
-        for key, val in kwargs.items():
-            dct[key]=val #update with values specified in kwargs
 
-        
-
-        for key, val in dct.items():
-            if key in self.node.attrib.keys():
-                self.node.set(key, str(val))
-        """
     def set_data(self,**kwargs):
         """set kwargs to self and apply to node"""
         for key, val in list(kwargs.items()): 
             if "Locked" in key:
-                if type(val)==bool:
-                    val="true" if val else "false" 
-                else:
+                if not type(val) is bool:
                     assert(type(val) in [str, unicode])
                     assert(val in tf.keys())
+                self.node.set(key, str(val).lower())
             setattr(self,key,val)
-        self.set_node(**kwargs)
+            self.node.set(key, str(val))
+
 
 class Absorber(Data):
     node_attrib=["id","ionName",
@@ -505,6 +493,10 @@ class Absorber(Data):
                 "b","bLocked","bError",
                 "z","zLocked","zError"]
     
+
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+
     @classmethod
     def registrar_for(cls,tag):
         return tag=="Absorber"
@@ -513,8 +505,7 @@ class Absorber(Data):
         return "%-5s id=%-6s N=%8.5lf b=%8.5lf z=%10.8lf"%(
                     self.ionName,self.id,self.N,self.b,self.z)
 
-    def alt_init(self,**kwargs):
-        self.obs=[item.get_obs(self.z) for item in atomic_data[self.ionName]]
+
 
     def getShift(self, z):
         return (float(self.z) - z)*c/(1.+z)
@@ -596,6 +587,8 @@ class Absorber(Data):
 
 class ContinuumPoint(Data):
     node_attrib=["id","x","xLocked","xError","y","yLocked","yError"]
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
     def __str__(self):
         return "id=%s x=%12.7lf y=%12.8E"%(self.id,self.x,self.y)
     @classmethod
@@ -604,7 +597,8 @@ class ContinuumPoint(Data):
         
 class Region(Data):
     node_attrib=["start","end"]
-
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
     def __contains__(self, key):
         return self.start<=float(key)<=self.end
         
@@ -614,7 +608,8 @@ class Region(Data):
 
 class SingleView(Data):
     node_attrib=["id","centWave","waveRange","minFlux","maxFlux"]
-
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
     @classmethod
     def registrar_for(cls,tag):
         return tag=="SingleView"
@@ -623,7 +618,8 @@ class VelocityView(Data):
     node_attrib=["id","labels",
                 "minWave","maxWave","minFlux","maxFlux",
                 "restWaves","redshift"]
-
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
     @classmethod
     def registrar_for(cls,tag):
         return tag=="VelocityView"
