@@ -109,8 +109,8 @@ def fit_absorption(dat, model):
         absorbers+=item.get_lines()
 
     absorbers=list(filter(
-                lambda x: dat.waves[4]<x.get_obs(x.z)<dat.waves[-4], 
-                absorbers))
+                            lambda x: dat.waves[4]<x.get_obs(x.z)<dat.waves[-4], 
+                            absorbers))
 
     regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
     regions=consolidate(regions) 
@@ -133,9 +133,6 @@ def fit_absorption(dat, model):
                                                  x,y,
                                                  N,b,z,rest,gamma,f,
                                                  starts,ends )
-
-    for i in range(len(absorbers)):
-        model.set_val(absorbers[i],**{"N":N[i],"b":b[i],"z":z[i]}) #this propagates all the way down
     return cont, absorption, chi2
 
 
@@ -343,13 +340,13 @@ def optimize(spec, model):
 
 if __name__ == "__main__":
     import dudeutils
-    test_xml = "/home/scott/research/test.xml"
+    test_xml = "test.xml"
 
     model=dudeutils.get_model(test_xml)
-    sp = spectrum.Spectrum.sniffer(model.flux, model.error)
+    sp = Spectrum.sniffer(model.flux, model.error)
 
     print("testing optimizer.fit_absorption")
-    cont, ab, chi2 = optimizer.fit_absorption(sp, model)
+    cont, ab, chi2 = fit_absorption(sp, model)
 
     continuum_points = sorted(model.get_lst('ContinuumPointList'),key=lambda u:u.x)
     

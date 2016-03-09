@@ -7,7 +7,7 @@ class Spectrum(object):
     def sniffer(filename, *args, **kwargs):
         """detects raw text format, returns num columns"""
         if filename.endswith('.fits'):
-            return FitsSpectrum(filename, error=kwargs.pop('error',None), *args, **kwargs)
+            return FitsSpectrum(filename, *args, **kwargs)
         with open(filename) as f:
             if len(f.readline().split())==5:
                 return TextSpectrum(filename, *args, **kwargs)

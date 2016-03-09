@@ -393,11 +393,11 @@ class Model(object):
                             raise"""
         else: #iden was the object, not just the id
             tag=iden.__class__.__name__.split('.')[-1]
-            if tag in Model.class_names.values():
+            if tag in Model.model_classes.values():
                 print(tag,iden.id, str(kwargs))
                 raise Exception("break")
                 iden.set_data(**kwargs)
-            elif tag in Model.class_names.keys():
+            elif tag in Model.model_classes.keys():
                 for key, val in dict(kwargs).items:
                     print(tag,iden.id, str(kwargs))
                     raise Exception("break")
@@ -758,7 +758,8 @@ class ModelDB(object):
             model = self.get_model(iden)
             model.set_val(**kwargs)
 
-    def write(self,filename=None):
+    def write(self,filename=None,verbose=False):
+
         if filename==None:
             if self.name == None:
                 filename=input("name of database file to write: ")
@@ -766,9 +767,13 @@ class ModelDB(object):
                 filename=self.name
                 if not filename.endswith('.xml'):
                     filename=filename+'.xml'
+
         root = ModelDB.build_xml(self.models)
         out = prettify(root)
         out.replace('\n\n','\n')
+                    
+        if verbose:
+            print("writing %s with %d models"%(filename,len(self.models)))
         f = open(filename,'w')
         f.write(out)
         #tree = et.ElementTree(root)

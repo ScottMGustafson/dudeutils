@@ -3,13 +3,14 @@
 #include<string.h>
 #include"spectrum.h"
 
+/*
 double* spectrum(   const double waves[], const double flux[], const double err[], double continuum[],
                     double xs[], double ys[],
                     double Nval[], double bval[], double redshift[], 
                     double restwv[], double gmma[], double osc_strn[],
                     int starts[], int ends[],
                     int len_cont_points, int len_arr, int len_abs, int len_pairs){
-    /*
+    
     int i=0;
     continuum_point cont_points[len_cont_points];
     absorber absorbers[len_abs];
@@ -24,7 +25,7 @@ double* spectrum(   const double waves[], const double flux[], const double err[
     
 
     
-    memcpy(absorption, continuum, sizeof(continuum));
+    //memcpy(absorption, continuum, sizeof(continuum));
 
     for(i=0;i<len_abs;i++){
         absorbers[i] = (absorber) { .N=Nval[i], .b=bval[i], .z=redshift[i], 
@@ -39,10 +40,10 @@ double* spectrum(   const double waves[], const double flux[], const double err[
     //spec spectrum= (spec) {.waves=waves, .flux=flux, 
     //                        .absorption=absorbed_flux, .continuum=continuum}; 
     //double chi2 = chi2(absorption, flux, err, pairs, len_pairs);
-    */
+    
     return continuum;
 }
-
+*/
 double* return_absorption(double continuum[], const double waves[], double Nval[], double bval[], double redshift[], 
                     double restwv[], double gmma[], double osc_strn[], size_t len_abs, size_t len_arr){
     int i;

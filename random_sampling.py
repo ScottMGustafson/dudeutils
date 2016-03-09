@@ -56,7 +56,6 @@ def perturb_absorbers(dct, model):
             model.monte_carlo_set(key,"Absorber",rng,param,False)
     model.write(model.xmlfile)
 
-    return model
 
 
 def filter_bad_models(models, dct, vel_pad=5.):
@@ -75,7 +74,7 @@ def filter_bad_models(models, dct, vel_pad=5.):
                                      # likely for our line of work
                             return False
                 elif param_name == "N":
-                    if val<10.5:  #this means dude tried to throw it out.
+                    if val<10.1:  #this means dude tried to throw it out.
                                   #if you are running this, then you've already decided that 
                                   #this absorber was needed, so will this is a bad model
                         return False
@@ -234,12 +233,19 @@ if __name__=="__main__":
     step='dude' if glob['method'].lower()=='dude' else None
     n=int(glob['n'])
 
+
+
+    if append:
+        name=input("path/name of db model to append: ")
+        if not name=="":
+            all_db=ModelDB(name=name)
+        else:
+            all_db=ModelDB(models=[])
+    else:
+        all_db=ModelDB(models=[])
+
     model=Model(xmlfile=source)
     constraints={}
-
-    all_db=ModelDB(models=[])
-
-
 
     for key, val in dct.items():
         for attr,rng in val.items():
@@ -249,7 +255,6 @@ if __name__=="__main__":
                                     constraints=constraints,
                                     iden2=iden2, step=step, verbose=True)
 
-            if append: pass
             min_chi2=min([item.chi2 for item in db.models])
             #added to remove irrelevant models more than like 10 sigma away                 
             all_db.append_lst([item for item in db.models if item.chi2<min_chi2+100.])
@@ -259,4 +264,10 @@ if __name__=="__main__":
                 plot_chi2(all_db, iden=key, attr=attr,
                           xlabel=r"$%s(%s)$"%(attr,key),
                           constraints={})
+    if input("save db?").lower() in ['y', 'yes']:
+        name=input("db path/name?") 
+        if not name.endswith('.xml'):
+            name+='.xml'
+        
+        all_db.write(name,True)
 

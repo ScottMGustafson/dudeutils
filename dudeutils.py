@@ -17,6 +17,15 @@ def run_optimize(fname,step=False, verbose=False, method='dude'):
     step (bool): if True, calls dude's step-iteration procedure,
         dumping some number of fits for each step of the procedure, named 
         \"iteration_%d.xml\"
+
+    ouput:
+    ------
+    popt, pcov:   if method!= 'dude', outputs optimized parameters and 
+                  covariance matrix (tuple)
+
+    Raises:
+    -------
+    None
     """
     if method=='dude':
         #call dude from the command line and call its Levenberg-marquardt algo.
@@ -71,6 +80,10 @@ def populate_database(abs_ids,keep=False,path=None,db=None,constraints=None):
     Output:
     -------
     ModelDB instance
+
+    Raises:
+    -------
+    Exception
 
     """
 
