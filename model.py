@@ -380,7 +380,7 @@ class Model(object):
             for item in ab_lst:  #for item in abslist
                 if item.id==iden:  #if the id of the absorber matches
                     item.set_data(**kwargs)
-                    print("setting to %s %s"%(iden, str(kwargs)))
+                    #print("setting to %s %s"%(iden, str(kwargs)))
                     """for key, val in dict(kwargs).items():
                         try:
                             assert(key in item.node.attrib.keys())

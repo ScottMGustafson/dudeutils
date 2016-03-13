@@ -7,7 +7,7 @@ from wavelength import c
 import spec_parser
 
 
-def run_optimize(fname,step=False, verbose=False, method='dude'):
+def run_optimize(fname,step=False, verbose=False, method='dude',timeout=45):
     """
     call dude and run OptimizeXML from the command line.
 
@@ -32,12 +32,13 @@ def run_optimize(fname,step=False, verbose=False, method='dude'):
         commands=["java","-cp",
                   "/home/scott/programming/dude/jd/build", 
                   "dude.commandline.OptimizeXML", 
-                  fname]
+                  fname
+                  ]
         if step:
             commands.append('step')
         if verbose:
             print("running: %s"%(" ".join(commands)))
-        subprocess.call(commands)
+        subprocess.call(commands,timeout=timeout)
     else: #use code from this project
         raise Exception("doesn't yet work as of 2016-02-29")
         model=model.Model(xmlfile=fname)

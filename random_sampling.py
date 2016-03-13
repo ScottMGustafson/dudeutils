@@ -30,6 +30,20 @@ def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
     dct={}
     for item in list(config.sections()):
         dct[item]=dict(config.items(item))
+
+    for ab in dct.keys():
+        if ab=='config':
+            continue
+        for k in ["N", "b", "z"]:
+            dct[ab][k] = list(map(float,dct[ab][k].strip().split(', ')))
+        cond=[dct[ab]["N"][0]<10.,dct[ab]["N"][1]>23.,
+              dct[ab]["N"][1]<dct[ab]["N"][0],
+              dct[ab]["b"][0]<1.,dct[ab]["b"][1]>50.,
+              dct[ab]["b"][1]<dct[ab]["b"][0],
+              dct[ab]["z"][0]<0.,dct[ab]["z"][1]<0.,
+              dct[ab]["z"][1]<dct[ab]["z"][0]]
+        if any(cond):
+            raise Exception("check your random sampling inputs")
     return dct
 
 def perturb_absorbers(dct, model):
@@ -58,7 +72,7 @@ def perturb_absorbers(dct, model):
 
 
 
-def filter_bad_models(models, dct, vel_pad=5.):
+def filter_bad_models(models, dct, vel_pad=2.):
     def _filter(model):
         for iden, params in dct.items():
             for param_name, param_range in params.items():
@@ -67,14 +81,14 @@ def filter_bad_models(models, dct, vel_pad=5.):
                     return False 
 
                 if param_name == "b":
-                    if val<0.5:
+                    if val<0.1:
                         return False
                     elif model.get_datum(iden,"Absorber","ionName")!="H I":
                         if val>60:   #a metal line with an extremely large b-value: not 
                                      # likely for our line of work
                             return False
                 elif param_name == "N":
-                    if val<10.1:  #this means dude tried to throw it out.
+                    if val<7.0 or val>23.:  #this means dude tried to throw it out.
                                   #if you are running this, then you've already decided that 
                                   #this absorber was needed, so will this is a bad model
                         return False
@@ -93,9 +107,9 @@ def filter_bad_models(models, dct, vel_pad=5.):
         
 
 def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints, 
-                    method='dude',step=False, verbose=False, iden2=None):
+                    method='dude',step=False, verbose=True, iden2=None):
     """
-    runs simmulated annealing algorithm on dude models.  This works best under 
+    runs random sampling dude models to estimate errors.  This works best under 
     a small number of parameters and parameter-space to explore.  Do this when 
     you ALREADY have an idea of what the result should be.  This can then be
     used to get an estimate of the errors.
@@ -160,7 +174,10 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
         #set value to random number within range
         perturb_absorbers(dct,model)
         #call dude to optimize
-        run_optimize(model.xmlfile,step=step,verbose=verbose,method=method)
+        try:
+            run_optimize(model.xmlfile,step=step,verbose=verbose,method=method)
+        except KeyboardInterrupt:
+            continue
         #add to ModelDB database
         if step:
             newdb=populate_database(abs_ids, keep=False,
@@ -179,7 +196,14 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
                     msg+=str(is_locked)
                     raise Exception(msg)
 
-            db.append_lst(filter_bad_models(newdb.models, dct))
+
+    
+            new_models=filter_bad_models(newdb.models, dct)
+            if len(new_models)>0:
+                print("appending new models")
+                db.append_lst(new_models)
+            else:
+                print("skipping bad models")
         else:
             model.read(model.xmlfile) #model.xmlfile is rewritten by OptimizeXML
             db.append(model.copy())
@@ -222,9 +246,7 @@ if __name__=="__main__":
     if not glob: 
         raise Exception()
 
-    for key, val in dct.items():
-        for k, rng in val.items():
-            dct[key][k]=list(map(float,rng.strip().split(', ')))
+
 
     source=glob['source']
     plot=True if glob['plot'].lower()=='true' else False
@@ -234,30 +256,42 @@ if __name__=="__main__":
     n=int(glob['n'])
 
 
-
+    
     if append:
         name=input("path/name of db model to append: ")
         if not name=="":
             all_db=ModelDB(name=name)
+            new_models=filter_bad_models(all_db.models, dct)
+            all_db=ModelDB(models=new_models) 
         else:
-            all_db=ModelDB(models=[])
+            raise Exception("invalid name: %s"%(name)) 
     else:
-        all_db=ModelDB(models=[])
-
+        all_db=ModelDB(models=[]) 
+        
     model=Model(xmlfile=source)
     constraints={}
-
+    count=len(dct.keys())*3*n
     for key, val in dct.items():
         for attr,rng in val.items():
             iden2=dct[iden]["iden2"] if attr=="vel" else None
-            db=random_sampling( model, key, attr, rng, n,
+            print("%d samplings remaining\n"%(count))
+            count-=1
+            try:
+                db=random_sampling( model, key, attr, rng, n,
                                     abs_ids=list(dct.keys()),dct=dct,
                                     constraints=constraints,
-                                    iden2=iden2, step=step, verbose=True)
+                                    iden2=iden2, step=step, verbose=False)
 
-            min_chi2=min([item.chi2 for item in db.models])
-            #added to remove irrelevant models more than like 10 sigma away                 
-            all_db.append_lst([item for item in db.models if item.chi2<min_chi2+100.])
+                min_chi2=min([item.chi2 for item in db.models])
+                #added to remove irrelevant models more than like 10 sigma away                 
+                all_db.append_lst([item for item in db.models if item.chi2<min_chi2+100.])
+            except:
+                print("failed either due to timeout, KeyboardInterrupt or other\n")
+                pass
+
+    if len(all_db.models)==0:
+        raise Exception("no surviving models...")
+     
     if plot:
         for key, val in dct.items():
             for attr,rng in val.items():
