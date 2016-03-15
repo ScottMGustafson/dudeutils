@@ -21,6 +21,7 @@ import data_types
 import xml.etree.ElementTree as et
 import copy
 import observer
+import io
 
 c = 299792.458 #speed of light in km/s
 def tf(val):
@@ -39,24 +40,32 @@ class Model(object):
         self.params=0
         self.flux=None  #fits (or text) file with flux
         self.error=None #fits (or text) file with flux.  if test, then this is the same as flux and xml format will change a bit
+        self.xmlfile=kwargs.pop("xmlfile",None)
         self.get_all=kwargs.pop("get_all",True)
         self.id=kwargs.pop("id",data_types.ObjList.generate_id())
         self.abs_ids=kwargs.pop("abs_ids",None)
-        for key, val in dict(kwargs).items():
-            setattr(self,key,val)  #data lists will be the id needed to fetch from the data pool
-                
 
-        if self.xmlfile==None:
-            try:
-                self.xmlfile=Model.get(self.AbsorberList)[0].xmlfile.name
-            except:
-                raise Exception("must specify either xml filename or model data")
+
+        if "buff" in kwargs.keys():
+            self.xmlfile="scratch.xml"
+            buff=kwargs.pop("buff")
+            import io
+            assert(type(buff) is io.BytesIO)
+            self.read(buff=buff)
+            
+        else:
+            for key, val in dict(kwargs).items():
+                setattr(self,key,val)  #data lists will be the id needed to fetch from the data pool
+            if not self.xmlfile:
+                try:
+                    self.xmlfile=Model.get(self.AbsorberList)[0].xmlfile.name
+                except:
+                    raise Exception("must specify either xml filename or model data")
+            if not "AbsorberList" in kwargs.keys(): #no fitting data is specified in __init__, then read
+                self.read()
 
         for key, val in kwargs.items():
             setattr(self, key, val)
-
-        if not "AbsorberList" in kwargs.keys(): #no fitting data is specified in __init__, then read
-            self.read()
 
         self.locked = {} 
         self._dof=float(self.pixels)-float(self.params)
@@ -269,7 +278,7 @@ class Model(object):
             new = (b-a)*random_sample()+a
         self.set_val(iden,tag,**{param:new})
 
-    def read(self,filename=None):
+    def read(self,buff=None, filename=None):
         """read from xml fit file, apply attribs to self
 
         input:
@@ -286,7 +295,9 @@ class Model(object):
 
 
         """
-        if not filename:
+        if buff:
+            filename=buff
+        elif not filename:
             filename=self.xmlfile
 
 
@@ -307,9 +318,14 @@ class Model(object):
 
         # read thorugh xml file for source data files
         try:
+            if not type(filename) is str:
+                filename.seek(0)
             duderoot = et.parse(filename).getroot()  ##should be SpecTool
         except:
-            raise Exception(filename+" failed to parse.")
+            if type(filename) is str:
+                raise Exception(filename+" failed to parse.")
+            else:
+                raise
         compositespec = duderoot.find("CompositeSpectrum")
         path=os.path.split(compositespec.get("id"))[0]
 
@@ -527,7 +543,12 @@ class ModelDB(object):
 
         return x, y
             
+    def remove(self, model):
+        #remove the relevant absorber list from the pool
+        del(data_types.ObjList._pool[model.AbsorberList])
+        self.models.remove(model)
 
+        
 
     def append_db(self,dbfile):
         """appends another xmldb from filename to the current db"""

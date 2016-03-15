@@ -4,6 +4,7 @@ import uuid
 import xml.etree.ElementTree as et
 import collections
 import os
+import sys
 from scipy import constants
 
 tf = {"true":True, "false":False}
@@ -426,10 +427,13 @@ class Data(object):
         filename: input filename
         tag (default='Absorber'): the specified data type
         ids: which ids to read.  if None, then read all available.
-
         """
 
-        duderoot = et.parse(filename).getroot()  ##should be SpecTool
+        if not type(filename) is str:
+            filename.seek(0)
+        etree=et.parse(filename)
+        duderoot = etree.getroot()  ##should be SpecTool
+ 
         dudespec = duderoot.find("CompositeSpectrum")
         if dudespec is None:
             raise Exception("error reading fit file.  check %s to verify."%(filename))

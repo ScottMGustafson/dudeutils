@@ -35,13 +35,14 @@ def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
         if ab=='config':
             continue
         for k in ["N", "b", "z"]:
-            dct[ab][k] = list(map(float,dct[ab][k].strip().split(', ')))
-        cond=[dct[ab]["N"][0]<10.,dct[ab]["N"][1]>23.,
-              dct[ab]["N"][1]<dct[ab]["N"][0],
-              dct[ab]["b"][0]<1.,dct[ab]["b"][1]>50.,
-              dct[ab]["b"][1]<dct[ab]["b"][0],
-              dct[ab]["z"][0]<0.,dct[ab]["z"][1]<0.,
-              dct[ab]["z"][1]<dct[ab]["z"][0]]
+            dct[ab][k]=dct[ab][k].replace(" ","")
+            dct[ab][k] = list(map(float,dct[ab][k].strip().split(',')))
+        cond=[dct[ab]["N"][0]<10.,dct[ab]["N"][-1]>23.,
+              dct[ab]["N"][-1]<dct[ab]["N"][0],
+              dct[ab]["b"][0]<1.,dct[ab]["b"][-1]>50.,
+              dct[ab]["b"][-1]<dct[ab]["b"][0],
+              dct[ab]["z"][0]<0.,dct[ab]["z"][-1]<0.,
+              dct[ab]["z"][-1]<dct[ab]["z"][0]]
         if any(cond):
             raise Exception("check your random sampling inputs")
     return dct
@@ -67,13 +68,17 @@ def perturb_absorbers(dct, model):
 
     for key, val in dct.items():
         for param, rng in val.items():
-            model.monte_carlo_set(key,"Absorber",rng,param,False)
+            
+            model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,False)
     model.write(model.xmlfile)
 
 
 
-def filter_bad_models(models, dct, vel_pad=2.):
+def filter_bad_models(models, dct, vel_pad=2.,chi2pad=50.):
+    min_chi2=min([float(item.chi2) for item in models])
     def _filter(model):
+        if float(model.chi2)>min_chi2+chi2pad:
+            return False
         for iden, params in dct.items():
             for param_name, param_range in params.items():
                 val=model.get_datum(iden,"Absorber",param_name)
@@ -100,7 +105,16 @@ def filter_bad_models(models, dct, vel_pad=2.):
                        (val<param_range[0] and vel_range[0]<-1.*vel_pad):
                         return False
         return True
-    return [item for item in models if _filter(item)]
+
+
+    if type(models) is ModelDB:
+        for item in models.models:
+            if not _filter(item):
+                models.remove(item)
+        return models        
+
+    else:
+        return [item for item in models if _filter(item)]
             
         
         
@@ -147,7 +161,7 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
             model.set_val(iden2,"Absorber",zLocked='true')
             
         vel=param_range
-        param_range=[(vel[0]/c)*(1.+zref)+zref, (vel[1]/c)*(1.+zref)+zref]
+        param_range=[(vel[0]/c)*(1.+zref)+zref, (vel[-1]/c)*(1.+zref)+zref]
         param='z'
 
         return param, param_range
@@ -261,8 +275,8 @@ if __name__=="__main__":
         name=input("path/name of db model to append: ")
         if not name=="":
             all_db=ModelDB(name=name)
-            new_models=filter_bad_models(all_db.models, dct)
-            all_db=ModelDB(models=new_models) 
+            print("initial filtering")
+            all_db=filter_bad_models(all_db, dct)
         else:
             raise Exception("invalid name: %s"%(name)) 
     else:
@@ -272,9 +286,9 @@ if __name__=="__main__":
     constraints={}
     count=len(dct.keys())*3*n
     for key, val in dct.items():
+        print("\n%d samplings remaining\n"%(count))
         for attr,rng in val.items():
             iden2=dct[iden]["iden2"] if attr=="vel" else None
-            print("%d samplings remaining\n"%(count))
             count-=1
             try:
                 db=random_sampling( model, key, attr, rng, n,

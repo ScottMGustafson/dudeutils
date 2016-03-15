@@ -6,10 +6,10 @@ import xml.etree.ElementTree as et
 from wavelength import c
 import spec_parser
 
-
-def run_optimize(fname,step=False, verbose=False, method='dude',timeout=45):
+def run_optimize(fname,step=False, verbose=False, 
+        to_buffer=True, method='dude',timeout=None):
     """
-    call dude and run OptimizeXML from the command line.
+    call dude and run commandline.OptimizeXML from the command line.
 
     input:
     ------
@@ -17,6 +17,8 @@ def run_optimize(fname,step=False, verbose=False, method='dude',timeout=45):
     step (bool): if True, calls dude's step-iteration procedure,
         dumping some number of fits for each step of the procedure, named 
         \"iteration_%d.xml\"
+    to_buffer (bool): if True, writes dude output to buffer instead of disk.  
+        models are then passed to xml.etree.ElementTree as BytesIO or StringIO
 
     ouput:
     ------
@@ -36,9 +38,19 @@ def run_optimize(fname,step=False, verbose=False, method='dude',timeout=45):
                   ]
         if step:
             commands.append('step')
+        if to_buffer:
+            commands.append('to_buffer')
         if verbose:
             print("running: %s"%(" ".join(commands)))
-        subprocess.call(commands,timeout=timeout)
+
+
+        #now run the optimizer
+        if to_buffer:
+            return subprocess.check_output(commands,timeout=timeout)
+                   
+        else:
+            subprocess.call(commands,timeout=timeout)
+            return None
     else: #use code from this project
         raise Exception("doesn't yet work as of 2016-02-29")
         model=model.Model(xmlfile=fname)
@@ -70,13 +82,19 @@ def get_model(xmlfile,chi2=0.,pixels=0.):
     return Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
 
 
-def populate_database(abs_ids,keep=False,path=None,db=None,constraints=None):
+def populate_database(abs_ids=[], separator="\n\n", 
+        path=None, db=None, constraints=None, buff=None):
     """
     parse all xmlfiles in a given directory and returns a ModelDB instance
 
     Input:
     ------
-    path : specified path to check
+    abs_ids: list of absorbers ids to keep (str)
+    separator: string separator to separate models in buffer stream
+    path : specified path to check if reading from file
+    db: if appending to specified database.
+    constraints:  model constraints.  (see constraints.Constraints)
+    buff: a buffer to read in models from memory
 
     Output:
     -------
@@ -87,35 +105,43 @@ def populate_database(abs_ids,keep=False,path=None,db=None,constraints=None):
     Exception
 
     """
+    if buff:  #passes buffer to model.Model.read(), then to data_types.read(), 
+              #then to xml.etree.ElementTree.parse() as io.BytesIO
 
-    if type(abs_ids)!=list:
-        raise Exception("abs_ids needs to be list")
+        strlst=buff.decode().strip(separator).split(separator)
+        buff=[io.BytesIO(item.replace("\n","").encode()) for item in strlst]
+        models = [model.Model(buff=item) for item in buff]
 
-    if len(abs_ids)==0:
-        raise Exception("need at least one absorber specified.  abs_ids=[]")
+    else:
+        if type(abs_ids)!=list:
+            raise Exception("abs_ids needs to be list")
 
-    files=[]
-    if not path:
-        path=os.getcwd()
-    for f in os.listdir(path):
-        if split(f)[-1].startswith('iteration') and split(f)[-1].endswith(".xml"):
-            files.append(f)
+        if len(abs_ids)==0:
+            raise Exception("need at least one absorber specified.  abs_ids=[]")
 
-    if len(files)==0 and not db:
-        raise Exception("too few files")
+        #read files on disk
+        files=[]
+        if not path:
+            path=os.getcwd()
+        for f in os.listdir(path):
+            if split(f)[-1].startswith('iteration') and split(f)[-1].endswith(".xml"):
+                files.append(f)
 
-    models=[Model( xmlfile=join(path,f), abs_ids=abs_ids ) for f in files]
+        if len(files)==0 and not db:
+            raise Exception("too few files")
+
+        models=[Model( xmlfile=join(path,f), abs_ids=abs_ids ) for f in files]
+        for f in files:
+            os.remove(join(path,f))
 
     if bool(db): #if None or []
         if type(db) is str:
             db=load_from_db(db)
         db.append_lst(models,constraints=constraints)
     else:
-        db = ModelDB(models=models,constraints=constraints)
+        db=model.ModelDB(models=models,constraints=constraints)
 
-    if not keep:
-        for f in files:
-            os.remove(join(path,f))
+
     return db
 
 
