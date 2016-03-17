@@ -22,6 +22,7 @@ import xml.etree.ElementTree as et
 import copy
 import observer
 import io
+import pickle
 
 c = 299792.458 #speed of light in km/s
 def tf(val):
@@ -66,6 +67,13 @@ class Model(object):
 
         for key, val in kwargs.items():
             setattr(self, key, val)
+
+        self.chi2=float(self.chi2)
+
+        self.pixels=int(float(self.pixels))
+        self.params=int(float(self.params))
+
+        
 
         self.locked = {} 
         self._dof=float(self.pixels)-float(self.params)
@@ -480,7 +488,10 @@ class ModelDB(object):
                     setattr(self,key,[])
             
         elif name:   
-            self.models = ModelDB.read(str(name), returndb=False)
+            if name.endswith('.xml')
+                self.models = ModelDB.read(str(name), returndb=False)
+            else:
+                self.models=ModelDB.load_models(name).models
         else:
             self.models = []
 
@@ -778,6 +789,18 @@ class ModelDB(object):
         elif type(model) is str:
             model = self.get_model(iden)
             model.set_val(**kwargs)
+
+    @staticmethod
+    def dump_models(db,fname=None):
+        if not fname:
+            fname=db.name
+        if not fname.endswith(".obj"):
+            fname+=".obj"
+        pickle.dump(db,open(fname, "wb"))
+
+    @staticmethod
+    def load_models(fname):
+        return pickle.load(open(fname, "rb"))
 
     def write(self,filename=None,verbose=False):
 

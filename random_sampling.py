@@ -274,7 +274,11 @@ if __name__=="__main__":
     if append:
         name=input("path/name of db model to append: ")
         if not name=="":
-            all_db=ModelDB(name=name)
+            if name.endswith('.xml')
+                all_db=ModelDB(name=name)
+            else:
+                all_db=ModelDB.load_models(name)
+            
             print("initial filtering")
             all_db=filter_bad_models(all_db, dct)
         else:
@@ -298,7 +302,7 @@ if __name__=="__main__":
 
                 min_chi2=min([item.chi2 for item in db.models])
                 #added to remove irrelevant models more than like 10 sigma away                 
-                all_db.append_lst([item for item in db.models if item.chi2<min_chi2+100.])
+                all_db.append_db(get_nsigma(db, n=5.))
             except:
                 print("failed either due to timeout, KeyboardInterrupt or other\n")
                 pass
@@ -316,6 +320,7 @@ if __name__=="__main__":
         name=input("db path/name?") 
         if not name.endswith('.xml'):
             name+='.xml'
-        
         all_db.write(name,True)
+        name=name.strip('.xml')+'.obj'
+        ModelDB.dump_models(all_db,name)
 
