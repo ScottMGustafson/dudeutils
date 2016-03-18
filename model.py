@@ -27,6 +27,7 @@ import pickle
 c = 299792.458 #speed of light in km/s
 def tf(val):
     return "true" if val in [True,"true"] else "false"
+
 class Model(object): 
     #this dict maps ObjList subclasses to their associated data type
     model_classes = {"AbsorberList":"Absorber",
@@ -208,7 +209,15 @@ class Model(object):
 
     def get_datum(self,iden,tag,param=None):
         """get an individual datum from model's data list."""
-        if tag in Model.model_classes.values(): tag=inv_dict(tag)
+        if tag in Model.model_classes.values(): 
+            tag=inv_dict(tag)
+
+
+        tst=self.get_lst(tag)
+        print(tst)
+        print(tag)
+        assert(tst)
+
         for item in self.get_lst(tag):
             if iden==item.id:
                 if param:
@@ -488,12 +497,13 @@ class ModelDB(object):
                     setattr(self,key,[])
             
         elif name:   
-            if name.endswith('.xml')
+            if name.endswith('.xml'):
                 self.models = ModelDB.read(str(name), returndb=False)
             else:
                 self.models=ModelDB.load_models(name).models
         else:
             self.models = []
+        self.pool=data_types.ObjList._pool  #need a reference to _pool for pickling purposes
 
         if constraints:
             self.models = ModelDB.constrain(self.models,constraints)
@@ -555,11 +565,44 @@ class ModelDB(object):
         return x, y
             
     def remove(self, model):
-        #remove the relevant absorber list from the pool
-        del(data_types.ObjList._pool[model.AbsorberList])
-        self.models.remove(model)
+        """
+        remove a model from the database.
+        also removes non-repeated entries in ObjList._pool
+
+        input:
+        ------
+        model: which model to remove
+
+        output:
+        -------
+        None
+
+        raises:
+        -------
+        None
+
+        """
 
         
+        def check_for_conflicts():
+            def get_keys(mod):
+                return [getattr(mod,item) for item in Model.model_classes.keys()]
+            these_keys=get_keys(model)
+            for mod in self.models:
+                if mod is model:
+                    continue
+                for item in get_keys(mod):  #check if any of these_keys are repeated in mod's keys
+                    if item in these_keys:
+                        these_keys.remove(item)
+                    if len(these_keys)==0:
+                        return []
+            return these_keys
+
+        these_keys=check_for_conflicts()
+        for key in these_keys: #remove items from ObjList._pool
+            data_types.ObjList.remove(key)
+     
+        self.models.remove(model)
 
     def append_db(self,dbfile):
         """appends another xmldb from filename to the current db"""
@@ -751,6 +794,8 @@ class ModelDB(object):
             objlist=data_types.ObjList.list_from_xml(parent,verbose) #instantiate all absorber/contpoint/view/etc data. data stored in data_types.ObjList._pool
         #print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
 
+        
+
         t1=time.time()
         print("time to get objlist: %lf"%(t1-t0))
 
@@ -789,19 +834,31 @@ class ModelDB(object):
         elif type(model) is str:
             model = self.get_model(iden)
             model.set_val(**kwargs)
-
+    
+    """
     @staticmethod
     def dump_models(db,fname=None):
         if not fname:
             fname=db.name
         if not fname.endswith(".obj"):
             fname+=".obj"
+        if len(db._pool.keys())==0:
+            raise data_type.MissingPoolKey("no data to dump from pool")
         pickle.dump(db,open(fname, "wb"))
 
+   
     @staticmethod
     def load_models(fname):
-        return pickle.load(open(fname, "rb"))
-
+        db = pickle.load(open(fname, "rb"))
+        if len(data_types.ObjList._pool.keys())==0:
+            print("need to refresh pooled data.")
+            try:
+                data_types.ObjList.refresh_list(fname.replace('.obj','.xml'))
+            except: 
+                data_types.ObjList.refresh_list(input('file to unpickle: '))
+        db.pool=data_types.ObjList._pool
+        return db
+    """
     def write(self,filename=None,verbose=False):
 
         if filename==None:

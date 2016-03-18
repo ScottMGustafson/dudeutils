@@ -13,6 +13,10 @@ c=constants.c/1000.  #speed of light in km/s
 #TODO add functionality to directly change from absorber and have
 #that propagate to all relevant entities...basically an observer pattern
 
+class MissingPoolKey(Exception):
+    """exception for when the pool is missing a key"""
+    pass
+
 class ObjList(object):
 
     _pool = dict() #stores objects already initialized
@@ -57,6 +61,10 @@ class ObjList(object):
         #ObjList.taken_names.append(iden)
         return iden
 
+    @staticmethod
+    def remove(iden):
+        del(ObjList._pool[iden])
+
     def get_item(self,iden):
         """get element from objlist.  
         if AbsList, this will be the user assigned id, not the _pool key"""
@@ -77,7 +85,7 @@ class ObjList(object):
 
         raises:
         -------
-        KeyError: when theID isn't recognized
+        MissingPoolKey: when theID isn't recognized
 
         """
         try:
@@ -85,7 +93,8 @@ class ObjList(object):
         except KeyError:
             msg = "\n  key not found: %s"%(str(theID))
             msg+="\n\n  available keys are:\n%s\n"%(str(sorted(ObjList._pool.keys())))
-            print("\n  key not found: %s"%(str(theID)))
+            raise MissingPoolKey(msg)
+            #print("\n  key not found: %s"%(str(theID)))
 
     @staticmethod
     def set(value): 
@@ -212,13 +221,20 @@ class ObjList(object):
         """
         given a node that is an AbsorberList or similar type parse individual 
         datum
+
+        input:
+        ------
+        node: node of one of AbsorberLists, etc...
+
+        output:
+        -------
+        ObjList (or subclass) instance
         """ 
         if verbose:
             print(len(list(node)))
         objlist = [Data.factory(**{"node":item}) for item in list(node)]  #each item should be xml node
-        temp = ObjList.factory(objlist,id=node.get("id"))
+        return ObjList.factory(objlist,id=node.get("id"))
 
-        return temp
 
     @staticmethod
     def sublass_str():
@@ -247,6 +263,15 @@ class ObjList(object):
                     return ObjList._read_node(item)
         return None
 
+    def refresh_list(xmlfile):
+        ObjList._pool = {}
+        tree = et.parse(xmlfile)
+        root = tree.getroot()
+        for tag in "AbsorberLists ContinuumPointLists RegionLists SingleViewLists VelocityViewLists".split():
+            parent = root.find(tag)
+            for objlist in parent:
+                inst=ObjList._read_node(objlist)
+                
     @staticmethod
     def list_from_xml(parent,verbose=False):
         """

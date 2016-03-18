@@ -274,7 +274,7 @@ if __name__=="__main__":
     if append:
         name=input("path/name of db model to append: ")
         if not name=="":
-            if name.endswith('.xml')
+            if name.endswith('.xml'):
                 all_db=ModelDB(name=name)
             else:
                 all_db=ModelDB.load_models(name)

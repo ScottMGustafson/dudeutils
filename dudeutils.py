@@ -149,14 +149,13 @@ def append_db(db,abs_ids,keep=False,path=None,constraints=None):
     """populate existing database"""
     populate_database(abs_ids,keep=keep,path=path,db=db,constraints=constraints)
 
-def dump_models(db,fname=None):
-    """alias to ModelDB.dump_models"""
-    ModelDB.dump_models(db,fname)
+#def dump_models(db,fname=None):
+#    """alias to ModelDB.dump_models"""
+#    ModelDB.dump_models(db,fname)
+#def load_models(fname):
+#    """alias to ModelDB.load_models"""
+#    return ModelDB.load_models(fname)
 
-def load_models(fname):
-    """alias to ModelDB.load_models"""
-    return ModelDB.load_models(fname)
-   
 def load_from_db(dbxml):
     """alias to load an xml database"""
     return ModelDB.read(dbxml)
