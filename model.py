@@ -329,7 +329,6 @@ class Model(object):
             if key=='AbsorberList': assert(len(lst)>0)
             newobj = data_types.ObjList.factory(lst)
             if newobj:
-                assert(newobj.id in data_types.ObjList._pool.keys())  #test that data was added to pool
                 setattr(self,key,newobj.id)
 
 
@@ -503,7 +502,7 @@ class ModelDB(object):
                 self.models=ModelDB.load_models(name).models
         else:
             self.models = []
-        self.pool=data_types.ObjList._pool  #need a reference to _pool for pickling purposes
+
 
         if constraints:
             self.models = ModelDB.constrain(self.models,constraints)
