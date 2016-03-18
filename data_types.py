@@ -53,6 +53,10 @@ class ObjList(object):
         return not self.__eq__(other)
 
     @staticmethod
+    def clean_pool(lst):
+        ObjList._pool = {k: v for (k, v) in ObjList._pool.items() if k in lst}
+
+    @staticmethod
     def generate_id():
         iden=str(uuid.uuid4())
         while iden in ObjList._pool.keys():

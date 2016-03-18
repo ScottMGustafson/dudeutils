@@ -503,9 +503,8 @@ class ModelDB(object):
         else:
             self.models = []
 
-
         if constraints:
-            self.models = ModelDB.constrain(self.models,constraints)
+            self.constrain(constraints)
 
     def __iter__(self):
         for i in range(len(self.models)):
@@ -521,23 +520,18 @@ class ModelDB(object):
         self.models.append(model)
 
     def append_lst(self, lst,constraints=None):
-        if constraints:
-            lst=ModelDB.constrain(lst, constraints)
         for item in lst:
             self.models.append(item)
+        if constraints:
+            self.constrain(constraints)
 
     def get_all_abs(self,iden,param,locked=False,constraints=None):
         """return a list of desired param values from all models"""
         x = []
         y = []
         if not constraints is None:
-            lst=ModelDB.constrain(self.models,constraints)
-            if len(lst)==0:
-                raise Exception("no surviving models:\n%s"%(str(constraints)))
-            if len(lst)==len(self.models):
-                warnings.warn("everything passed")
-        else:
-            lst = self.models
+            self.constrain(constraints)
+        lst = self.models
         if locked:
             for item in lst:
                 abslist = Model.get(item.AbsorberList)
@@ -563,6 +557,12 @@ class ModelDB(object):
 
         return x, y
             
+    def remove_unused(self):
+        lst=[]
+        for mod in self.models:
+            lst+=[getattr(mod,key) for key in Model.model_classes.keys()]
+        data_types.ObjList.clean_pool(list(set(lst)))
+
     def remove(self, model):
         """
         remove a model from the database.
@@ -699,11 +699,7 @@ class ModelDB(object):
             
         return root
 
-    def trim(self,constraints):
-        self.models = ModelDB.constrain(self.models,constraints)
-
-    @staticmethod
-    def constrain(models,constraints):
+    def constrain(self,constraints):
         """
         example constraints:   
             constraints={"chi2":123,"params":3,"pixels":2345,"D":{"N":(12.3,14.3),"b":(15,16)}}
@@ -711,7 +707,9 @@ class ModelDB(object):
 
         if type(constraints) is dict: 
             constraints=Constraint(**constraints)
-        return [item for item in models if item in constraints]
+
+        for item in [it for it in self.models if not it in constraints]:
+            self.remove(item)
 
     def get(self,xmlfile,chi2,pixels,params=None):
         """get from xml fit file"""
@@ -792,8 +790,6 @@ class ModelDB(object):
             parent = root.find(key+'s')
             objlist=data_types.ObjList.list_from_xml(parent,verbose) #instantiate all absorber/contpoint/view/etc data. data stored in data_types.ObjList._pool
         #print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
-
-        
 
         t1=time.time()
         print("time to get objlist: %lf"%(t1-t0))
