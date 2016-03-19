@@ -498,6 +498,8 @@ class ModelDB(object):
         elif name:   
             if name.endswith('.xml'):
                 self.models = ModelDB.read(str(name), returndb=False)
+                
+
             else:
                 self.models=ModelDB.load_models(name).models
         else:
@@ -505,6 +507,8 @@ class ModelDB(object):
 
         if constraints:
             self.constrain(constraints)
+#this breaks encapsulation, but I need a reference to pool so the data will pickle ok
+        self.pool=data_types.ObjList._pool
 
     def __iter__(self):
         for i in range(len(self.models)):
@@ -841,7 +845,7 @@ class ModelDB(object):
             fname=db.name
         if not fname.endswith(".obj"):
             fname+=".obj"
-        if len(db._pool.keys())==0:
+        if len(db.pool.keys())==0:
             raise data_type.MissingPoolKey("no data to dump from pool")
         pickle.dump(db,open(fname, "wb"))
 
@@ -849,13 +853,16 @@ class ModelDB(object):
     @staticmethod
     def load_models(fname):
         db = pickle.load(open(fname, "rb"))
-        if len(data_types.ObjList._pool.keys())==0:
+        data_types.ObjList._pool=db.pool
+
+
+        """if len(data_types.ObjList._pool.keys())==0:
             print("need to refresh pooled data.")
             try:
                 data_types.ObjList.refresh_list(fname.replace('.obj','.xml'))
             except: 
                 data_types.ObjList.refresh_list(input('file to unpickle: '))
-        db.pool=data_types.ObjList._pool
+        db.pool=data_types.ObjList._pool"""
         return db
 
     def write(self,filename=None,verbose=False):
