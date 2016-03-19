@@ -80,7 +80,7 @@ class Model(object):
         self._dof=float(self.pixels)-float(self.params)
 
     def __eq__(self,other):
-        attrs = list(['id','chi2','pixels','params']+[Model.model_classes.keys()])
+        attrs = list(['id','chi2','pixels','params'])+list(Model.model_classes.keys())
         for item in attrs:
             if getattr(self,item)!=getattr(other,item):
                 return False
@@ -429,7 +429,7 @@ class Model(object):
                 print(tag,iden.id, str(kwargs))
                 raise Exception("break")
                 iden.set_data(**kwargs)
-            elif tag in Model.model_classes.keys():
+            elif tag in list(Model.model_classes.keys()):
                 for key, val in dict(kwargs).items:
                     print(tag,iden.id, str(kwargs))
                     raise Exception("break")
@@ -489,7 +489,7 @@ class ModelDB(object):
         #self.dbxml=xmlutils.Model_xml(filename=name)
         if len(models)>0:  #instantiate new db from models
             self.models = models
-            for key in Model.model_classes.keys():
+            for key in list(Model.model_classes.keys()):
                 try:
                     setattr(self,key,[getattr(item,key) for item in self.models])
                 except:
@@ -560,7 +560,7 @@ class ModelDB(object):
     def remove_unused(self):
         lst=[]
         for mod in self.models:
-            lst+=[getattr(mod,key) for key in Model.model_classes.keys()]
+            lst+=[getattr(mod,key) for key in list(Model.model_classes.keys())]
         data_types.ObjList.clean_pool(list(set(lst)))
 
     def remove(self, model):
@@ -585,7 +585,7 @@ class ModelDB(object):
         
         def check_for_conflicts():
             def get_keys(mod):
-                return [getattr(mod,item) for item in Model.model_classes.keys()]
+                return [getattr(mod,item) for item in list(Model.model_classes.keys())]
             these_keys=get_keys(model)
             for mod in self.models:
                 if mod is model:
@@ -669,7 +669,7 @@ class ModelDB(object):
             if current_group is None or group_name != current_group.text:
                 data = {'id':group_name,'xmlfile':item.xmlfile,'chi2':str(item.chi2),
                     'pixels':str(item.pixels),'params':str(item.params)}
-                for attr in Model.model_classes.keys():
+                for attr in list(Model.model_classes.keys()):
                     try:
                         inst = getattr(item,attr)
                         assert(type(inst) is str)
@@ -681,7 +681,7 @@ class ModelDB(object):
                 current_group = et.SubElement(modeldb, 'model', data)
 
         #build the actuall fitting data
-        for attr in Model.model_classes.keys():  #write AbsorberList, cont points and views
+        for attr in list(Model.model_classes.keys()):  #write AbsorberList, cont points and views
             parent = et.SubElement(root,str(attr)+'s')
             instances = data_types.ObjList.get_all_instances(attr)
             #instances = [ item for item in data_types.ObjList._pool.values() if attr==str(type(item))]
@@ -768,23 +768,28 @@ class ModelDB(object):
         
     
     @staticmethod 
-    def read(filename, returndb=True, verbose=False):
+    def read(filename, returndb=True, verbose=False,time=False):
         """read from xml db, return inputs for Model"""
+
+        if not filename.endswith('.xml'):
+            try:
+                return ModelDB.load_models(filename)
+            except:
+                msg= "ModelDB.read: input file %s is"%(filename)
+                msg+=" of incorrect format. Please verify"
+                raise Exception(msg)
+                    
+
         import time 
-
         t=time.time()
-
         tree = et.parse(filename)
-
         t0=time.time()
-        print("time to parse file: %lf"%(t0-t))
-
+        if time: print("time to parse file: %lf"%(t0-t))
         root = tree.getroot()
-
         #root=xmlutils.Model_xml.get_root(filename)
         data_types.ObjList._pool = {}  #clear out cache of data
         #build all data first before instantiating individual models
-        for key in Model.model_classes.keys():
+        for key in list(Model.model_classes.keys()):
             if verbose:
                 print('reading '+key+'s instances...')
             parent = root.find(key+'s')
@@ -792,7 +797,7 @@ class ModelDB(object):
         #print("\n\n\n"+str(data_types.ObjList._pool.keys())+"\n\n")
 
         t1=time.time()
-        print("time to get objlist: %lf"%(t1-t0))
+        if time: print("time to get objlist: %lf"%(t1-t0))
 
         model_list = []
         models = root.find('ModelDB').findall('model')
@@ -808,7 +813,7 @@ class ModelDB(object):
                 raise Exception(str(kwargs))
 
         t2=time.time()
-        print("instantiate models: %lf"%(t2-t1))
+        if time:print("instantiate models: %lf"%(t2-t1))
 
         if len(model_list)==0:
             raise Exception("no models saved")
@@ -830,7 +835,6 @@ class ModelDB(object):
             model = self.get_model(iden)
             model.set_val(**kwargs)
     
-    """
     @staticmethod
     def dump_models(db,fname=None):
         if not fname:
@@ -853,7 +857,7 @@ class ModelDB(object):
                 data_types.ObjList.refresh_list(input('file to unpickle: '))
         db.pool=data_types.ObjList._pool
         return db
-    """
+
     def write(self,filename=None,verbose=False):
 
         if filename==None:

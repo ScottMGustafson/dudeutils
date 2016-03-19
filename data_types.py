@@ -59,7 +59,7 @@ class ObjList(object):
     @staticmethod
     def generate_id():
         iden=str(uuid.uuid4())
-        while iden in ObjList._pool.keys():
+        while iden in list(ObjList._pool.keys()):
             iden=str(uuid.uuid4())  
 
         #ObjList.taken_names.append(iden)
@@ -111,11 +111,11 @@ class ObjList(object):
     @id.setter
     def id(self, value):
         """when setting a new id, changes should also be reflected in _pool"""
-        if value in ObjList._pool.keys():
+        if value in list(ObjList._pool.keys()):
             raise KeyError(str(value)+" already in pool")
         try:
             old = self._id
-            assert(old in ObjList._pool.keys())
+            assert(old in list(ObjList._pool.keys()))
         except AttributeError:
             raise Exception("trying to change id of data not yet registered in pool")
         except AssertionError:
@@ -166,7 +166,7 @@ class ObjList(object):
                 obj=cls(objlist,id=iden,**kwargs)
 
                 #register data into the pool
-                if not obj.id in ObjList._pool.keys():
+                if not obj.id in list(ObjList._pool.keys()):
                     ObjList._pool[obj.id] = obj
                     return obj
                 else:
@@ -402,7 +402,7 @@ class Data(object):
                     inst=cls.from_file(**kwargs)
                 else:
                     raise Exception("need to specify either an xml element node or an xml file")
-                inst.keys=inst.node.attrib.keys()
+                inst.keys=list(inst.node.attrib.keys())
                 inst.parse_node()
                 #inst.set_data(**kwargs)
                 try:  #if an additional constructor is specified, run it
