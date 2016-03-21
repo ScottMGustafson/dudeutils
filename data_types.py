@@ -6,6 +6,7 @@ import collections
 import os
 import sys
 from scipy import constants
+from atomic import *
 
 tf = {"true":True, "false":False}
 c=constants.c/1000.  #speed of light in km/s
@@ -316,11 +317,50 @@ class ContinuumPointList(ObjList):
         return tag=="ContinuumPoint"
 
 class RegionList(ObjList):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.consolidate_regions()
+
     @classmethod
     def registrar_for(cls,tag):
         return tag=="Region"
 
-    def consolidate(self):
+    @staticmethod
+    def consolidate_list(ranges):
+        """
+        consolidate list of ranges to combine overlapping ranges as one.
+
+        Input:
+        ------
+        ranges:  list of ranges  (list of length=2 lists of floats)
+
+        Output:
+        -------
+        result: list of consolidated ranges  (list of length=2 lists of floats)
+
+        Raises:
+        -------
+        None
+
+        """
+        result = []
+        current_start = -1
+        current_stop = -1 
+
+        for start, stop in sorted(ranges):
+            if start > current_stop:
+                # this segment starts after the last segment stops
+                # just add a new segment
+                result.append( (start, stop) )
+                current_start, current_stop = start, stop
+            else:
+                # segments overlap, replace
+                result[-1] = (current_start, stop)
+                # current_start already guaranteed to be lower
+                current_stop = max(current_stop, stop)
+        return result
+
+    def consolidate_regions(self):
         """
         adapted from:
         http://codereview.stackexchange.com/questions/21307/consolidate-list-of-ranges-that-overlap
@@ -328,21 +368,7 @@ class RegionList(ObjList):
         self.objlist = sorted(self.objlist, key=lambda x: x.start)
         ranges=[(item.start, item.end) for item in self.objlist]
 
-        result = []
-        current_start = -1
-        current_end = -1 
-
-        for start, end in sorted(ranges):
-            if start > current_end:
-                # this segment starts after the last segment stops
-                # just add a new segment
-                result.append( (start, end) )
-                current_start, current_end = start, end
-            else:
-                # segments overlap, replace
-                result[-1] = (current_start, end)
-                # current_start already guaranteed to be lower
-                current_end = max(current_end, end)
+        result = RegionList.consolidate_list(ranges)
 
         for i in range(len(self.objlist)):
             if i<len(ranges):
@@ -664,96 +690,45 @@ class VelocityView(Data):
 #            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
 #        return cls._instances[cls]
 
-class AtomicData(object):
-    def __init__(self):
-        self.atomic_data = AtomicData.get_lines()
-
-    @staticmethod
-    def get_lines(fname='data/atom.dat'):
-        all_lines={}
-        f=open(fname,'r')
-        for line in f:
-            ion, line= line[0:5].strip(), line[5:]
-            line=line.split()
-            try:
-                all_lines[ion].append(
-                    SpectralLine(**{
-                        'ionName':ion,
-                        'wave': float(line[0]),
-                        'f':    float(line[1]),
-                        'gamma':float(line[2])
-                    }))
-            except KeyError:
-                all_lines[ion]=[
-                    SpectralLine(**{
-                        'ionName':ion,
-                        'wave': float(line[0]),
-                        'f':    float(line[1]),
-                        'gamma':float(line[2])
-                    })]
-        for k in all_lines.keys():
-            all_lines[k] = sorted(all_lines[k], 
-                                  key=lambda item:item.wave, reverse=True)
-        return all_lines
-
-
-
-class SpectralLine(object):
-    mass_dict={
-            'H':1.008,
-            'D':2.014,
-            'He':4.003,
-            'Li':6.941,
-            'Be':9.012,
-            'B':10.081,
-            'C':12.011,
-            'N':14.007,
-            'O':15.999,
-            'F':18.998,
-            'Ne':20.180,
-            'Na':22.990,
-            'Mg':24.305,
-            'Al':26.982,
-            'Si':28.086,
-            'P':30.974,
-            'S':32.066,
-            'Cl':35.453,
-            'Ar':39.948,
-            'K':39.098,
-            'Ca':40.078,
-            'Sc':44.956,
-            'Ti':47.867,
-            'Cr':51.996,
-            'Mn':54.938,
-            'Fe':55.845,
-            'Co':58.933,
-            'Ni':58.693,
-            'Cu':63.546,
-            'Zn':65.38,
-            'Ge':72.631
-    }
-
-    def __init__(self,**kwargs):
-        for key, val in kwargs.items():
-            setattr(self,key,val)
-
-    def get_obs(self,z=None):
-        try:
-            if not z:
-                z=self.z
-            return (1.+z)*self.wave
-        except:
-            raise Exception(str(self.__dict__))
-
-    @staticmethod
-    def get_atom_name(ionName):
-        ionName=ionName[:2]
-        if ionName[-1] in 'IV ':
-            return ionName[0]
+class Param(object):
+    """
+    class for the manipulation of individual absorption parameters, N,b and z"""
+    def __init__(self,param_name,value, locked, error=0., parent=None, index=None, bounds=None):
+        self.name=param_name
+        self.absorber=parent
+        self.locked=locked
+        self.error=float(error)
+        self.value=float(value)
+        self.index=int(index)
+        if bounds:
+            self.guess=Param.random_initial_cond(bounds)
         else:
-            return ionName
+            self.guess=float(value)     
+
+    @staticmethod
+    def random_initial_cond(bounds):
+        """
+        provide randomized initial conditions given some set of bounds
+
+        Input:
+        ------
+        bounds: length=2 list of floats
+
+        Output:
+        -------
+        (float)
+
+        Raises:
+        -------
+        None
+        """
+        return(bounds[1]-bounds[0]) * np.random.random_sample()+bounds[0]
+            
+    def __str__(self):
+        return"%s=%lf, %sError=%lf, %sLocked=%s"%(
+            self.name,self.value,
+            self.name,self.error,
+            self.name,str(self.locked).lower())
 
 
-#call on import
-atomic_data=AtomicData().atomic_data  
 

@@ -3,137 +3,8 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import _spectrum
 from spec_parser import Spectrum
-
-class Param(object):
-    """
-    class for the manipulation of individual absorption parameters, N,b and z"""
-    def __init__(self,param_name,value, locked, error=0., parent=None, index=None, bounds=None):
-        self.name=param_name
-        self.absorber=parent
-        self.locked=locked
-        self.error=float(error)
-        self.value=float(value)
-        self.index=int(index)
-        if bounds:
-            self.guess=Param.random_initial_cond(bounds)
-        else:
-            self.guess=float(value)     
-
-    @staticmethod
-    def random_initial_cond(bounds):
-        """
-        provide randomized initial conditions given some set of bounds
-
-        Input:
-        ------
-        bounds: length=2 list of floats
-
-        Output:
-        -------
-        (float)
-
-        Raises:
-        -------
-        None
-        """
-        return(bounds[1]-bounds[0]) * np.random.random_sample()+bounds[0]
-            
-    def __str__(self):
-        return"%s=%lf, %sError=%lf, %sLocked=%s"%(
-            self.name,self.value,
-            self.name,self.error,
-            self.name,str(self.locked).lower())
-         
-
-def consolidate(ranges):
-    """
-    consolidate list of ranges to combine overlapping ranges as one.
-
-    Input:
-    ------
-    ranges:  list of ranges  (list of length=2 lists of floats)
-
-    Output:
-    -------
-    result: list of consolidated ranges  (list of length=2 lists of floats)
-
-    Raises:
-    -------
-    None
-
-    """
-    result = []
-    current_start = -1
-    current_stop = -1 
-
-    for start, stop in sorted(ranges):
-        if start > current_stop:
-            # this segment starts after the last segment stops
-            # just add a new segment
-            result.append( (start, stop) )
-            current_start, current_stop = start, stop
-        else:
-            # segments overlap, replace
-            result[-1] = (current_start, stop)
-            # current_start already guaranteed to be lower
-            current_stop = max(current_stop, stop)
-
-    return result
-   
-
-def fit_absorption(dat, model):
-    """
-    Input:
-    ------
-    dat : specParser.Spectrum instance
-    model : model.Model instance
-
-    Output:
-    -------
-    cont : the continuum of the spectrum
-    absorption : absorption of the spectrum
-    chi2 : chi-square calculated for spectral regions specified in model.RegionList 
-
-    Raises:
-    -------
-    AssertionError
-
-    """
-    cont_points=model.get_lst("ContinuumPointList")
-    cont_points = sorted(cont_points, key=lambda pt: pt.x)
-    x=np.array([float(item.x) for item in cont_points])
-    y=np.array([float(item.y) for item in cont_points])
-
-    absorbers=[]
-    for item in model.get_lst("AbsorberList"):
-        absorbers+=item.get_lines()
-
-    absorbers=list(filter(
-                            lambda x: dat.waves[4]<x.get_obs(x.z)<dat.waves[-4], 
-                            absorbers))
-
-    regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
-    regions=consolidate(regions) 
-    starts=np.array([item[0] for item in regions],dtype=np.float)
-    ends=np.array([item[1] for item in regions],dtype=np.float)
-
-    assert(starts.shape[0]==ends.shape[0])
-    assert(x.shape==y.shape)
-    assert(dat.waves.shape==dat.flux.shape==dat.error.shape)
-    
-    N=np.array([item.N for item in absorbers], dtype=np.float)
-    b=np.array([item.b for item in absorbers], dtype=np.float)
-    z=np.array([item.z for item in absorbers], dtype=np.float)
-    rest=np.array([item.wave for item in absorbers], dtype=np.float)
-    gamma=np.array([item.gamma for item in absorbers], dtype=np.float)
-    f=np.array([item.f for item in absorbers], dtype=np.float)
-
-
-    cont, absorption, chi2= _spectrum.spectrum( dat.waves,dat.flux,dat.error,
-                                                 x,y,
-                                                 N,b,z,rest,gamma,f,
-                                                 starts,ends )
-    return cont, absorption, chi2
+from data_types import *
+from model import *
 
 
 
@@ -204,20 +75,35 @@ def optimize(spec, model):
     -------
     AssertionError
     """
+
     cont_points=model.get_lst("ContinuumPointList")
     cont_points = sorted(cont_points, key=lambda pt: pt.x)
     x=np.array([float(item.x) for item in cont_points])
     y=np.array([float(item.y) for item in cont_points])
 
-    regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
-    regions=consolidate(regions) 
-    starts=np.array([item[0] for item in regions],dtype=np.float)
-    ends=np.array([item[1] for item in regions],dtype=np.float)
+    absorbers=[]
+    for item in model.get_lst("AbsorberList"):
+        absorbers+=item.get_lines()
 
-    #check that arrays are equaly sized
-    assert(starts.shape==ends.shape)
-    assert(x.shape==y.shape)
-    assert(spec.waves.shape==spec.flux.shape==spec.error.shape)
+    absorbers=list(filter(
+                   lambda x: 
+                        spec.waves[4]<x.get_obs(x.z)<spec.waves[-4], 
+                        absorbers))
+    regions=Model.get(model.RegionList)
+    starts=np.array([item.start for item in regions],dtype=np.float)
+    ends=np.array([item.end for item in regions],dtype=np.float)
+    
+    #convert into numpy array for c extension use
+
+
+    N=np.array([i.N for i in absorbers], dtype=np.float)
+    b=np.array([i.N for i in absorbers], dtype=np.float)
+    z=np.array([i.N for i in absorbers], dtype=np.float)
+    wave=np.array([i.wave for i in absorbers], dtype=np.float)
+    gamma=np.array([i.gamma for i in absorbers], dtype=np.float)
+    f=np.array([i.f for i in absorbers], dtype=np.float)
+
+
 
 
     #get indices relevant for optimization
@@ -346,7 +232,7 @@ if __name__ == "__main__":
     sp = Spectrum.sniffer(model.flux, model.error)
 
     print("testing optimizer.fit_absorption")
-    cont, ab, chi2 = fit_absorption(sp, model)
+    cont, ab, chi2 = Spectrum.fit_absorption(sp, model)
 
     continuum_points = sorted(model.get_lst('ContinuumPointList'),key=lambda u:u.x)
     

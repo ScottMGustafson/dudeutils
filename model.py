@@ -469,6 +469,13 @@ class Model(object):
                 f.write("<Region start=\"%lf\" end=\"%lf\"/>\n"%(item.start, item.end))
             f.write("</SpecTool>")
 
+    def get_spectral_line(self, iden, transition):
+        if type(iden) is int:  #gave an index instead of id
+            return Model.get(self.AbsorberList)[iden].get_lines()[transition]
+        else:
+            return Model.get(self.AbsorberList).get(iden).get_lines()[transition]
+        
+
 
 class ModelDB(object):
     def __init__(self, name=None, models=[], constraints=None,**kwargs): 

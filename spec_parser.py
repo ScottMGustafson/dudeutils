@@ -1,11 +1,13 @@
 import numpy as np
 from astropy.io import fits
 import wavelength
+from data_types import *
 
 class Spectrum(object):
     @staticmethod
     def sniffer(filename, *args, **kwargs):
-        """detects raw text format, returns num columns"""
+        """detects raw text format, returns correct spectrum class instance"""
+        for item in ""
         if filename.endswith('.fits'):
             return FitsSpectrum(filename, *args, **kwargs)
         with open(filename) as f:
@@ -27,8 +29,16 @@ class Spectrum(object):
         ind = list(set(lst1) & set(lst2))
         return ind
 
-    @staticmethod
+    @staticmethods
     def convert_to_vel(waves,ref_wave):
+        """
+        input:
+        ------
+        waves (float or array of floats): wavelengths
+        ref_wave (float or atomic.SpectralLine): a reference absorption line
+        """
+        if not type(ref_wave) is float: #then is SpectralLine instance
+            ref_wave=refwave.obs_wave
         return c*(waves-ref_wave)/ref_wave
 
     @staticmethod        
@@ -41,6 +51,65 @@ class Spectrum(object):
         ind = list(np.arange(0,arr.shape[0]-1,binsize))
         arr=[np.median(arr[i:i+binsize])  if i+binsize<arr.shape[0]-1 else np.median(arr[i:-1]) for i in ind]
         return np.array(arr)
+
+
+
+    @staticmethod
+    def fit_absorption(dat, model, ab_to_plot=None):
+        """
+        Input:
+        ------
+        dat : specParser.Spectrum instance
+        model : model.Model instance
+
+        Output:
+        -------
+        cont : the continuum of the spectrum
+        absorption : absorption of the spectrum
+        chi2 : chi-square calculated for spectral regions specified in
+               model.RegionList 
+
+        Raises:
+        -------
+        AssertionError
+
+        """
+        cont_points=model.get_lst("ContinuumPointList")
+        cont_points = sorted(cont_points, key=lambda pt: pt.x)
+        x=np.array([float(item.x) for item in cont_points])
+        y=np.array([float(item.y) for item in cont_points])
+
+        absorbers=[]
+        abslst=ab_to_plot if ab_to_plot else model.get_lst("AbsorberList")
+        for item in abslst:
+            absorbers+=item.get_lines()
+
+        absorbers=list(filter(
+                            lambda x: dat.waves[4]<x.get_obs(x.z)<dat.waves[-4], 
+                            absorbers))
+
+        regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
+        regions=RegionList.consolidate_regions(regions) 
+        starts=np.array([item[0] for item in regions],dtype=np.float)
+        ends=np.array([item[1] for item in regions],dtype=np.float)
+
+        assert(starts.shape[0]==ends.shape[0])
+        assert(x.shape==y.shape)
+        assert(dat.waves.shape==dat.flux.shape==dat.error.shape)
+        
+        #convert into numpy array for c extension use
+        N=np.array([item.N for item in absorbers], dtype=np.float)
+        b=np.array([item.b for item in absorbers], dtype=np.float)
+        z=np.array([item.z for item in absorbers], dtype=np.float)
+        rest=np.array([item.wave for item in absorbers], dtype=np.float)
+        gamma=np.array([item.gamma for item in absorbers], dtype=np.float)
+        f=np.array([item.f for item in absorbers], dtype=np.float)
+
+        cont, absorption, chi2= _spectrum.spectrum( dat.waves,dat.flux,dat.error,
+                                                     x,y,
+                                                     N,b,z,rest,gamma,f,
+                                                     starts,ends )
+        return cont, absorption, chi2
 
 class FitsSpectrum(Spectrum):
     def __init__(self, filename, error=None):
@@ -72,11 +141,11 @@ class TextSpectrum(Spectrum):
 
     def set_data(self,*lst):  
         assert(len(lst)==5)
-        self.waves = lst[0]
-        self.flux  = lst[1]
-        self.error = lst[2]
-        self.abs  = lst[3]
-        self.cont  = lst[4]
+        
+        i=0
+        for it in "waves flux error abs cont".split():
+            setattr(self,it,lst[i])
+            i+=1
 
     @staticmethod
     def get_ind(waves,beg,end):
@@ -99,7 +168,7 @@ class TextSpectrum(Spectrum):
             return np.argmin(np.fabs(x-self.wave))
 
     def get_at(self,attr,x):
-        assert(attr in ['flux','error','abs','cont'])
+        assert(attr in 'flux error abs cont'.split())
         return getattr(self,attr)[self.get_ind_at(x)]
 
     @staticmethod
