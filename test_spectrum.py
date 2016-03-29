@@ -42,6 +42,7 @@ class TestSpectrum(unittest.TestCase):
                                 dtype=np.float)
                     )
 
+    
 
     def test_find_absorption(self):
         cont, ab, chi2= _spectrum.spectrum(self.spec.waves,

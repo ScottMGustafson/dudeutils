@@ -1,60 +1,57 @@
-import dudeutils
+#import dudeutils
 from spec_parser import *
+from atomic import *
 import matplotlib.pyplot as plt
 from model import *
 import os
 
-def get_lines(lst, dct):
-    ablst=[]
-    for key, transition in dct.items():
-        ab_line=lst.get_item(key).get_lines()[transition]
-        ablst.append(ab_line)
-    return ablst
+def get_lines(model, dct):
+    return [model.get_spectral_line(key, val) for key, val in dct.items()]
+
 
 def plot_line(spec, model, fig, subplot_key, line, velocity=True, ax=None,**kwargs):
     sharex, sharey= kwargs.get("sharex",None), kwargs.get("sharey",None)
+    waves, ab, cont, flux, error = get_data(spec,model,absorbers=line,**kwargs)
+    assert(flux.shape[0]==ab.shape[0]==cont.shape[0]==waves.shape[0])
     if not ax:
         ax=fig.add_subplot(subplot_key,sharex=sharex, sharey=sharey)
-        assert(ax)
-    waves, ab, cont, flux, error = get_data(spec,model,absorbers=[line],**kwargs)
-
-    ax.plot(waves, flux, 'k', linestyle='steps')
-    ax.plot(waves, error, 'g', linestyle='steps')
-    ax.plot(waves, cont, 'r', linestyle='steps')
-    ax.plot(waves, ab, 'b', linestyle='steps')
+        ax.plot(waves, flux, 'k', linestyle='steps-mid')
+        if error: ax.plot(waves, error, 'g', linestyle='steps-mid')
+        ax.plot(waves, cont, 'r', linestyle='steps-mid')
+    ax.plot(waves, ab, 'b', linestyle='steps-mid') #this needs to be outside of if 
+                                               #in case appending ab to 
+                                               #pre-existing ax
     ax.set_xlim(kwargs.get("xlims"),None)
     ax.set_ylim(kwargs.get("ylims"),None)
     return ax
 
 def get_data(spec,model,wave_r=None, vel_r=None, absorbers=None, ref_ab=None,**kwargs):
-    if not hasattr(spec,'abs') or absorbers:        
-        if not type(absorbers) is list:
-            absorbers=[absorbers]
-        if type(absorbers[0]) is dict:
-            # given list of one-element dicts, get single spectral line
-            # list of dicts:
-            # [ {abs_id (str): transition number (int)} ]
-            # 
-            tmp=[]
-            lst=Model.get(model.AbsorberList)
-            for i in range(len(absorbers)): 
-                tmp+=get_lines(lst, absorbers[i])
-            absorbers=tmp
+    if not hasattr(spec,'abs') or absorbers:       
+
+        if type(absorbers) is dict:
+            absorbers=get_lines(model, absorbers)
+        elif type(absorbers) is list:
+            assert(type(absorbers[0]) is SpectralLine)
+        else:
+            raise TypeError("type of absorbers must either be list of SpectralLine instances or dict")
+ 
         ab, cont, chi2= Spectrum.fit_absorption(spec,
                                                 model,
                                                 ab_to_plot=absorbers)        
     else:
         ab, cont, error = spec.abs, spec.cont, spec.error
 
-
-
     if vel_r and ref_ab:
-        if not type(ref_ab) is SpectralLine:
-            ref_ab=get_lines(Model.get(model.AbsorberList), ref_ab)[0]
+        if type(ref_ab) is dict:
+            assert(len(ref_ab.keys())==1)  #should only be one element long
+            key=list(ref_ab.keys())[0]
+            ref_ab=model.get_spectral_line(key, ref_ab[key])
+        else:
+            assert(type(ref_ab) is SpectralLine)
             
         ind=Spectrum.get_indices(
                 Spectrum.convert_to_vel(spec.waves,ref_ab.obs_wave), 
-                vel_r)
+                vel_r) #get indices within velocity range
     elif wave_r:
         ind=Spectrum.get_indices(spec.waves, wave_r)
     else:
@@ -64,7 +61,7 @@ def get_data(spec,model,wave_r=None, vel_r=None, absorbers=None, ref_ab=None,**k
     if spec.error:
         error=spec.error[ind]
     else:
-        error=np.zeros(len(ind))
+        error=None
     if vel_r: 
         waves=Spectrum.convert_to_vel(waves, ref_ab.obs_wave)
        
@@ -97,39 +94,48 @@ def parse_spectrum(model):
     return model, spec
 
 if __name__=="__main__":
-    #this is an example for plotting a few lyman alpha transitions plus 
-    #an intervening line
+    #this is an example for plotting a few transitions of SiII
 
-    xmlfile,  vel_r = "test.xml", [-50., 50.]
+    xmlfile,  vel_r = "/home/scott/research/J0744+2059/SiII.xml", [-120., 121.]
     model, spec=parse_spectrum( Model(xmlfile=xmlfile) )
-    absorbers=[{"test_ab",2},{"HI_1":0},{"HI_1":1},{"HI_1":5},{"HI_1":10}]
+    absorbers=[{"SiII2":3, "SiII3":3},{"SiII2":4,"SiII3":4},{"SiII2":5},{"SiII2":6}]
     fig = plt.figure()
 
     axes=[]
 
-    axes.append(plot_line(spec, model,
-                        fig, subplot_key, 
-                        model.get_spectral_line("HI_1",0), 
-                        velocity=True, sharex=None, 
-                        ref_ab=model.get_spectral_line("HI_1",0)))
+    axes.append(plot_line(  spec, model,
+                            fig, 411,  
+                            absorbers[0], 
+                            vel_r=vel_r,velocity=True, ax=None,   
+                            ref_ab={"SiII2":3}))
 
 
-    sharex=axes[0]
+    sharex=axes[-1]
 
-    axes[0]=plot_line(spec, model,  #to append another line to this ax
-                        fig, subplot_key, 
-                        model.get_spectral_line("test_ab",2), 
-                        velocity=True, ax=axes[0],   #to share the ax with previous
-                        ref_ab=model.get_spectal_line("HI_1",0))
+    axes.append(plot_line(  spec, model,
+                            fig, 412,  
+                            absorbers[1], 
+                            vel_r=vel_r,velocity=True, ax=None,   
+                            ref_ab=model.get_spectral_line("SiII2",4),
+                            sharex=sharex))
 
-    subplot_key=100*len(absorbers)+12   #212, since loop starts with second plot
-    for item in absorbers[2:]:
-        axes.append(plot_line(spec, model,
-                        fig, subplot_key, 
-                        item, 
-                        velocity=True, sharex=sharex, ref_ab=item))
-        sharex=axes[0]
-        subplot_key+=1  #aling them vertically
+
+    axes.append(plot_line(  spec, model,
+                            fig, 413,  
+                            absorbers[2], 
+                            vel_r=vel_r,velocity=True, ax=None,   
+                            ref_ab=model.get_spectral_line("SiII2",5),
+                            sharex=sharex))
+
+    axes.append(plot_line(  spec, model,
+                            fig, 414,  
+                            absorbers[3], 
+                            vel_r=vel_r,velocity=True, ax=None,   
+                            ref_ab=model.get_spectral_line("SiII2",6),
+                            sharex=sharex))
+
+
+
+
     plt.show()
-    
     

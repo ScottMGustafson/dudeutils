@@ -2,6 +2,7 @@ import numpy as np
 from astropy.io import fits
 import wavelength
 from data_types import *
+from atomic import *
 import sys
 import _spectrum
 
@@ -82,16 +83,23 @@ class Spectrum(object):
   
         absorbers=[]
 
-        abslst=ab_to_plot if ab_to_plot else Model.get(model.AbsorberList)  
-        if not abslst[0]:
-            raise Exception("no absorbers specified")
-        if type(abslst[0]) is Absorber:
-            for item in abslst:
-                absorbers+=item.get_lines()
+        abslst=ab_to_plot if ab_to_plot else Model.get(model.AbsorberList) 
 
-        absorbers=list(filter(
-                            lambda x: spec.waves[4]<x.get_obs(x.z)<spec.waves[-4], 
-                            absorbers))
+
+        if type(abslst[0]) is  SpectralLine:
+            pass
+        elif type(abslst[0]) is Absorber:
+            if not abslst[0]:
+                raise Exception("no absorbers specified")
+            for item in abslst:
+                    absorbers+=item.get_lines()
+
+            absorbers=list(filter(
+                                lambda x: spec.waves[4]<x.get_obs(x.z)<spec.waves[-4], 
+                                absorbers))
+
+        else: 
+            raise Exception("type of ab_to_plot must either be list of SpectralLine instances or Absorber instances ")
 
         regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
         regions=RegionList.consolidate_list(regions) 
