@@ -2,12 +2,13 @@ import numpy as np
 from astropy.io import fits
 import wavelength
 from data_types import *
+import sys
+import _spectrum
 
 class Spectrum(object):
     @staticmethod
     def sniffer(filename, *args, **kwargs):
         """detects raw text format, returns correct spectrum class instance"""
-        for item in ""
         if filename.endswith('.fits'):
             return FitsSpectrum(filename, *args, **kwargs)
         with open(filename) as f:
@@ -29,7 +30,7 @@ class Spectrum(object):
         ind = list(set(lst1) & set(lst2))
         return ind
 
-    @staticmethods
+    @staticmethod
     def convert_to_vel(waves,ref_wave):
         """
         input:
@@ -55,11 +56,11 @@ class Spectrum(object):
 
 
     @staticmethod
-    def fit_absorption(dat, model, ab_to_plot=None):
+    def fit_absorption(spec, model, ab_to_plot=None):
         """
         Input:
         ------
-        dat : specParser.Spectrum instance
+        spec : specParser.Spectrum instance
         model : model.Model instance
 
         Output:
@@ -78,24 +79,28 @@ class Spectrum(object):
         cont_points = sorted(cont_points, key=lambda pt: pt.x)
         x=np.array([float(item.x) for item in cont_points])
         y=np.array([float(item.y) for item in cont_points])
-
+  
         absorbers=[]
-        abslst=ab_to_plot if ab_to_plot else model.get_lst("AbsorberList")
-        for item in abslst:
-            absorbers+=item.get_lines()
+
+        abslst=ab_to_plot if ab_to_plot else Model.get(model.AbsorberList)  
+        if not abslst[0]:
+            raise Exception("no absorbers specified")
+        if type(abslst[0]) is Absorber:
+            for item in abslst:
+                absorbers+=item.get_lines()
 
         absorbers=list(filter(
-                            lambda x: dat.waves[4]<x.get_obs(x.z)<dat.waves[-4], 
+                            lambda x: spec.waves[4]<x.get_obs(x.z)<spec.waves[-4], 
                             absorbers))
 
         regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
-        regions=RegionList.consolidate_regions(regions) 
+        regions=RegionList.consolidate_list(regions) 
         starts=np.array([item[0] for item in regions],dtype=np.float)
         ends=np.array([item[1] for item in regions],dtype=np.float)
 
         assert(starts.shape[0]==ends.shape[0])
         assert(x.shape==y.shape)
-        assert(dat.waves.shape==dat.flux.shape==dat.error.shape)
+        assert(spec.waves.shape==spec.flux.shape)#==spec.error.shape)
         
         #convert into numpy array for c extension use
         N=np.array([item.N for item in absorbers], dtype=np.float)
@@ -105,7 +110,7 @@ class Spectrum(object):
         gamma=np.array([item.gamma for item in absorbers], dtype=np.float)
         f=np.array([item.f for item in absorbers], dtype=np.float)
 
-        cont, absorption, chi2= _spectrum.spectrum( dat.waves,dat.flux,dat.error,
+        cont, absorption, chi2= _spectrum.spectrum( spec.waves,spec.flux,spec.error,
                                                      x,y,
                                                      N,b,z,rest,gamma,f,
                                                      starts,ends )

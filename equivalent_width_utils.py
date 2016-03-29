@@ -334,13 +334,20 @@ if __name__ == "__main__":
 
     
     dct = {
-            "CI":[ {'start':5299.5 , 'end':5300.5, 'trans':2},{'start':4761.6, 'end':4762.4,'trans':7},{'start':4545.5, 'end':4546.,'trans':13}],
-            "CIV":[ {'start':6174.8 , 'end':6175.2, 'trans':1},{'start':6184.7, 'end':6185.1,'trans':0}],
-            "SiIV":[{'start':5558.4 , 'end':5559.0, 'trans':1},{'start':5594.4,  'end':5595.,'trans':0}],
-            "OVI":[{'start':4115.6 , 'end':4115.9, 'trans':1},{'start':4138.1,  'end':4138.4,'trans':0}],
-            "CII":[{'start':5322.3 , 'end':5323.1, 'trans':0}],
-            "SiII":[{'start':6088.7 , 'end':6089.2, 'trans':2},{'start':5026.5 , 'end':5027.2, 'trans':4},{'start':4759. , 'end':4759.3, 'trans':5}],
-            "OI":[{'start':5193. , 'end':5193.6, 'trans':1}],
+            "CI":[  {'start':5299.5 , 'end':5300.5, 'trans':2},
+                    {'start':4761.6, 'end':4762.4,'trans':7},
+                    {'start':4545.5, 'end':4546.,'trans':13}],
+            "CIV":[ {'start':6174.8 , 'end':6175.2, 'trans':1},
+                    {'start':6184.7, 'end':6185.1,'trans':0}],
+            "SiIV":[{'start':5558.4 , 'end':5559.0, 'trans':1},
+                    {'start':5594.4,  'end':5595.,'trans':0}],
+            "OVI":[ {'start':4115.6 , 'end':4115.9, 'trans':1},
+                    {'start':4138.1,  'end':4138.4,'trans':0}],
+            "CII":[ {'start':5322.3 , 'end':5323.1, 'trans':0}],
+            "SiII":[{'start':6088.7 , 'end':6089.2, 'trans':2},
+                    {'start':5026.5 , 'end':5027.2, 'trans':4},
+                    {'start':4759. , 'end':4759.3, 'trans':5}],
+            "OI":[  {'start':5193. , 'end':5193.6, 'trans':1}],
             "SiIII_":[{'start':4811.9 , 'end':4812.0, 'trans':0}],
             "CIII_":[{'start':3896.67 , 'end':3896.82, 'trans':0}],
 

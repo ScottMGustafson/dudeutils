@@ -71,8 +71,19 @@ class ObjList(object):
         del(ObjList._pool[iden])
 
     def get_item(self,iden):
-        """get element from objlist.  
-        if AbsList, this will be the user assigned id, not the _pool key"""
+        """get element from objlist.
+        input:
+        ------
+        iden: id of elemnet to fetch
+
+        output:
+        -------
+        data_types.Data subclass instance
+
+        raises:
+        -------
+        none
+        """
         for item in self.objlist:
             if iden==item.id:
                 return item

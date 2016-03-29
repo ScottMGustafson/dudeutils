@@ -471,9 +471,15 @@ class Model(object):
 
     def get_spectral_line(self, iden, transition):
         if type(iden) is int:  #gave an index instead of id
-            return Model.get(self.AbsorberList)[iden].get_lines()[transition]
+            ab=Model.get(self.AbsorberList)[iden]
         else:
-            return Model.get(self.AbsorberList).get(iden).get_lines()[transition]
+            ab=Model.get(self.AbsorberList).get_item(iden)
+        try:
+            return ab.get_lines()[transition]
+        except AttributeError:
+            raise Exception("absorber %s not found"%(str(iden)))
+        except KeyError:
+            raise KeyError("absorber %s has no transition %d"%(str(iden), transition))
         
 
 
