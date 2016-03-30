@@ -67,6 +67,9 @@ class SpectralLine(object):
             'Ge':72.631
     }
 
+    def __str__(self):
+        return "%s: rest wave=%6.2lf A f=%lf"%(self.ionName, self.wave, self.f)
+
     def __init__(self,**kwargs):
         for key, val in kwargs.items():
             setattr(self,key,val)

@@ -214,8 +214,6 @@ class Model(object):
 
 
         tst=self.get_lst(tag)
-        print(tst)
-        print(tag)
         assert(tst)
 
         for item in self.get_lst(tag):
@@ -426,13 +424,9 @@ class Model(object):
         else: #iden was the object, not just the id
             tag=iden.__class__.__name__.split('.')[-1]
             if tag in Model.model_classes.values():
-                print(tag,iden.id, str(kwargs))
-                raise Exception("break")
                 iden.set_data(**kwargs)
             elif tag in list(Model.model_classes.keys()):
                 for key, val in dict(kwargs).items:
-                    print(tag,iden.id, str(kwargs))
-                    raise Exception("break")
                     setattr(iden,key,val)
             else:
                 raise TypeError("model.Model.set_val(): unrecognized type: %s"%(tag))
@@ -491,7 +485,7 @@ class ModelDB(object):
         Inputs:
         -------
         models:  list of Model instances
-        constraints: dict of dicts of tuples of floats.  (see ModelDB.constrain) 
+        constraints: see ModelDB.constrain
         name: name of the xml models file.  (not the fit file)
         """
 
@@ -622,7 +616,7 @@ class ModelDB(object):
 
     def append_db(self,dbfile):
         """appends another xmldb from filename to the current db"""
-        tree = et.parse(filename)
+        tree = et.parse(dbfile)
         root = tree.getroot()
 
         for key in Model.model_classes.keys():

@@ -29,7 +29,7 @@ class Spectrum(object):
         lst1 = list(np.where(start<=lst)[0])
         lst2 = list(np.where(end>=lst)[0])
         ind = list(set(lst1) & set(lst2))
-        return ind
+        return sorted(ind)
 
     @staticmethod
     def convert_to_vel(waves,ref_wave):

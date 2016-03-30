@@ -21,6 +21,7 @@ def plot_line(spec, model, fig, subplot_key, line, velocity=True, ax=None,**kwar
     ax.plot(waves, ab, 'b', linestyle='steps-mid') #this needs to be outside of if 
                                                #in case appending ab to 
                                                #pre-existing ax
+
     ax.set_xlim(kwargs.get("xlims"),None)
     ax.set_ylim(kwargs.get("ylims"),None)
     return ax
@@ -30,6 +31,7 @@ def get_data(spec,model,wave_r=None, vel_r=None, absorbers=None, ref_ab=None,**k
 
         if type(absorbers) is dict:
             absorbers=get_lines(model, absorbers)
+            print(str(absorbers[-1]))
         elif type(absorbers) is list:
             assert(type(absorbers[0]) is SpectralLine)
         else:
@@ -98,7 +100,7 @@ if __name__=="__main__":
 
     xmlfile,  vel_r = "/home/scott/research/J0744+2059/SiII.xml", [-120., 121.]
     model, spec=parse_spectrum( Model(xmlfile=xmlfile) )
-    absorbers=[{"SiII2":3, "SiII3":3},{"SiII2":4,"SiII3":4},{"SiII2":5},{"SiII2":6}]
+    absorbers=[{"SiII3":2, "SiII1":2},{"SiII3":3, "SiII1":3},{"SiII3":4,"SiII1":4},{"SiII3":5},{"SiII3":6}]
     fig = plt.figure()
 
     axes=[]
@@ -107,16 +109,16 @@ if __name__=="__main__":
                             fig, 411,  
                             absorbers[0], 
                             vel_r=vel_r,velocity=True, ax=None,   
-                            ref_ab={"SiII2":3}))
+                            ref_ab={"SiII3":absorbers[0]["SiII3"]}))
 
 
     sharex=axes[-1]
-
+    
     axes.append(plot_line(  spec, model,
                             fig, 412,  
                             absorbers[1], 
                             vel_r=vel_r,velocity=True, ax=None,   
-                            ref_ab=model.get_spectral_line("SiII2",4),
+                            ref_ab={"SiII3":absorbers[1]["SiII3"]},
                             sharex=sharex))
 
 
@@ -124,18 +126,25 @@ if __name__=="__main__":
                             fig, 413,  
                             absorbers[2], 
                             vel_r=vel_r,velocity=True, ax=None,   
-                            ref_ab=model.get_spectral_line("SiII2",5),
+                            ref_ab={"SiII3":absorbers[2]["SiII3"]},
                             sharex=sharex))
 
     axes.append(plot_line(  spec, model,
                             fig, 414,  
                             absorbers[3], 
                             vel_r=vel_r,velocity=True, ax=None,   
-                            ref_ab=model.get_spectral_line("SiII2",6),
+                            ref_ab={"SiII3":absorbers[3]["SiII3"]},
                             sharex=sharex))
 
+    """axes.append(plot_line(  spec, model,
+                            fig, 415,  
+                            absorbers[4], 
+                            vel_r=vel_r,velocity=True, ax=None,   
+                            ref_ab={"SiII3":absorbers[4]["SiII3"]},
+                            sharex=sharex))"""
 
 
+    
 
     plt.show()
     

@@ -5,6 +5,7 @@ import subprocess
 import xml.etree.ElementTree as et
 from wavelength import c
 import spec_parser
+import io
 
 def run_optimize(fname,step=False, verbose=False, 
         to_buffer=True, method='dude',timeout=None):
@@ -53,7 +54,7 @@ def run_optimize(fname,step=False, verbose=False,
             return None
     else: #use code from this project
         raise Exception("doesn't yet work as of 2016-02-29")
-        model=model.Model(xmlfile=fname)
+        model=Model(xmlfile=fname)
         src_data=model.flux
         popt, pcov = optimizer.optimize(src_data, model)
         return popt,pcov
@@ -105,12 +106,12 @@ def populate_database(abs_ids=[], separator="\n\n",
     Exception
 
     """
-    if buff:  #passes buffer to model.Model.read(), then to data_types.read(), 
+    if buff:  #passes buffer to Model.read(), then to data_types.read(), 
               #then to xml.etree.ElementTree.parse() as io.BytesIO
 
         strlst=buff.decode().strip(separator).split(separator)
         buff=[io.BytesIO(item.replace("\n","").encode()) for item in strlst]
-        models = [model.Model(buff=item) for item in buff]
+        models = [Model(buff=item) for item in buff]
 
     else:
         if type(abs_ids)!=list:
@@ -139,7 +140,7 @@ def populate_database(abs_ids=[], separator="\n\n",
             db=load_from_db(db)
         db.append_lst(models,constraints=constraints)
     else:
-        db=model.ModelDB(models=models,constraints=constraints)
+        db=ModelDB(models=models,constraints=constraints)
 
 
     return db
@@ -292,23 +293,7 @@ def parse(filename, ab_ids, path='/home/scott/research/J0744+2059/'):
 
 
 if __name__=='__main__':
-    #parse("FeIIdb.xml",["FeII", "FeII_1","FeII_2","FeII_3","FeII_4","FeII_5"])
     pass
-
-    #import plot_distribution as plt
-    """path="/home/scott/research/J0744+2059/"
-    fname="test.xml"
-    abs_ids=["CIV_1","CIV_2","CIV_3"]
-    model=Model(xmlfile=os.path.join(path,fname))
-    db=random_sampling(model,"CIV_3","N",[13.2,13.7],4,abs_ids,constraints={},iden2=None)
-    print("len db: %d"%(len(db)))
-    for item in db:
-        print(item.chi2, item.get_datum("CIV_3","Absorber","N"))"""
-        
-    #db=load_from_db("testdb.xml")
-    #db=populate_database(abs_ids=["CIV_1","CIV_2","CIV_3"],path=path)
-    #db.write("testdb.xml")
-    #plt.plot_chi2(db,"N",xlabel="N column", iden="test")
 
         
     

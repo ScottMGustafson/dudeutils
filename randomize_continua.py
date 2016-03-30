@@ -146,7 +146,8 @@ def get_continua(mod,n,limits_file='',gaussian=False,xpercent=0.,ypercent=0.02):
         randomize_list_of_points(mod,dct,gaussian)
         fname=path+"/continuum_%d.xml"%(i)
         mod.write(fname)
-        run_optimize(fname)
+        run_optimize(fname,step=False, verbose=False, 
+                    to_buffer=True, method='dude',timeout=15):
         models.append(Model(xmlfile=fname))
     return models
     
@@ -157,11 +158,23 @@ if __name__=='__main__':
     mod=Model(xmlfile=name)
     lst = mod.get_lst("ContinuumPointList")
 
+    init_chi2=mod.chi2
+
     try:
         for item in lst:
             assert(item.xLocked and item.yLocked)
     except:
         raise Exception("need to set all continuumpoints to locked for %s\n"%(name))
-    models = ModelDB(models=get_continua(mod,n,limits_file='',gaussian=True,xpercent=0.,ypercent=0.02))
+
+    models=sorted(
+                get_continua(mod,n,
+                            limits_file='',gaussian=True,
+                            xpercent=0.,ypercent=0.02),
+                key=lambda x: x.chi2)
+
+    db = ModelDB(models=models, constraints={"chi2":models[0].chi2+100.})
+
+    best_lst=sorted(db.models, key=lambda x: x.chi2)
+    best_lst[0].write("new_best_continuum.xml")
     print(len(models))
     

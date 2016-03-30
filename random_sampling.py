@@ -1,11 +1,12 @@
 from dudeutils import *
 from model import *
+import sys
 from plot_distribution import plot_chi2
 from configparser import ConfigParser
 from scipy.constants import c
 c*=0.001   #convert to km/s
 
-def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
+def parse_config(config_file=os.path.join('data','random_sampling_config.OI.cfg')):
     """
     parse the config file to produce a dict of absorbers, parameters and 
     allowed ranges
@@ -188,15 +189,15 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
         #set value to random number within range
         perturb_absorbers(dct,model)
         #call dude to optimize
+        #print('.', end="")
         try:
-            run_optimize(model.xmlfile,step=step,verbose=verbose,method=method)
+            buff=run_optimize(model.xmlfile,step=step,verbose=verbose,
+                              method=method,to_buffer=True,timeout=30)
         except KeyboardInterrupt:
             continue
         #add to ModelDB database
         if step:
-            newdb=populate_database(abs_ids, keep=False,
-                                 path=os.path.split(model.xmlfile)[0],
-                                 db=None, constraints=constraints)
+            newdb=populate_database(abs_ids, constraints=constraints, buff=buff)
             if len(newdb.models)==1:
                 is_locked=[]
                 for key, val in dct.items():
@@ -214,10 +215,9 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
     
             new_models=filter_bad_models(newdb.models, dct)
             if len(new_models)>0:
-                print("appending new models")
                 db.append_lst(new_models)
-            else:
-                print("skipping bad models")
+            #else:
+            #    print("_",end="")
         else:
             model.read(model.xmlfile) #model.xmlfile is rewritten by OptimizeXML
             db.append(model.copy())
@@ -251,7 +251,7 @@ def get_nsigma(db,n=1):
     def delta(): return float(n**2)
     lst=sorted(db.models, key=lambda x: x.chi2)
 
-    return ModelDB(models=[item for item in lst if item.chi2<lst[0].chi2+delta()])
+    return [item for item in lst if item.chi2<lst[0].chi2+delta()]
 
 if __name__=="__main__":
     dct=parse_config()
@@ -278,8 +278,6 @@ if __name__=="__main__":
                 all_db=ModelDB(name=name)
             else:
                 all_db=ModelDB.load_models(name)
-            
-            print("initial filtering")
             all_db=filter_bad_models(all_db, dct)
         else:
             raise Exception("invalid name: %s"%(name)) 
@@ -288,24 +286,24 @@ if __name__=="__main__":
         
     model=Model(xmlfile=source)
     constraints={}
-    count=len(dct.keys())*3*n
+    print("%d total models"%(len(dct.keys())*3*n))
+
     for key, val in dct.items():
-        print("\n%d samplings remaining\n"%(count))
         for attr,rng in val.items():
             iden2=dct[iden]["iden2"] if attr=="vel" else None
-            count-=1
             try:
                 db=random_sampling( model, key, attr, rng, n,
                                     abs_ids=list(dct.keys()),dct=dct,
                                     constraints=constraints,
                                     iden2=iden2, step=step, verbose=False)
 
+                
                 min_chi2=min([item.chi2 for item in db.models])
                 #added to remove irrelevant models more than like 10 sigma away                 
-                all_db.append_db(get_nsigma(db, n=5.))
+                all_db.append_lst(get_nsigma(db, n=5.))
             except:
                 print("failed either due to timeout, KeyboardInterrupt or other\n")
-                pass
+                raise
 
     if len(all_db.models)==0:
         raise Exception("no surviving models...")
@@ -321,6 +319,6 @@ if __name__=="__main__":
         if not name.endswith('.xml'):
             name+='.xml'
         all_db.write(name,True)
-        name=name.strip('.xml')+'.obj'
+        name=name.replace('.xml','.obj')
         ModelDB.dump_models(all_db,name)
 
