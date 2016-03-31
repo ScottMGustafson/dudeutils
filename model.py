@@ -571,8 +571,22 @@ class ModelDB(object):
     def remove_unused(self):
         lst=[]
         for mod in self.models:
-            lst+=[getattr(mod,key) for key in list(Model.model_classes.keys())]
+            for key in list(Model.model_classes.keys()):
+                try:
+                    lst.append(getattr(mod,key))
+                except AttributeError:
+                    pass
         data_types.ObjList.clean_pool(list(set(lst)))
+
+        for mod in list(self.models):
+            for key in list(Model.model_classes.keys()):
+                try: #delete the entire model if not in _pool.  This breaks encapsulation
+                    if not getattr(mod,key) in list(data_types.ObjList._pool.keys()):
+                        self.models.remove(mod)
+                except (AttributeError, ValueError):
+                    pass
+
+        
 
     def remove(self, model):
         """
@@ -596,7 +610,15 @@ class ModelDB(object):
         
         def check_for_conflicts():
             def get_keys(mod):
-                return [getattr(mod,item) for item in list(Model.model_classes.keys())]
+                out=[]
+                for item in list(Model.model_classes.keys()):
+                    try:
+                        out.append(getattr(mod,item))
+                    except AttributeError:
+                        pass
+                return out
+
+
             these_keys=get_keys(model)
             for mod in self.models:
                 if mod is model:

@@ -6,7 +6,7 @@ from configparser import ConfigParser
 from scipy.constants import c
 c*=0.001   #convert to km/s
 
-def parse_config(config_file=os.path.join('data','random_sampling_config.OI.cfg')):
+def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
     """
     parse the config file to produce a dict of absorbers, parameters and 
     allowed ranges
@@ -36,14 +36,26 @@ def parse_config(config_file=os.path.join('data','random_sampling_config.OI.cfg'
         if ab=='config':
             continue
         for k in ["N", "b", "z"]:
-            dct[ab][k]=dct[ab][k].replace(" ","")
-            dct[ab][k] = list(map(float,dct[ab][k].strip().split(',')))
-        cond=[dct[ab]["N"][0]<10.,dct[ab]["N"][-1]>23.,
-              dct[ab]["N"][-1]<dct[ab]["N"][0],
-              dct[ab]["b"][0]<1.,dct[ab]["b"][-1]>50.,
-              dct[ab]["b"][-1]<dct[ab]["b"][0],
-              dct[ab]["z"][0]<0.,dct[ab]["z"][-1]<0.,
-              dct[ab]["z"][-1]<dct[ab]["z"][0]]
+            try:
+                dct[ab][k]=dct[ab][k].replace(" ","")
+                dct[ab][k] = list(map(float,dct[ab][k].strip().split(',')))
+            except KeyError:
+                pass
+
+        cond=[]
+        if "N" in dct[ab].keys():
+            cond+=[ dct[ab]["N"][0]<10.,dct[ab]["N"][-1]>23.,
+                    dct[ab]["N"][-1]<dct[ab]["N"][0]]
+
+        if "b" in dct[ab].keys():
+            cond+=[ dct[ab]["b"][0]<0.,dct[ab]["b"][-1]>50.,
+                    dct[ab]["b"][-1]<dct[ab]["b"][0]]
+
+        if "z" in dct[ab].keys():
+            cond+=[ dct[ab]["z"][0]<0.,dct[ab]["z"][-1]<0.,
+                    dct[ab]["z"][-1]<dct[ab]["z"][0]]
+
+        
         if any(cond):
             raise Exception("check your random sampling inputs")
     return dct
@@ -69,14 +81,17 @@ def perturb_absorbers(dct, model):
 
     for key, val in dct.items():
         for param, rng in val.items():
-            
-            model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,False)
+            model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,True) #set gaussian true
     model.write(model.xmlfile)
 
 
 
-def filter_bad_models(models, dct, vel_pad=2.,chi2pad=50.):
+def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=50.):
     min_chi2=min([float(item.chi2) for item in models])
+    if min_chi2<1.:  #some error occured:
+        models=sorted(models, key=lambda x: x.chi2)
+        while models[0].chi2<=1.:
+            del(models[0])
     def _filter(model):
         if float(model.chi2)>min_chi2+chi2pad:
             return False
@@ -192,27 +207,16 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
         #print('.', end="")
         try:
             buff=run_optimize(model.xmlfile,step=step,verbose=verbose,
-                              method=method,to_buffer=True,timeout=30)
+                              method=method,to_buffer=False,timeout=30)
+            sys.stdout.write('.')
         except KeyboardInterrupt:
+            
             continue
         #add to ModelDB database
         if step:
-            newdb=populate_database(abs_ids, constraints=constraints, buff=buff)
-            if len(newdb.models)==1:
-                is_locked=[]
-                for key, val in dct.items():
-                    for param in val.keys():
-                        if model.get_datum(key,"Absorber",param+"Locked"):
-                            is_locked.append("%s: %s is locked"%(key,param))  
-
-                if len(is_locked)>2:
-                    msg="random_sampling.py: random_sampling():\n"
-                    msg+="optimization procedure didn't run.\n"
-                    msg+=str(is_locked)
-                    raise Exception(msg)
-
-
-    
+            newdb=populate_database(abs_ids, 
+                                    path="/home/scott/research/J0744+2059/",
+                                    constraints=constraints, buff=buff)
             new_models=filter_bad_models(newdb.models, dct)
             if len(new_models)>0:
                 db.append_lst(new_models)
@@ -223,8 +227,6 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,
             db.append(model.copy())
 
     model.set_val(iden,"Absorber",**{param+"Locked":False}) 
-    assert(not model.get_datum(iden,'Absorber',param+"Locked"))  
-
 
     return db
 
@@ -266,7 +268,7 @@ if __name__=="__main__":
     plot=True if glob['plot'].lower()=='true' else False
     append=True if glob['append'].lower()=='true' else False
     step=True if glob['step'].lower()=='true' else False
-    step='dude' if glob['method'].lower()=='dude' else None
+    method='dude' if glob['method'].lower()=='dude' else None
     n=int(glob['n'])
 
 
@@ -286,8 +288,6 @@ if __name__=="__main__":
         
     model=Model(xmlfile=source)
     constraints={}
-    print("%d total models"%(len(dct.keys())*3*n))
-
     for key, val in dct.items():
         for attr,rng in val.items():
             iden2=dct[iden]["iden2"] if attr=="vel" else None
@@ -302,9 +302,9 @@ if __name__=="__main__":
                 #added to remove irrelevant models more than like 10 sigma away                 
                 all_db.append_lst(get_nsigma(db, n=5.))
             except:
-                print("failed either due to timeout, KeyboardInterrupt or other\n")
-                raise
-
+                #print("failed either due to timeout, KeyboardInterrupt or other\n")
+                sys.stdout.write('_')
+                
     if len(all_db.models)==0:
         raise Exception("no surviving models...")
      
@@ -314,7 +314,7 @@ if __name__=="__main__":
                 plot_chi2(all_db, iden=key, attr=attr,
                           xlabel=r"$%s(%s)$"%(attr,key),
                           constraints={})
-    if input("save db?").lower() in ['y', 'yes']:
+    if not input("save db?").lower() in ['n', 'no']:
         name=input("db path/name?") 
         if not name.endswith('.xml'):
             name+='.xml'

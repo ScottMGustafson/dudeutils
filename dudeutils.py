@@ -7,8 +7,8 @@ from wavelength import c
 import spec_parser
 import io
 
-def run_optimize(fname,step=False, verbose=False, 
-        to_buffer=True, method='dude',timeout=None):
+def run_optimize(fname,step=False, verbose=False, to_buffer=True, 
+                 method='dude',timeout=None):
     """
     call dude and run commandline.OptimizeXML from the command line.
 
@@ -23,7 +23,7 @@ def run_optimize(fname,step=False, verbose=False,
 
     ouput:
     ------
-    popt, pcov:   if method!= 'dude', outputs optimized parameters and 
+    popt, pcov:   if method != 'dude', outputs optimized parameters and 
                   covariance matrix (tuple)
 
     Raises:
