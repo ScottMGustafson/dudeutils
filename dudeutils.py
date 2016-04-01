@@ -8,7 +8,7 @@ import spec_parser
 import io
 
 def run_optimize(fname,step=False, verbose=False, to_buffer=True, 
-                 method='dude',timeout=None):
+                 method='dude',timeout=None,**kwargs):
     """
     call dude and run commandline.OptimizeXML from the command line.
 
