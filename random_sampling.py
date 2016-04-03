@@ -100,11 +100,11 @@ def perturb_absorbers(dct, model, gaussian=True):
     """
 
     for key, val in dct.items():
-        if key =='continuum': continue
+        if key in ['continuum', 'config']: continue
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,gaussian) 
 
-def perturb_continua(mod, dct): 
+def perturb_continua(mod, dct,glob): 
     """
     
     input:
@@ -173,6 +173,11 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=50.):
     else:
         return [item for item in models if _filter(item)]   
 
+def toggle_ylock(model,lst,locked):
+    for key in lst: #unlock all points
+        model.set_val(key,"ContinuumPoint",**{"yLocked":bool(locked)})
+
+
 def random_sampling(model, iden, param, param_range, n,
                     abs_ids, dct, constraints, iden2,**kwargs):
     """
@@ -221,6 +226,8 @@ def random_sampling(model, iden, param, param_range, n,
 
         return param, param_range
 
+
+
     db=ModelDB(models=[]) 
     if type(model) is str:
         if glob['step']:
@@ -241,12 +248,21 @@ def random_sampling(model, iden, param, param_range, n,
     for i in range(n):
         #set value to random number within range
         perturb_absorbers(dct,model)
-        if glob['vary_continuum']:
-            perturb_continua(model,dct['continuum'])
+        #if glob['vary_continuum']:
+        #    perturb_continua(model,dct['continuum'],glob)
+        toggle_ylock(model,list(dct['continuum'].keys()),False)
         model.write(model.xmlfile) #apply changes
-
+        try:
+            run_optimize(model.xmlfile,timeout=30,**glob) #optimize continuum points
+            model.read()
+        except:
+            continue
+        
+        toggle_ylock(model,list(dct['continuum'].keys()),True)
+        model.write(model.xmlfile) #apply changes
         try:
             buff=run_optimize(model.xmlfile,timeout=30,**glob)
+            model.read()
         except:
             continue
 
@@ -330,6 +346,12 @@ if __name__=="__main__":
                 #print("failed either due to timeout, KeyboardInterrupt or other\n")
                 sys.stdout.write('_')
                 
+
+    models=get_nsigma(all_db,n=10)
+    for model in list(all_db.models):
+        if not model in models:
+            all_db.remove(model)
+
     if len(all_db.models)==0:
         raise Exception("no surviving models...")
      

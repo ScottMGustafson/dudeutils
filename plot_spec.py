@@ -4,6 +4,7 @@ from atomic import *
 import matplotlib.pyplot as plt
 from model import *
 import os
+import numpy as np
 
 def get_lines(model, dct):
     return [model.get_spectral_line(key, val) for key, val in dct.items()]
@@ -13,14 +14,23 @@ def plot_line(spec, model, fig, subplot_key, line, velocity=True, ax=None,**kwar
     sharex, sharey= kwargs.get("sharex",None), kwargs.get("sharey",None)
     waves, ab, cont, flux, error = get_data(spec,model,absorbers=line,**kwargs)
     assert(flux.shape[0]==ab.shape[0]==cont.shape[0]==waves.shape[0])
+
+    print("test: ab,cont=",ab[10:15],cont[10:15])
     if not ax:
         ax=fig.add_subplot(subplot_key,sharex=sharex, sharey=sharey)
         ax.plot(waves, flux, 'k', linestyle='steps-mid')
-        if error: ax.plot(waves, error, 'g', linestyle='steps-mid')
+        ax.plot(waves, np.zeros(waves.shape[0]), 'k--')
         ax.plot(waves, cont, 'r', linestyle='steps-mid')
-    ax.plot(waves, ab, 'b', linestyle='steps-mid') #this needs to be outside of if 
+        if error: 
+            ax.plot(waves, error, 'g', linestyle='steps-mid')
+
+    if not np.array_equal(ab,cont):
+        ax.plot(waves, ab, 'b', linestyle='steps-mid') #this needs to be outside of if 
                                                #in case appending ab to 
                                                #pre-existing ax
+
+
+    
 
     ax.set_xlim(kwargs.get("xlims"),None)
     ax.set_ylim(kwargs.get("ylims"),None)

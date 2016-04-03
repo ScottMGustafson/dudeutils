@@ -708,7 +708,10 @@ class ModelDB(object):
                         assert(type(inst) is str)
                         data[attr]=inst
                     except: 
-                        warnings.warn("model "+group_name+"has no attribute "+attr)
+                        if attr in ['AbsorberList', 'ContinuumPointList']:
+                            warnings.warn(
+                                "model "+group_name+"has no attribute "+attr
+                            )
                         data[attr]="None"
 
                 current_group = et.SubElement(modeldb, 'model', data)
