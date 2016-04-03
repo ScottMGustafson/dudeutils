@@ -132,14 +132,11 @@ def perturb_continua(mod, dct):
 
 def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=50.):
     min_chi2=min([float(item.chi2) for item in models])
-    if min_chi2<1.:  #some error occured:
-        models=sorted(models, key=lambda x: x.chi2)
-        while models[0].chi2<=1.:
-            del(models[0])
     def _filter(model):
-        if float(model.chi2)>min_chi2+chi2pad:
+        if float(model.chi2)>min_chi2+chi2pad or float(model.chi2)==0.:
             return False
         for iden, params in dct.items():
+            if iden=='continuum':continue
             for param_name, param_range in params.items():
                 val=model.get_datum(iden,"Absorber",param_name)
                 if val==-1.:
@@ -176,7 +173,8 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=50.):
     else:
         return [item for item in models if _filter(item)]   
 
-def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,iden2,**kwargs):
+def random_sampling(model, iden, param, param_range, n,
+                    abs_ids, dct, constraints, iden2,**kwargs):
     """
     runs random sampling dude models to estimate errors.  This works best under 
     a small number of parameters and parameter-space to explore.  Do this when 
@@ -249,8 +247,7 @@ def random_sampling(model,iden,param,param_range,n,abs_ids,dct,constraints,iden2
 
         try:
             buff=run_optimize(model.xmlfile,timeout=30,**glob)
-        except KeyboardInterrupt:
-            
+        except:
             continue
 
         #add to ModelDB database
@@ -327,7 +324,7 @@ if __name__=="__main__":
                 
                 min_chi2=min([item.chi2 for item in db.models])
                 #added to remove irrelevant models more than like 10 sigma away                 
-                all_db.append_lst(get_nsigma(db, n=5.))
+                all_db.append_lst(db.models)
             except:
                 raise
                 #print("failed either due to timeout, KeyboardInterrupt or other\n")
@@ -344,12 +341,11 @@ if __name__=="__main__":
                 plot_chi2(all_db, iden=key, attr=attr,
                           xlabel=r"$%s(%s)$"%(attr,key),
                           constraints={})
-    if not input("save db?").lower() in ['n', 'no']:
-        if not glob['append']:
-            name=input("db path/name?") 
-        if not name.endswith('.xml'):
-            name+='.xml'
-        all_db.write(name,True)
-        name=name.replace('.xml','.obj')
-        ModelDB.dump_models(all_db,name)
+    if type(glob['append']) is bool:
+        name=input("db path/name?") 
+    else:
+        name=glob['append']
+    name=os.path.splitext(name)[0]
+    all_db.write(name+'.xml',True)
+    ModelDB.dump_models(all_db,name+'.obj')
 
