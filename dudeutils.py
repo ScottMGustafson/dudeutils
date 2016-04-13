@@ -30,6 +30,7 @@ def run_optimize(fname,step=False, verbose=False, to_buffer=False,
     -------
     None
     """
+    if timeout: timeout=float(timeout)
     if method=='dude':
         #call dude from the command line and call its Levenberg-marquardt algo.
         commands=["java","-cp",
@@ -41,9 +42,8 @@ def run_optimize(fname,step=False, verbose=False, to_buffer=False,
             commands.append('step')
         if to_buffer:
             commands.append('to_buffer')
-        if verbose:
+        if verbose: 
             print("running: %s"%(" ".join(commands)))
-
 
         #now run the optimizer
         if to_buffer:

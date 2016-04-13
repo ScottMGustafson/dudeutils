@@ -315,6 +315,8 @@ class Model(object):
         elif not filename:
             filename=self.xmlfile
 
+            
+
 
         #read through the data:  
         #  if data is new, then create the new class instances and store data in
@@ -444,8 +446,13 @@ class Model(object):
         with open(filename,"w") as f:
             f.write("<?xml version=\"1.0\"?>\n")
             f.write("<SpecTool version=\"1.0\">\n")
-            f.write("<CompositeSpectrum id=\"%s\"><Spectrum spec=\"%s\" error=\"%s\" chi2=\"%lf\" pixels=\"%lf\" params=\"%d\"/>\n"%(
+            if self.flux.endswith('.fits'):
+                f.write("<CompositeSpectrum id=\"%s\"><Spectrum spec=\"%s\" error=\"%s\" chi2=\"%lf\" pixels=\"%lf\" params=\"%d\"/>\n"%(
                       self.flux,os.path.split(self.flux)[-1],os.path.split(self.error)[-1],self.chi2,self.pixels,self.params
+                   ))
+            else:
+                f.write("<CompositeSpectrum id=\"%s\"><Spectrum spec=\"%s\" spectype=\"ascii1\" chi2=\"%lf\" pixels=\"%lf\" params=\"%d\"/>\n"%(
+                      self.flux,os.path.split(self.flux)[-1],self.chi2,self.pixels,self.params
                    ))
             for item in data_types.ObjList.get(getattr(self,"ContinuumPointList")):
                 if not item.id: item.id="null"

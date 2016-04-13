@@ -44,8 +44,10 @@ double* spectrum(   const double waves[], const double flux[], const double err[
     return continuum;
 }
 */
-double* return_absorption(double continuum[], const double waves[], double Nval[], double bval[], double redshift[], 
-                    double restwv[], double gmma[], double osc_strn[], size_t len_abs, size_t len_arr){
+double* return_absorption(double continuum[], const double waves[], 
+                          double Nval[], double bval[], double redshift[], 
+                          double restwv[], double gmma[], double osc_strn[], 
+                          size_t len_abs, size_t len_arr){
     int i;
     absorber absorbers[len_abs];
 
@@ -61,7 +63,9 @@ double* return_absorption(double continuum[], const double waves[], double Nval[
     return absorption;
 }
 
-double* return_continuum(double xs[], double ys[], const double waves[], size_t len_cont_points, size_t len_arr){
+double* return_continuum(double xs[], double ys[], const double waves[], 
+                        size_t len_cont_points, size_t len_arr){
+
     continuum_point cont_points[len_cont_points];
     int i;
     for(i=0;i<len_cont_points;++i){
@@ -71,7 +75,9 @@ double* return_continuum(double xs[], double ys[], const double waves[], size_t 
     return cont;
 }
 
-double get_chi2(double absorption[], const double flux[], const double err[], const double waves[], double starts[], double ends[], size_t len_pairs, size_t len_arr){
+double get_chi2(double absorption[], const double flux[], const double err[], 
+                const double waves[], double starts[], double ends[], 
+                size_t len_pairs, size_t len_arr){
     int i;
     int beg, end;
 

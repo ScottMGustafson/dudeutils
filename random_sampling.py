@@ -104,7 +104,15 @@ def perturb_absorbers(dct, model, gaussian=True):
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,gaussian) 
 
-def perturb_continua(mod, dct,glob): 
+def toggle_ab_locks(model,ab_cfg,locked,param=None):
+    for key, val in ab_cfg.items():
+        if param:
+            model.set_val(iden,"Absorber",**{param+"Locked":locked}) 
+        else:
+            for attr in val.keys():
+                model.set_val(key,"Absorber",**{attr+"Locked":locked})
+
+def perturb_continua(mod, dct, glob): 
     """
     
     input:
@@ -123,14 +131,15 @@ def perturb_continua(mod, dct,glob):
         y=mod.get_datum(key,"ContinuumPoint",'y')
         rng=(1.+float(val['ylim']))*y, (1.-float(val['ylim']))*y
         mod.monte_carlo_set(key,"ContinuumPoint",[ rng[0],rng[-1] ],
-                            'y',glob['gaussian'])
+                            'y',gaussian=glob['gaussian'])
         if 'xlim' in val.keys():
             x=mod.get_datum(key,"ContinuumPoint",'x')
             rng=(1.+float(val['xlim']))*x, (1.-float(val['xlim']))*x
             mod.monte_carlo_set(key,"ContinuumPoint",[ rng[0],rng[-1] ],
-                                'x',glob['gaussian'])
+                                'x',gaussian=glob['gaussian'])
 
-def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=50.):
+
+def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=200.):
     min_chi2=min([float(item.chi2) for item in models])
     def _filter(model):
         if float(model.chi2)>min_chi2+chi2pad or float(model.chi2)==0.:
@@ -163,19 +172,17 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=50.):
                         return False
         return True
 
-
     if type(models) is ModelDB:
         for item in models.models:
             if not _filter(item):
                 models.remove(item)
         return models        
-
     else:
         return [item for item in models if _filter(item)]   
 
-def toggle_ylock(model,lst,locked):
+def toggle_cont_lock(model,lst,locked,param='y'):   
     for key in lst: #unlock all points
-        model.set_val(key,"ContinuumPoint",**{"yLocked":bool(locked)})
+        model.set_val(key,"ContinuumPoint",**{param+"Locked":bool(locked)})
 
 
 def random_sampling(model, iden, param, param_range, n,
@@ -250,7 +257,7 @@ def random_sampling(model, iden, param, param_range, n,
         perturb_absorbers(dct,model)
         #if glob['vary_continuum']:
         #    perturb_continua(model,dct['continuum'],glob)
-        toggle_ylock(model,list(dct['continuum'].keys()),False)
+        toggle_cont_lock(model,list(dct['continuum'].keys()),False)
         model.write(model.xmlfile) #apply changes
         try:
             run_optimize(model.xmlfile,timeout=30,**glob) #optimize continuum points
@@ -258,7 +265,7 @@ def random_sampling(model, iden, param, param_range, n,
         except:
             continue
         
-        toggle_ylock(model,list(dct['continuum'].keys()),True)
+        toggle_cont_lock(model,list(dct['continuum'].keys()),True)
         model.write(model.xmlfile) #apply changes
         try:
             buff=run_optimize(model.xmlfile,timeout=30,**glob)
@@ -359,7 +366,7 @@ if __name__=="__main__":
         for key, val in dct.items():
             if key=='continuum':
                 continue
-            for attr,rng in val.items():
+            for attr in list(val.keys()):
                 plot_chi2(all_db, iden=key, attr=attr,
                           xlabel=r"$%s(%s)$"%(attr,key),
                           constraints={})

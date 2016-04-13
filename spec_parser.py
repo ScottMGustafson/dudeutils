@@ -4,18 +4,24 @@ import wavelength
 from data_types import *
 from atomic import *
 import sys
+from model import Model
 import _spectrum
 
 class Spectrum(object):
     @staticmethod
     def sniffer(filename, *args, **kwargs):
         """detects raw text format, returns correct spectrum class instance"""
+        if type(filename) in [FitsSpectrum, TextSpectrum]:
+            return filename
+        if type(filename) is Model:
+            if filename.flux.endswith('.fits'):
+                return FitsSpectrum(filename.flux, *args, **kwargs)   
+            else: 
+                return TextSpectrum(filename, *args, **kwargs)  
         if filename.endswith('.fits'):
             return FitsSpectrum(filename, *args, **kwargs)
         with open(filename) as f:
-            if len(f.readline().split())==5:
-                return TextSpectrum(filename, *args, **kwargs)
-            elif len(f.readline().split())==6:
+            if len(f.readline().split())==5 or len(f.readline().split())==6:
                 return TextSpectrum(filename, *args, **kwargs)
             else:
                 raise Exception("unrecognied filetype: %s"%(filename))
@@ -39,8 +45,10 @@ class Spectrum(object):
         waves (float or array of floats): wavelengths
         ref_wave (float or atomic.SpectralLine): a reference absorption line
         """
-        if not type(ref_wave) is float: #then is SpectralLine instance
-            ref_wave=refwave.obs_wave
+        if type(ref_wave) is SpectralLine: #then is SpectralLine instance
+            ref_wave=ref_wave.obs_wave
+        elif type(ref_wave) is not float:
+            raise Exception("convert_to_vel only accepts SpectralLine or float types") 
         return c*(waves-ref_wave)/ref_wave
 
     @staticmethod        
@@ -56,8 +64,9 @@ class Spectrum(object):
 
 
 
+
     @staticmethod
-    def fit_absorption(spec, model, ab_to_plot=None):
+    def fit_absorption(spec, model, ab_to_plot=None, indices=None):
         """
         Input:
         ------
@@ -76,40 +85,49 @@ class Spectrum(object):
         AssertionError
 
         """
+        def truncate(indices=None):
+            try:
+                assert(spec.error.shape[0]==spec.waves.shape[0])
+            except:
+                spec.error=np.zeros(spec.waves.shape[0])
+            if indices:
+                return spec.waves[indices],spec.flux[indices],spec.error[indices]
+            else:
+                return spec.waves,spec.flux,spec.error
+
+        wv,flux,e=truncate(indices)
+
         cont_points=model.get_lst("ContinuumPointList")
         cont_points = sorted(cont_points, key=lambda pt: pt.x)
         x=np.array([float(item.x) for item in cont_points])
         y=np.array([float(item.y) for item in cont_points])
-  
+
         absorbers=[]
 
         abslst=ab_to_plot if ab_to_plot else Model.get(model.AbsorberList) 
 
-
         if type(abslst[0]) is  SpectralLine:
-            pass
+            absorbers=abslst
         elif type(abslst[0]) is Absorber:
             if not abslst[0]:
                 raise Exception("no absorbers specified")
             for item in abslst:
                     absorbers+=item.get_lines()
-
-            absorbers=list(filter(
-                                lambda x: spec.waves[4]<x.get_obs(x.z)<spec.waves[-4], 
-                                absorbers))
-
         else: 
             raise Exception("type of ab_to_plot must either be list of SpectralLine instances or Absorber instances ")
 
-        regions=[(item.start, item.end) for item in list(model.get_lst("RegionList"))]
-        regions=RegionList.consolidate_list(regions) 
+        absorbers=[it for it in absorbers if wv[4]<it.get_obs(it.z)<wv[-4]]
+
+
+        regions= RegionList.consolidate_list( 
+                                  [ (item.start, item.end) 
+                                  for item in list(model.get_lst("RegionList"))
+                                  if item.start<wv[-1] and item.end>wv[0] ]
+                 )
+
         starts=np.array([item[0] for item in regions],dtype=np.float)
         ends=np.array([item[1] for item in regions],dtype=np.float)
 
-        assert(starts.shape[0]==ends.shape[0])
-        assert(x.shape==y.shape)
-        assert(spec.waves.shape==spec.flux.shape)#==spec.error.shape)
-        
         #convert into numpy array for c extension use
         N=np.array([item.N for item in absorbers], dtype=np.float)
         b=np.array([item.b for item in absorbers], dtype=np.float)
@@ -118,11 +136,16 @@ class Spectrum(object):
         gamma=np.array([item.gamma for item in absorbers], dtype=np.float)
         f=np.array([item.f for item in absorbers], dtype=np.float)
 
-        cont, absorption, chi2= _spectrum.spectrum( spec.waves,spec.flux,spec.error,
+
+
+        cont, absorption, chi2= _spectrum.spectrum(  wv,flux,e,
                                                      x,y,
                                                      N,b,z,rest,gamma,f,
                                                      starts,ends )
-        return cont, absorption, chi2
+        from numpy import ma
+        print('cont',np.mean(ma.masked_outside(cont,-10E-12,10E-12)),
+               'ab', np.mean(ma.masked_outside(absorption,-10E-12,10E-12)))
+        return wv,flux,e, absorption, cont, chi2
 
 class FitsSpectrum(Spectrum):
     def __init__(self, filename, error=None):
