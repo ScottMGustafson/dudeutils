@@ -67,8 +67,16 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
             if not np.array_equal(ab,cont):
                 ab=ma.masked_outside(ab,-1.*tol,tol)
                 ax.plot(waves, ab, 'b', linestyle='steps-mid') 
+    
+
 
     plot_ab(ab)
+    for item in prep_absorbers(spec, model, absorbers):
+        for line in item:
+            obs_wave=Spectrum.convert_to_vel(line.obs_wave,ref)
+            print(obs_wave, ref, line.obs_wave)
+            if np.amin(waves)<obs_wave<np.amax(waves):
+                ax.axvline(x=obs_wave, ymin=0., ymax=np.amax(cont), linewidth=1, color='k')
 
     if xlabel:
         ax.set_xlabel(xlabel)
@@ -185,24 +193,13 @@ def get_ab(spec,model,ref, ind, absorbers, vel_r=True, return_ab=True):
     else: 
         return waves, flux, error, ab, cont
     
-    
-
-def temp(ax, wv, flux, ab, cont, error=None):
-    ax=fig.add_subplot(subplot_key,sharex=sharex, sharey=sharey)
-    ax.plot(waves, flux, 'k', linestyle='steps-mid')
-    ax.plot(waves, np.zeros(waves.shape[0]), 'k--')
-    ax.plot(waves, cont, 'r', linestyle='steps-mid')
-    if error: 
-        ax.plot(waves, error, 'g', linestyle='steps-mid')
-
-    if not np.array_equal(ab,cont):
-        ax.plot(waves, ab, 'b', linestyle='steps-mid') #this needs to be outside of if 
-                                               #in case appending ab to 
-                                               #pre-existing ax
-
-    #ax.set_xlim(kwargs.get("xlims"),None)
-    #ax.set_ylim(kwargs.get("ylims"),None)
+def label_lines(ax, x, y, label):
+    for i in range(len(label)):
+        ax.annotate(label[i], xy=(x[i], y[i]), xytext=(x[i], 0.8),ha='center', va='center',
+                    arrowprops=dict(arrowstyle="-",facecolor='black') )
+        #plt.axvline(x=x[i], ymin=0., ymax=0.68, linewidth=1, color='k')
     return ax
+
     
 
 
