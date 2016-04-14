@@ -104,6 +104,85 @@ def perturb_absorbers(dct, model, gaussian=True):
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,gaussian) 
 
+def toggle_cont_ab_locks(model, ab_lock,ab_cfg,cont_cfg):
+    toggle_ab_locks(model,ab_cfg,ab_lock)
+    toggle_cont_lock(model,list(cont_cfg.keys()),not ab_lock)
+
+def perturb_values(model,ab_cfg,cont_cfg,glob):
+    perturb_absorbers(ab_cfg, model, gaussian=True)  
+    perturb_continua(model, cont_cfg, glob)
+    toggle_cont_ab_locks(model,False,ab_cfg,cont_cfg)
+    model.write(model.xmlfile)
+
+
+def is_better(new_chi2,old_chi2,tol=4.): return new_chi2<old_chi2+tol
+
+def vary_cont(db,ab_cfg,cont_cfg,glob,tol=4.):
+
+    model=db[-1]
+    old_model=model.copy()
+    prev=old_model.chi2  
+    perturb_values(model,ab_cfg,cont_cfg,glob) #initial perturbation
+    new_chi2=0.
+
+    
+    count=0
+    while np.fabs(new_chi2-prev)>tol and count<3:
+        #while chi2 hasn't improved or optimization hasn't stalled
+        #alternate between varying continua and absorbers
+        prev=model.chi2
+        toggle_cont_ab_locks(model,False,ab_cfg,cont_cfg)
+        model.write()
+
+        run_optimize(model.xmlfile,**glob)
+        model.read()
+        toggle_cont_ab_locks(model,True,ab_cfg,cont_cfg)
+        model.write()
+
+        run_optimize(model.xmlfile,**glob)
+        model.read()
+
+        new_chi2=model.chi2
+        count+=1
+
+    db.append(model.copy())
+    return
+
+def get_attr_lst(db,attr,cond_fn,*args):
+    """ 
+    cond_fn should be some boolean function definition
+    """
+    if args:
+        return [getattr(it,attr)(*args) for it in db if cond_fn(it)]
+    else:
+        return [getattr(it,attr) for it in db if cond_fn(it)]
+
+
+def plt_sigmas(db,ax,x_attr,y_attr,xargs=[],yargs=[],**kwargs):
+    min_chi2=min([item.chi2 for item in db])
+    xfact=kwargs.get("xfact",1.)
+    yfact=kwargs.get("yfact",1.)
+    def one_sig(mod): return mod.chi2<=min_chi2+1.
+    def two_sig(mod): return 1.<mod.chi2<=min_chi2+4.
+    def morethan_2sig(mod): return 4.<mod.chi2
+
+    ax.plot(  xfact*np.array(get_attr_lst(db,x_attr,morethan_2sig,*xargs)),
+              yfact*np.array(get_attr_lst(db,y_attr,morethan_2sig,*yargs)),
+              'ko'
+           )
+
+    ax.plot(  xfact*np.array(get_attr_lst(db,x_attr,two_sig,*xargs)),
+              yfact*np.array(get_attr_lst(db,y_attr,two_sig,*yargs)),
+              'bo'
+           )
+
+    ax.plot(  xfact*np.array(get_attr_lst(db,x_attr,one_sig,*xargs)),
+              yfact*np.array(get_attr_lst(db,y_attr,one_sig,*yargs)),
+              'co'
+           )  
+
+
+
 def toggle_ab_locks(model,ab_cfg,locked,param=None):
     for key, val in ab_cfg.items():
         if param:

@@ -21,9 +21,11 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
     sharey= kwargs.get("sharey",None)
     multiplier=kwargs.pop('multiplier',None)
     xlabel=kwargs.pop('xlabel',None)
+    topmost=kwargs.pop('topmost',False)
+    ref=kwargs.pop('ref',None)
 
 
-    wave_r, ref, ind = prep_data(spec,model,**kwargs)
+    wave_r, ind, ref = prep_data(spec,model,ref,**kwargs)
     absorbers=[item for item in line] if type(line) is list else [line]
     waves, flux, error, ab0, cont = get_ab(spec,model,ref, ind, absorbers[0],return_ab=False)
     ab=[ab0]
@@ -48,7 +50,7 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
         ax=fig.add_subplot(subplot_key,sharex=sharex, sharey=sharey)
         ax.plot(waves, flux, 'k', linestyle='steps-mid')
         ax.plot(waves, np.zeros(waves.shape[0]), 'k--')
-        ax.plot(waves, cont, 'r', linestyle='steps-mid')
+        ax.plot(waves, cont, 'r--', linestyle='steps-mid')
         try:
             ax.plot(waves, error, 'g', linestyle='steps-mid')
         except:
@@ -66,17 +68,39 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
         else:
             if not np.array_equal(ab,cont):
                 ab=ma.masked_outside(ab,-1.*tol,tol)
-                ax.plot(waves, ab, 'b', linestyle='steps-mid') 
+                ax.plot(waves, ab, 'b--') 
     
 
 
     plot_ab(ab)
+
+
+    x,labels, y=[],[],[]
+    import lineid_plot
     for item in prep_absorbers(spec, model, absorbers):
         for line in item:
             obs_wave=Spectrum.convert_to_vel(line.obs_wave,ref)
-            print(obs_wave, ref, line.obs_wave)
             if np.amin(waves)<obs_wave<np.amax(waves):
-                ax.axvline(x=obs_wave, ymin=0., ymax=np.amax(cont), linewidth=1, color='k')
+                x.append(obs_wave)
+                labels.append(line.ionName)
+                y.append(np.mean(cont))
+
+                
+    box_loc=lineid_plot.get_box_loc(fig, ax, x, y, box_axes_space=0.06)
+    if topmost:
+        for i in range(len(x)):  
+            ax.annotate(line.ionName, xy=(x[i], y[i]),
+            xytext=(box_loc[i][0],
+                    box_loc[i][1]),
+            xycoords="data", textcoords="data",
+            rotation=90, horizontalalignment="center",
+            verticalalignment="center",
+            fontsize=12,
+            arrowprops=dict(arrowstyle="-",
+                            relpos=(0.5, 0.0)),
+            label=line.ionName)
+    for i in range(len(x)): 
+        ax.axvline(x=x[i], ymin=0, ymax=y[i], linewidth=1, color='k',linestyle='--')
 
     if xlabel:
         ax.set_xlabel(xlabel)
@@ -136,25 +160,25 @@ def prep_absorbers(spec, model, absorbers):
 def get_wr_from_vr(ref,model,vel_r):
     return [(1+vel_r[0]/c)*ref, (1+vel_r[1]/c)*ref]
 
-def prep_data(spec,model,wave_r=None, vel_r=None, ref=None,**kwargs):
+def prep_data(spec,model,ref=None,wave_r=None, vel_r=None,**kwargs):
 
-    if type(ref) is dict:
-        assert(len(ref.keys())==1)  #should only be one element long
-        key=list(ref.keys())[0]
-        ref=model.get_spectral_line(key, ref[key]).obs_wave
-    elif type(ref) is SpectralLine:
-        ref=model.get_spectral_line(key, ref[key]).obs_wave
-    elif type(ref) is float:
-        pass
-    else:
-        raise Exception("poorly defined input: ref")
+    if ref:
+        if type(ref) is dict:
+            assert(len(ref.keys())==1)  #should only be one element long
+            key=list(ref.keys())[0]
+            ref=model.get_spectral_line(key, ref[key]).obs_wave
+        elif type(ref) is SpectralLine:
+            ref=model.get_spectral_line(key, ref[key]).obs_wave
+        elif type(ref) is float:
+            pass
+        else:
+            raise Exception("poorly defined input: ref")
 
     if vel_r:
         if wave_r or not ref:
             raise Exception("poorly defined input")
         else:
             wave_r=get_wr_from_vr(ref,model,vel_r)
-            print("obs_wave:",str(ref),"wave_r",wave_r)
  
     if wave_r:
         ind=Spectrum.get_indices(spec.waves, wave_r) 
@@ -165,7 +189,7 @@ def prep_data(spec,model,wave_r=None, vel_r=None, ref=None,**kwargs):
     if len(ind)==0:
         raise Exception("No data selected")
 
-    return wave_r, ref, ind
+    return wave_r, ind, ref
 
 
 def get_ab(spec,model,ref, ind, absorbers, vel_r=True, return_ab=True):
@@ -176,7 +200,6 @@ def get_ab(spec,model,ref, ind, absorbers, vel_r=True, return_ab=True):
 
 
     absorbers=prep_absorbers(spec, model, absorbers)
-    print(type(absorbers), len(absorbers))
     waves, flux, error, ab, cont, chi2= Spectrum.fit_absorption(spec,
                                                         model,
                                                         ab_to_plot=absorbers,
@@ -214,30 +237,23 @@ if __name__=="__main__":
     axes=[]
 
     axes.append(plot_line(  spec, model,
-                            fig, 511,  
+                            fig, 411,  
                             [{"SiII2":2},{"SiII1":2},{"SiII3":2}], 
                             vel_r=vel_r,velocity=True, ax=None,   
                             ref={"SiII2":2},
-                            multiplier=10E14))
+                            multiplier=10E14,topmost=True))
     
     axes.append(plot_line(  spec, model,
-                            fig, 512,  
+                            fig, 412,  
                             [{"SiII2":3},{"SiII1":3},{"SiII3":3}], 
                             vel_r=vel_r,velocity=True, ax=None,   
                             ref={"SiII2":3},
                             multiplier=10E14,
                             sharex=axes[0]))
 
-    axes.append(plot_line(  spec, model,
-                            fig, 513,  
-                            [{"SiII2":4},{"SiII1":4},{"SiII3":4}], 
-                            vel_r=vel_r,velocity=True, ax=None,   
-                            ref={"SiII2":5},
-                            multiplier=10E14,
-                            sharex=axes[0]))
 
     axes.append(plot_line(  spec, model,
-                            fig, 514,  
+                            fig, 413,  
                             [{"SiII1":5},{"SiII2":5},{"SiII3":5}], 
                             vel_r=vel_r,velocity=True, ax=None,   
                             ref={"SiII2":5},
@@ -245,7 +261,7 @@ if __name__=="__main__":
                             sharex=axes[0]))
 
     axes.append(plot_line(  spec, model,
-                            fig, 515,  
+                            fig, 414,  
                             [{"SiII1":6},{"SiII2":6},{"SiII3":6}], 
                             vel_r=vel_r,velocity=True, ax=None,   
                             ref={"SiII2":6},
@@ -254,7 +270,8 @@ if __name__=="__main__":
                             xlabel=r"velocity km s$^{-1}$"))
 
 
-    
+
+    fig.text(0.04, 0.5, 'Flux', va='center', rotation='vertical')
 
     plt.show()
     

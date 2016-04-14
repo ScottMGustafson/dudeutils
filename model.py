@@ -141,6 +141,11 @@ class Model(object):
         except AttributeError:
             raise Exception("no availble D/H")
 
+
+    def append_datum(self,tag,**kwargs):
+        data_types.ObjList.append_datum(tag,**kwargs)
+        
+
     def get_vel(self,id1,id2):
         """
         get velocity shift between two absorbers

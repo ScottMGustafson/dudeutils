@@ -279,6 +279,11 @@ class ObjList(object):
                     return ObjList._read_node(item)
         return None
 
+    def append_datum(self,tag,**kwargs):
+        node=et.Element(tag,**kwargs)
+        self.objlist.append(Data.factory(node=node))
+        #will automatically be written also to _pool        
+
     def refresh_list(xmlfile):
         ObjList._pool = {}
         tree = et.parse(xmlfile)

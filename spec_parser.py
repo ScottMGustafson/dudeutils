@@ -142,9 +142,7 @@ class Spectrum(object):
                                                      x,y,
                                                      N,b,z,rest,gamma,f,
                                                      starts,ends )
-        from numpy import ma
-        print('cont',np.mean(ma.masked_outside(cont,-10E-12,10E-12)),
-               'ab', np.mean(ma.masked_outside(absorption,-10E-12,10E-12)))
+
         return wv,flux,e, absorption, cont, chi2
 
 class FitsSpectrum(Spectrum):
