@@ -218,11 +218,12 @@ def perturb_continua(mod, dct, glob):
                                 'x',gaussian=glob['gaussian'])
 
 
-def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=200.):
+def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=None):
     min_chi2=min([float(item.chi2) for item in models])
     def _filter(model):
-        if float(model.chi2)>min_chi2+chi2pad or float(model.chi2)==0.:
-            return False
+        if chi2pad:
+            if float(model.chi2)>min_chi2+chi2pad or float(model.chi2)==0.:
+                return False
         for iden, params in dct.items():
             if iden=='continuum':continue
             for param_name, param_range in params.items():
