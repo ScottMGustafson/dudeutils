@@ -2,27 +2,29 @@
 from spec_parser import *
 from atomic import *
 import matplotlib.pyplot as plt
+from matplotlib import rc
 from model import *
 import os
 import numpy as np
 import numpy.ma as ma
+import lineid_plot
 
-
+rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], 'size':16})
+rc('text', usetex=True)
 
 def get_lines(model, dct):
     return [model.get_spectral_line(key, val) for key, val in dct.items()]
 
 
-def plot_line(spec, model, fig, subplot_key, line,**kwargs):
+def plot_line(spec, model, fig, line,**kwargs):
 
     velocity=kwargs.pop("velocity",True)
     ax=kwargs.pop("ax",None)
-    sharex=kwargs.get("sharex",None)
-    sharey= kwargs.get("sharey",None)
     multiplier=kwargs.pop('multiplier',None)
     xlabel=kwargs.pop('xlabel',None)
     topmost=kwargs.pop('topmost',False)
     ref=kwargs.pop('ref',None)
+    ylabel=kwargs.pop('ylabel',None)
 
 
     wave_r, ind, ref = prep_data(spec,model,ref,**kwargs)
@@ -38,7 +40,7 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
         ab=[f(it) for it in ab]
         #ab=[multiplier*np.array(it) for it in ab]
 
-    tol=kwargs.pop('tol',1E12)
+    tol=kwargs.pop('tol',1000.)
 
     cont=ma.masked_outside(cont,-1.*tol,tol)
     flux=ma.masked_outside(flux,-1.*tol,tol)
@@ -46,15 +48,13 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
 
     assert(flux.shape[0]==ab[0].shape[0]==cont.shape[0]==waves.shape[0])
 
-    if not ax:
-        ax=fig.add_subplot(subplot_key,sharex=sharex, sharey=sharey)
-        ax.plot(waves, flux, 'k', linestyle='steps-mid')
-        ax.plot(waves, np.zeros(waves.shape[0]), 'k--')
-        ax.plot(waves, cont, 'r--', linestyle='steps-mid')
-        try:
-            ax.plot(waves, error, 'g', linestyle='steps-mid')
-        except:
-            pass
+    ax.plot(waves, flux, 'k', linestyle='steps-mid')
+    ax.plot(waves, np.zeros(waves.shape[0]), 'k--')
+    ax.plot(waves, cont, 'r--', linestyle='steps-mid')
+    try:
+        ax.plot(waves, error, 'g', linestyle='steps-mid')
+    except:
+        pass
 
     def plot_ab(ab):
         """
@@ -69,14 +69,13 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
             if not np.array_equal(ab,cont):
                 ab=ma.masked_outside(ab,-1.*tol,tol)
                 ax.plot(waves, ab, 'b--') 
-    
+
 
 
     plot_ab(ab)
 
-
     x,labels, y=[],[],[]
-    import lineid_plot
+
     for item in prep_absorbers(spec, model, absorbers):
         for line in item:
             obs_wave=Spectrum.convert_to_vel(line.obs_wave,ref)
@@ -89,7 +88,7 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
     box_loc=lineid_plot.get_box_loc(fig, ax, x, y, box_axes_space=0.06)
     if topmost:
         for i in range(len(x)):  
-            ax.annotate(line.ionName, xy=(x[i], y[i]),
+            ax.annotate(labels[i], xy=(x[i], y[i]),
             xytext=(box_loc[i][0],
                     box_loc[i][1]),
             xycoords="data", textcoords="data",
@@ -98,7 +97,7 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
             fontsize=12,
             arrowprops=dict(arrowstyle="-",
                             relpos=(0.5, 0.0)),
-            label=line.ionName)
+            label=labels[i])
     for i in range(len(x)): 
         ax.axvline(x=x[i], ymin=0, ymax=y[i], linewidth=1, color='k',linestyle='--')
 
@@ -107,8 +106,12 @@ def plot_line(spec, model, fig, subplot_key, line,**kwargs):
     else:
         ax.axes.get_xaxis().set_visible(False)
         ax.set_xlabel(None)
-    ax.set_xlim(kwargs.get("xlims"),None)
+    #ax.set_xlim(kwargs.get("xlims"),None)
     ax.set_ylim(kwargs.get("ylims"),None)
+
+    if ylabel:
+        ax.set_ylabel(ylabel)
+
     return ax
         
 def parse_spectrum(model):
@@ -132,9 +135,8 @@ def parse_spectrum(model):
 
 #TODO: error lies somewhere fit_absorption returns flux (and presumably also error)
 #very subtle bug.
-    #spec=Spectrum.sniffer(spec, error=error)
-    sp_dump='test_SiII_out.dat'
-    spec=Spectrum.sniffer(sp_dump)
+    spec=Spectrum.sniffer(spec, error=error)
+    spec=Spectrum.sniffer(spec.dump)
 
     #if not hasattr(spec, 'abs')
     #    spec.cont, spec.abs, chi2 = Spectrum.fit_absorption(spec,model)
@@ -148,7 +150,7 @@ def prep_absorbers(spec, model, absorbers):
     
     if type(absorbers) is dict:
         absorbers=get_lines(model, absorbers)
-        #print(str(absorbers[-1]),str(absorbers[-1].z))
+
     elif type(absorbers) is SpectralLine:
         pass
     else:
@@ -195,7 +197,6 @@ def prep_data(spec,model,ref=None,wave_r=None, vel_r=None,**kwargs):
 def get_ab(spec,model,ref, ind, absorbers, vel_r=True, return_ab=True):
 
     if type(absorbers) is list:
-        print('should be dict or spectral line',type(absorbers[0]), len(absorbers[0]))
         return [get_ab(spec,model,ref, ind, ab, vel_r, return_ab) for ab in absorbers]
 
 
@@ -232,46 +233,34 @@ if __name__=="__main__":
 
     xmlfile,  vel_r = "/home/scott/research/J0744+2059/SiII.xml", [-120., 120.]
     model, spec=parse_spectrum( Model(xmlfile=xmlfile) )
-    fig = plt.figure()
+    fig, axes = plt.subplots(3,sharex=True)
 
-    axes=[]
-
-    axes.append(plot_line(  spec, model,
-                            fig, 411,  
+    axes[0]=   plot_line(  spec, model,
+                            fig,
                             [{"SiII2":2},{"SiII1":2},{"SiII3":2}], 
-                            vel_r=vel_r,velocity=True, ax=None,   
+                            vel_r=vel_r,velocity=True, ax=axes[0],   
                             ref={"SiII2":2},
-                            multiplier=10E14,topmost=True))
+                            multiplier=10E14,
+                            topmost=True)
     
-    axes.append(plot_line(  spec, model,
-                            fig, 412,  
+    axes[1]=   plot_line(  spec, model,
+                            fig, 
                             [{"SiII2":3},{"SiII1":3},{"SiII3":3}], 
-                            vel_r=vel_r,velocity=True, ax=None,   
+                            vel_r=vel_r,velocity=True, ax=axes[1],   
                             ref={"SiII2":3},
-                            multiplier=10E14,
-                            sharex=axes[0]))
+                            multiplier=10E14)
 
 
-    axes.append(plot_line(  spec, model,
-                            fig, 413,  
+    axes[2]=   plot_line(  spec, model,
+                            fig, 
                             [{"SiII1":5},{"SiII2":5},{"SiII3":5}], 
-                            vel_r=vel_r,velocity=True, ax=None,   
+                            vel_r=vel_r,velocity=True, ax=axes[2],   
                             ref={"SiII2":5},
-                            multiplier=10E14,
-                            sharex=axes[0]))
-
-    axes.append(plot_line(  spec, model,
-                            fig, 414,  
-                            [{"SiII1":6},{"SiII2":6},{"SiII3":6}], 
-                            vel_r=vel_r,velocity=True, ax=None,   
-                            ref={"SiII2":6},
-                            multiplier=10E14,
-                            sharex=axes[0],
-                            xlabel=r"velocity km s$^{-1}$"))
+                            multiplier=10E14)
 
 
 
-    fig.text(0.04, 0.5, 'Flux', va='center', rotation='vertical')
+    fig.text(0.04, 0.5, 'Flux', va='center', rotation='vertical', size=22)
 
     plt.show()
     

@@ -155,9 +155,11 @@ class FitsSpectrum(Spectrum):
             _, self.error=wavelength.xy(error)
         else:
             self.error=None
+        self.dump=filename.replace('.fits','.dat')
             
 class TextSpectrum(Spectrum): 
     def __init__(self,dumpfile,*lst):
+
         if len(lst)!=5:
             try:
                 lst = np.loadtxt(dumpfile,unpack=True)
@@ -171,7 +173,7 @@ class TextSpectrum(Spectrum):
                 raise Exception("bad formatting for "+dumpfile)
         self.set_data(*lst)
         self.name=dumpfile
-
+        self.dump=dumpfile  #this is an alias for self.name
 
     def set_data(self,*lst):  
         assert(len(lst)==5)
