@@ -142,6 +142,24 @@ class Model(object):
             raise Exception("no availble D/H")
 
 
+    def toggle_locks(self,idens, params, locked,tag='Absorber'):
+        if not type(idens) is list:
+            idens=[idens]
+        if not type(params) is list:
+            params=[params]
+        for iden in idens:
+            for param in params:
+                self.set_val(iden,tag,**{param+"Locked":bool(locked)}) 
+
+    def toggle_cont_lock(self,lst,param='y',locked=True):  
+        self.toggle_locks(lst,param,locked,tag='ContinuumPoint')
+
+    def lock_all_cont(self):
+        for item in Model.get(self.ContinuumPointList):
+            for param in 'xLocked yLocked'.split():
+                self.set_val(item,"ContinuumPoint",**{param:True}) 
+
+
     def append_datum(self,tag,**kwargs):
         data_types.ObjList.append_datum(tag,**kwargs)
         
@@ -647,6 +665,15 @@ class ModelDB(object):
             data_types.ObjList.remove(key)
      
         self.models.remove(model)
+
+    def get_attr_lst(self,attr,cond_fn,*args):
+        """ 
+        cond_fn should be some boolean function definition
+        """
+        if args: #if attr is actually a function
+            return [getattr(it,attr)(*args) for it in self.models if cond_fn(it)]
+        else:
+            return [getattr(it,attr) for it in self.models if cond_fn(it)]
 
     def append_db(self,dbfile):
         """appends another xmldb from filename to the current db"""

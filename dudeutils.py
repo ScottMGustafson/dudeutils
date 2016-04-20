@@ -83,7 +83,7 @@ def get_model(xmlfile,chi2=0.,pixels=0.):
     return Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
 
 
-def populate_database(abs_ids=[], separator="\n\n", 
+def populate_database(abs_ids=None, separator="\n\n", 
         path=None, db=None, constraints=None, buff=None):
     """
     parse all xmlfiles in a given directory and returns a ModelDB instance
@@ -114,12 +114,6 @@ def populate_database(abs_ids=[], separator="\n\n",
         models = [Model(buff=item) for item in buff]
 
     else:
-        if type(abs_ids)!=list:
-            raise Exception("abs_ids needs to be list")
-
-        if len(abs_ids)==0:
-            raise Exception("need at least one absorber specified.  abs_ids=[]")
-
         #read files on disk
         files=[]
         if not path:
@@ -135,7 +129,7 @@ def populate_database(abs_ids=[], separator="\n\n",
         for f in files:
             os.remove(join(path,f))
 
-    if bool(db): #if None or []
+    if db: #if None or []
         if type(db) is str:
             db=load_from_db(db)
         db.append_lst(models,constraints=constraints)
