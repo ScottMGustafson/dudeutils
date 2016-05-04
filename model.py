@@ -348,7 +348,12 @@ class Model(object):
 
         for key, val in Model.model_classes.items():
             ids=self.abs_ids if val=="Absorber" else None #and not self.get_all else None  #if looking at absorbers, can specify which absorbers to include
-            lst = data_types.Data.read(filename, tag=val, ids=ids)
+
+            try:
+                lst = data_types.Data.read(filename, tag=val, ids=ids)
+            except:
+                print(filename)
+                raise
             if key=='AbsorberList': assert(len(lst)>0)
             newobj = data_types.ObjList.factory(lst)
             if newobj:

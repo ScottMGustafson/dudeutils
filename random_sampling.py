@@ -10,7 +10,7 @@ c*=0.001   #convert to km/s
 
 glob={}
 
-def parse_config(config_file=os.path.join('data','random_sampling_config.cfg')):
+def parse_config(config_file=os.path.join('data','random_sampling_config.metals.cfg')):
     """
     parse the config file to produce a dict of absorbers, parameters and 
     allowed ranges
@@ -97,7 +97,30 @@ def toggle_cont_ab_locks(model, ab_lock,ab_cfg,cont_cfg, locked_keys=None, locke
     if locked_keys:
         model.toggle_locks(locked_keys, locked_params, True,'Absorber')
 
-#perturb params
+def sort_by_z(model, idens):
+    """
+    Sometimes when optimizing a model, two absorbers close in velocity will 
+    cross over each other in redshift.   This rearaanges the ids to the 
+    appropriate absorbers.
+
+    input:
+    ------
+    model: model.Model instance
+    idens: list of absorber ids to consider, sorted by expected z.
+
+    output:
+    -------
+    None
+
+    """
+    ab_lst = [model.get_datum(iden,'Absorber') for iden in idens]
+    aborbers=sorted([ab for item in ab_lst], key=lambda x: x.z ) 
+    if idens!=[ab.id for item in absorbers]:
+        for i in range(len(idens)):
+            model.set_val(absorber[i].id, tag='Absorber', **{"id":idens[i]})
+
+
+
 def perturb_absorbers(dct, model, **kwargs):
     """
     randomly perturb absorbers to explore the parameter-space
@@ -132,13 +155,13 @@ def is_better(new_chi2,old_chi2,tol=4.): return new_chi2<old_chi2+tol
 
 #the varying methods
 
-def vary_ab(db,model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
+def vary_ab(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
     """
     varies param values.
 
     params:
     -------
-    db: ModelDB instance
+    model: Model instance
     ab_cfg: absorber config dict
     n: (int) number of iterations
     tol:  chi2 tolerance: model accepted if better than within prev_chi2+tol
@@ -146,7 +169,7 @@ def vary_ab(db,model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
 
     returns:
     --------
-    None
+    list of new models
 
     raises:
     -------
@@ -158,25 +181,24 @@ def vary_ab(db,model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
                     locked_keys=locked_keys, 
                     locked_params=locked_params)
     model.write()
-    if step:
+    if kwargs.get('step',False):
         buff=run_optimize(model.xmlfile,to_buffer=kwargs['to_buffer'],step=True,timeout=30)
-        db=populate_database(abs_ids=list(ab_cfg.keys()), db=db,
+        return populate_database(abs_ids=list(ab_cfg.keys()), return_list=True,
                             path=os.path.split(model.xmlfile)[0],
                             buff=buff)
     else:
         run_optimize(model.xmlfile,timeout=30,**kwargs)
         model.read()          
-        db.models.append(model.copy())
-    return db
+        return [model.copy()]
 
-def vary_cont(db,model,ab_cfg,cont_cfg,
+def vary_cont(model,ab_cfg,cont_cfg,
               locked_keys=None, locked_params=None, **kwargs):
     """
     varies param values AND continuum level at specified points.
 
     params:
     -------
-    db: ModelDB instance
+    model: Model instance
     ab_cfg: absorber config dict
     cont_cfg: continuum config dict
     tol:  chi2 tolerance: model accepted if better than within prev_chi2+tol
@@ -184,7 +206,7 @@ def vary_cont(db,model,ab_cfg,cont_cfg,
 
     returns:
     --------
-    None
+    list of new models
 
     raises:
     -------
@@ -207,17 +229,15 @@ def vary_cont(db,model,ab_cfg,cont_cfg,
     if kwargs.get('step',False):
         perturb_values(model,ab_cfg,cont_cfg,**kwargs)
         buff=find_better_cont()
-        return populate_database(abs_ids=list(ab_cfg.keys()), db=db,
+        return populate_database(abs_ids=list(ab_cfg.keys()),
                             path=os.path.split(model.xmlfile)[0],
-                            buff=buff)
+                            buff=buff,return_list=True)
         
     else:
         tol=kwargs.get('tol',4.)
         old_model=model.copy()
-        prev=old_model.chi2  
-        perturb_values(model,ab_cfg,cont_cfg,**kwargs) #initial perturbation
-        new_chi2=0.
-        
+        prev, new_chi2=old_model.chi2, 0.
+        perturb_values(model,ab_cfg,cont_cfg,**kwargs) #initial perturbation  
         count=0
         while np.fabs(new_chi2-prev)>tol and count<3:
             #while chi2 hasn't improved or optimization hasn't stalled
@@ -228,9 +248,7 @@ def vary_cont(db,model,ab_cfg,cont_cfg,
             new_chi2=model.chi2
             if not is_better(new_chi2, prev,tol):
                 count+=1
-
-        db.models.append(model.copy())  
-        return db
+        return model.copy()
 
 
 def plt_sigmas(db,ax,x_attr,y_attr,xargs=[],yargs=[],**kwargs):
@@ -286,7 +304,7 @@ def perturb_continua(mod, dct, **kwargs):
                                 'x',gaussian=kwargs.get('gaussian',True))
 
 
-def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=None):
+def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
     min_chi2=min([float(item.chi2) for item in models])
     def _filter(model):
         if chi2pad:
@@ -303,8 +321,8 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=None):
                     if val<0.1:
                         return False
                     elif model.get_datum(iden,"Absorber","ionName")!="H I":
-                        if val>60:   #a metal line with an extremely large b-value: not 
-                                     # likely for our line of work
+                        if val>60:   #a metal line with an extremely large 
+                                     #b-value: not likely.
                             return False
                 elif param_name == "N":
                     if val<7.0 or val>23.:  #this means dude tried to throw it out.
@@ -329,25 +347,32 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=None):
         return [item for item in models if _filter(item)]   
 
 
-def iterate_fn(fn,ab_cfg,n,db,kwargs):
+def iterate_fn(fn,ab_cfg,n,kwargs):
+    out_lst=[]
     for i in range(n):
+        print('iteration %d'%(i))
+        
         for key in ab_cfg.keys():
             for attr in ab_cfg[key].keys():
-                kwargs['locked_keys']=key
-                kwargs['locked_params']=attr
+                kwargs['locked_keys']=[key]
+                kwargs['locked_params']=[attr]
+                
+                #a quick hack to ensure z cannot vary freely...ever.
+                if not 'z' in kwargs['locked_params']:
+                    kwargs['locked_params'].append('z')
                 try:
-                    db=fn(db,**kwargs)
-                    print(len(db))
+                    out_lst+=fn(**kwargs)
                     sys.stdout.write('.')
                 except TimeoutExpired:
                     sys.stdout.write('_')
                     continue
                 except KeyboardInterrupt:
-                    return db
+                    return out_lst
                 except:
                     raise
                 sys.stdout.flush()
-    return db
+        out_lst=filter_bad_models(out_lst, ab_cfg, vel_pad=4.0,chi2pad=100.)
+    return out_lst
 
 def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
     """
@@ -398,13 +423,11 @@ def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
 
     kwargs.update({'ab_cfg':ab_cfg,'cont_cfg':cont_cfg,'model':model})
     n=int(kwargs.pop('n',1))
-    print(len(db))
     if glob['vary_continuum']:
-        db=iterate_fn(vary_cont,ab_cfg,n,db,kwargs)
+        db.models+=iterate_fn(vary_cont,ab_cfg,n,kwargs)
     else:
         model.lock_all_cont()
-        db=iterate_fn(vary_ab,ab_cfg,n,db,kwargs)
-    print(len(db))
+        db.models+=iterate_fn(vary_ab,ab_cfg,n,kwargs)
 
     return db
 
@@ -446,34 +469,47 @@ if __name__=="__main__":
         if name.endswith('.xml'):
             all_db=ModelDB(name=name)
         else:
+            print('loading %s'%name)
             all_db=ModelDB.load_models(name)
-        all_db=filter_bad_models(all_db, ab_cfg)
+        #all_db=filter_bad_models(all_db, ab_cfg)
     else:
+        print('initializing new model db')
         all_db=ModelDB(models=[]) 
         
+
+    """
     model=Model(xmlfile=glob['source'])
 
     all_db=random_sampling( all_db, model, ab_cfg, cont_cfg, **glob)
+    print("before filtering: %d"%len(all_db))
+    all_db=filter_bad_models(all_db, ab_cfg, vel_pad=4.0,chi2pad=100.)
 
-    """models=get_nsigma(all_db,n=10)
-    for model in list(all_db.models):
-        if not model in models:
-            all_db.remove(model)"""
+    minchi2=min([item.chi2 for item in all_db.models if item.chi2>1.])
+    for item in list(all_db.models):
+        if item.chi2<1. or item.chi2>minchi2+100.:
+            all_db.remove(item)
+
+    print("after filtering: %d"%len(all_db))
+    if type(glob['append']) is bool:
+        name='latest.obj' 
+    else:
+        name=glob['append']
+    name=os.path.splitext(name)[0]
+    all_db.write(name+'.xml',True)
+    ModelDB.dump_models(all_db,name+'.obj')
+    #models=get_nsigma(all_db,n=10)
+    #for model in list(all_db.models):
+    #    if not model in models:
+    #        all_db.remove(model)
 
     if len(all_db.models)==0:
         raise Exception("no surviving models...")
-     
+    """
     if glob['plot']:
         for key, val in ab_cfg.items():
             for attr in list(val.keys()):
                 plot_chi2(all_db, iden=key, attr=attr,
                           xlabel=r"$%s(%s)$"%(attr,key),
                           constraints={})
-    if type(glob['append']) is bool:
-        name=input("db path/name?") 
-    else:
-        name=glob['append']
-    name=os.path.splitext(name)[0]
-    all_db.write(name+'.xml',True)
-    ModelDB.dump_models(all_db,name+'.obj')
+
 

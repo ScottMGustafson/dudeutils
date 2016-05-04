@@ -7,7 +7,7 @@ class AtomicData(object):
         all_lines={}
         f=open(fname,'r')
         for line in f:
-            ion, line= line[0:5].strip(), line[5:]
+            ion, line= line[0:5].replace(' ',''), line[5:]
             line=line.split()
             try:
                 all_lines[ion].append(

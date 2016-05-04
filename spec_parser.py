@@ -13,18 +13,31 @@ class Spectrum(object):
         """detects raw text format, returns correct spectrum class instance"""
         if type(filename) in [FitsSpectrum, TextSpectrum]:
             return filename
-        if type(filename) is Model:
+        elif type(filename) is Model:
             if filename.flux.endswith('.fits'):
                 return FitsSpectrum(filename.flux, *args, **kwargs)   
             else: 
                 return TextSpectrum(filename, *args, **kwargs)  
-        if filename.endswith('.fits'):
+        
+        elif filename.endswith('.fits'):
             return FitsSpectrum(filename, *args, **kwargs)
+        elif filename.endswith('.xml'):
+            return Model(xmlfile=filename)
         with open(filename) as f:
-            if len(f.readline().split())==5 or len(f.readline().split())==6:
+            try:
+                cols=len(f.readline().split())
+            except:
+                raise Exception("cannot sniff ",filename)
+            if cols==5 or cols==6:
                 return TextSpectrum(filename, *args, **kwargs)
+            elif cols in [7,8,10,11]:  
+                #7, 10 columns for line dump.  cols+1 if ionName has a space in it
+                return LineDump(filename, *args, **kwargs)
+            
             else:
-                raise Exception("unrecognied filetype: %s"%(filename))
+                raise Exception(
+                    "unrecognized filetype: %s \nwith shape %d\nfirst line:\n%s"%(
+                    filename, cols,f.readline()))
 
     @staticmethod
     def get_indices(lst,xr):
@@ -227,4 +240,22 @@ class TextSpectrum(Spectrum):
                 xx.append(x[i])
 
         return np.array(xx)
+
+class LineDump(object):
+    def __init__(self,fname):
+        self.fname=fname
+        self.absorbers=[]
+        for line in open(fname,'r').readlines():
+            ionName=line[0:6].replace(' ','')    
+            s=line[5:-1].strip().split()
+            self.absorbers.append(
+                Absorber(ionName=ionName, N=s[0], b=s[1], z=s[2])
+            )
+
+    def get_bin(self,rng):
+        return [item for item in self.absorbers if rng[0]<=item.z<rng[-1] ]
+
+    def get_ion(self, ionName):
+        return [item for item in self.absorbers if item.ionName==ionName]
+
 

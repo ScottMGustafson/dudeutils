@@ -137,7 +137,7 @@ class ObjList(object):
         ObjList._pool[self._id] = ObjList._pool.pop(old)
        
     @staticmethod
-    def factory(objlist,**kwargs):
+    def factory(objlist=None,**kwargs):
         """
         factory method to produce instances of the chidren of ObjList.  If user 
         provides id=some value alread in _pool, then just return that data.
@@ -148,8 +148,8 @@ class ObjList(object):
         objlist : a list of data.  elements should be instances of some derived 
                   class of Data
 
-        in **kwargs:
-        ------------ 
+        keyword args:
+        -------------
 
         id : (default None) if specified, _pool will be searched for the 
              relevant data.  If not present, id will be set to specified value
@@ -407,13 +407,18 @@ class VelocityViewList(ObjList):
 
 class Data(object):
     node_attrib=[]
-    def __init__(self,tag,**kwargs):
-        self.tag=tag
+    def __init__(self,*args, **kwargs):
+        #
+        tag=kwargs.get('tag',False)
+        if not tag:
+            self.tag=self.__class__.__name__
         for key,val in kwargs.items():
             try:
                 setattr(self,key,float(val))
             except:
                 setattr(self,key,val)
+
+            
 
     def __eq__(self,other):
         if type(self)!=type(other):
@@ -428,8 +433,8 @@ class Data(object):
 
     @staticmethod
     def factory(**kwargs):
-        tag=kwargs.get("tag")
-        if tag==None:
+        tag=kwargs.get("tag",None)
+        if not tag:
             try:
                 tag=kwargs.get("node").tag
                 assert(tag!=None)
@@ -443,7 +448,10 @@ class Data(object):
                 elif "xmlfile" in kwargs.keys():
                     inst=cls.from_file(**kwargs)
                 else:
-                    raise Exception("need to specify either an xml element node or an xml file")
+                    #if no xml data associated with it, will instantiate without.
+                    #xml data will be created on model.write()
+                    return cls(**kwargs)  
+
                 inst.keys=list(inst.node.attrib.keys())
                 inst.parse_node()
                 #inst.set_data(**kwargs)
@@ -470,7 +478,8 @@ class Data(object):
             
 
         return cls(tag,id=id,xmlfile=xmlfile,node=node,**kwargs)
-
+            
+        
 
     @classmethod
     def from_node(cls,**kwargs):
@@ -491,7 +500,7 @@ class Data(object):
         return _kwargs
 
     @staticmethod
-    def read(filename,tag='Absorber', ids=None):
+    def read(filename, tag='Absorber', ids=None):
         
         """
         read the data.
@@ -502,6 +511,7 @@ class Data(object):
 
         if not type(filename) is str:
             filename.seek(0)
+
         etree=et.parse(filename)
         duderoot = etree.getroot()  ##should be SpecTool
  
@@ -570,6 +580,7 @@ class Absorber(Data):
     
 
     def __init__(self,*args,**kwargs):
+        kwargs['ionName']=kwargs['ionName'].replace(' ','')
         super().__init__(*args,**kwargs)
 
     @classmethod
@@ -614,7 +625,10 @@ class Absorber(Data):
             for key in ['f','gamma']:
                 kwargs[key]=getattr(item,key)
             for key in Absorber.node_attrib:
-                kwargs[key]=getattr(self,key)
+                try:
+                    kwargs[key]=getattr(self,key)
+                except:
+                    kwargs[key]=''
             kwargs['wave']=float(getattr(item,'wave'))
             kwargs['obs_wave']=(1.+self.z)*float(getattr(item,'wave'))
             lst.append(SpectralLine(**kwargs))

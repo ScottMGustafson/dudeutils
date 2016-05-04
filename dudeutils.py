@@ -83,7 +83,7 @@ def get_model(xmlfile,chi2=0.,pixels=0.):
     return Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
 
 
-def populate_database(abs_ids=None, separator="\n\n", 
+def populate_database(abs_ids=None, separator="\n\n", return_list=False,
         path=None, db=None, constraints=None, buff=None):
     """
     parse all xmlfiles in a given directory and returns a ModelDB instance
@@ -124,20 +124,24 @@ def populate_database(abs_ids=None, separator="\n\n",
 
         if len(files)==0 and not db:
             raise Exception("too few files")
-
-        models=[Model( xmlfile=join(path,f), abs_ids=abs_ids ) for f in files]
+        models=[]
+        for f in files:
+            try:
+                models.append(Model( xmlfile=join(path,f), abs_ids=abs_ids ))                
+            except:
+                print(join(path,f)," failed to parse")
         for f in files:
             os.remove(join(path,f))
-
-    if db: #if None or []
+    if return_list:
+        return models
+    elif db: #if None or []
         if type(db) is str:
             db=load_from_db(db)
         db.append_lst(models,constraints=constraints)
+        return db
     else:
-        db=ModelDB(models=models,constraints=constraints)
+        return ModelDB(models=models,constraints=constraints)
 
-
-    return db
 
 
 def append_db(db,abs_ids,keep=False,path=None,constraints=None):
@@ -158,115 +162,6 @@ def load_from_db(dbxml):
 def get_db(dbfile):
     """alias to load an xml database"""
     return ModelDB.read(dbfile)
-
-def random(xmlfile,itemid,tag,param,val_range,modelid=None):
-    """get a new random setting a parameter to a random value in val_range (tuple or list)"""
-    mod=Model(xmlfile=xmlfile,chi2=0,pixels=0,params=0,id=modelid)
-    old = mod.get_datum(itemid,tag,"N")
-    mod.monte_carlo_set(itemid,tag,param,val_range)
-    new=mod.get_datum(itemid,tag,"N")
-    assert(old!=new)
-    print("model written to %s"%(xmlfile))
-
-def all_conts(db=None):
-    """get the set of all continua"""
-    if type(db) is str:
-        db = load_from_db(db)
-    elif db is None: 
-        db = load_from_db('database.xml')
-    conts=[]
-    for item in db:
-        conts.append((item.ContinuumPointList, item.xmlfile))
-    return list(set(conts))
-
-def cont_check_pipeline(reduced_chi2_limit=1.8,verbose=True, db=None):
-    if type(db) is str:
-        db = load_from_db(db)
-    conts = all_conts(db)
-
-    ids = [item[0] for item in conts]
-    for item in ids:
-        assert(ids.count(item)==1)
-    out=[]  #the 'good' continua
-    for item in conts:
-        models = db.get_lst_from_id(id=item[0],attr='ContinuumPointList')
-        _min = min([float(mod.reduced_chi2) for mod in models])
-        _min_chi2=min([float(mod.chi2) for mod in models])
-        if _min <= reduced_chi2_limit:
-            out.append((item[0],item[1],_min,_min_chi2))
-    if verbose:
-        print(len(out))
-        for item in out:
-            msg="%15s, id=%15s: \n    reduced chi2 = %6.4f, chi2=%6.4f"%(item[0],item[1],item[2],item[3])
-            print(msg)
-        print('\n')
-    return out
-
-def getDH(vr=(-0.5,0.5), dbfile='database.xml'):
-    import matplotlib.pyplot as plt
-
-    db = load_from_db(dbfile) 
-    allmods = []
-    _conts = cont_check_pipeline(db=db)
-    conts = [item[0] for item in _conts]
-    for item in db:
-        if vr[0]<=item.get_shift('D','H')<=vr[1] and item.ContinuumPointList in conts:
-            allmods.append(item)
-
-    for cont in _conts:
-        id = cont[0]
-        name=cont[1]
-        mods = []
-        for mod in db.models:
-            if vr[0]<=mod.get_shift('D','H')<=vr[1] and mod.ContinuumPointList==id:
-                mods.append(mod)
-
-        #dh = [{'dh':item.dh, 'chi2':item.chi2} for item in mods]
-        plt.plot([item.dh for item in mods], [item.reduced_chi2 for item in mods],'ko')
-        plt.title(name)
-        plt.show()
-        
-
-    plt.plot([item.dh for item in allmods], [item.chi2 for item in allmods],'ko')
-    plt.title("all continua")
-    plt.show()
-
-def check_for_cont_duplicates():
-    import datetime
-    import os
-    def print_pretty(lst):
-        for item in lst:
-            print("  %15s  %15s"%(item[0],item[1]))
-    def get_new_name(name):
-        name, ext = os.path.splitext(name)
-        num = 1
-        new_name = name+str(num)+ext
-        while os.path.isfile(new_name):
-            num+=1
-            new_name=name+str(num)+ext
-        return new_name
-
-    db = load_from_db('database.xml')
-    conts = all_conts(db)
-    names = [item[1] for item in conts]
-    duplicates = list(set([(item[0],item[1]) for item in conts if names.count(item[1]) > 1 ]))
-    print_pretty(duplicates)
-    
-    #rewrite duplicates to different xmlfiles
-    for item in duplicates:
-        models = db.get_lst_from_id(id=item[0],attr='ContinuumPointList')
-        models = sorted( models, key=lambda x: x.chi2 )
-        best_fit = models[0]
-        new_name = get_new_name(best_fit.xmlfile)
-        for i in range(0,len(db.models)):  #update db
-            if db[i] in models:
-                db[i].xmlfile=new_name  #update for model
-            
-        best_fit.write(filename=new_name)
-                
-    #write changes.  to avoid overwriting potentially desirable data, append date, time to fname
-    db.write(str(datetime.datetime.now().isoformat()+"_db.xml"))
-
 
 def parse(filename, ab_ids, path='/home/scott/research/J0744+2059/'):
     """clear a db file of all absorbers not in ab_ids"""
