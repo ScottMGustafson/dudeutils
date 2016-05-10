@@ -1,4 +1,4 @@
-from data_types import atomic_data, SpectralLine
+from atomic import SpectralLine
 from dudeutils import newdb
 from model import Model
 from numpy import fabs, log10

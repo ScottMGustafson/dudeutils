@@ -1,9 +1,11 @@
+from get_data import get_data
+
 class AtomicData(object):
     def __init__(self):
         self.atomic_data = AtomicData.get_lines()
 
     @staticmethod
-    def get_lines(fname='data/atom.dat'):
+    def get_lines(fname=get_data('atom.dat')):
         all_lines={}
         f=open(fname,'r')
         for line in f:

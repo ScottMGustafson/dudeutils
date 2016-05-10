@@ -5,7 +5,6 @@ plot_ly_series.py
 replacestuffs.py
 speccut_continua.py
 *.txt
-*.dat
 test*.py
 *.bak
 searchArray.py
@@ -30,4 +29,5 @@ compare_lines.py
 compare_D_vel.py
 clear_db.py
 bootstrap_stuff.py
-
+*J0744*
+*J1201*

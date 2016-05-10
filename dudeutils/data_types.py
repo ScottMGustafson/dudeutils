@@ -580,7 +580,10 @@ class Absorber(Data):
     
 
     def __init__(self,*args,**kwargs):
-        kwargs['ionName']=kwargs['ionName'].replace(' ','')
+        try:
+            kwargs['ionName']=kwargs['ionName'].replace(' ','')
+        except:
+            pass
         super().__init__(*args,**kwargs)
 
     @classmethod
@@ -679,7 +682,8 @@ class ContinuumPoint(Data):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
     def __str__(self):
-        return "id=%s x=%12.7lf y=%12.8E"%(self.id,self.x,self.y)
+        return "id=%10s x=%7.2lf y=%10.8E xLocked=%s yLocked=%s"%(
+                self.id,self.x,self.y,str(self.xLocked), str(self.yLocked))
     @classmethod
     def registrar_for(cls,tag):
         return tag=="ContinuumPoint"

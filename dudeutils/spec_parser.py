@@ -4,6 +4,7 @@ import wavelength
 from data_types import *
 from atomic import *
 import sys
+import copy
 from model import Model
 import _spectrum
 
@@ -242,9 +243,13 @@ class TextSpectrum(Spectrum):
         return np.array(xx)
 
 class LineDump(object):
-    def __init__(self,fname):
+    def __init__(self,fname=None):
         self.fname=fname
         self.absorbers=[]
+        if fname:
+            self.parse(fname)
+
+    def parse(self,fname):
         for line in open(fname,'r').readlines():
             ionName=line[0:6].replace(' ','')    
             s=line[5:-1].strip().split()
@@ -257,5 +262,13 @@ class LineDump(object):
 
     def get_ion(self, ionName):
         return [item for item in self.absorbers if item.ionName==ionName]
+
+    def split(self, ionName):
+        copy=copy.deepcopy(self)
+        copy.absorbers=[item for item in self.absorbers if item.ionName==ionName]
+        self.absorbers=[item for item in self.absorbers if item.ionName!=ionName]
+        return copy
+        
+        
 
 

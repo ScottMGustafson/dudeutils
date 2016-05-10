@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import re
 from constraints import Constraint
 from numpy.random import random_sample, randn
-import data_types
 import xml.etree.ElementTree as et
 import copy
 import observer
@@ -154,10 +153,10 @@ class Model(object):
     def toggle_cont_lock(self,lst,param='y',locked=True):  
         self.toggle_locks(lst,param,locked,tag='ContinuumPoint')
 
-    def lock_all_cont(self):
+    def lock_all_cont(self, tf=True):
         for item in Model.get(self.ContinuumPointList):
             for param in 'xLocked yLocked'.split():
-                self.set_val(item,"ContinuumPoint",**{param:True}) 
+                self.set_val(item,"ContinuumPoint",**{param:tf}) 
 
 
     def append_datum(self,tag,**kwargs):

@@ -6,11 +6,12 @@ from configparser import ConfigParser
 from scipy.constants import c
 import numpy as np
 from subprocess import TimeoutExpired
+from get_data import get_data
 c*=0.001   #convert to km/s
 
 glob={}
 
-def parse_config(config_file=os.path.join('data','random_sampling_config.metals.cfg')):
+def parse_config(config_file=get_data('random_sampling_config.two_comp.cfg')):
     """
     parse the config file to produce a dict of absorbers, parameters and 
     allowed ranges
@@ -90,10 +91,16 @@ def toggle_ab_locks(model, ab_cfg, locked,locked_keys=None, locked_params=None):
         model.toggle_locks(locked_keys, locked_params, True, 'Absorber')
 
 
-def toggle_cont_ab_locks(model, ab_lock,ab_cfg,cont_cfg, locked_keys=None, locked_params=None):
-    toggle_ab_locks(model,ab_cfg,ab_lock)
+def toggle_cont_ab_locks(model, ab_lock,ab_cfg,cont_cfg, 
+                         cont_lock=None, locked_keys=None, locked_params=None):
 
-    model.toggle_cont_lock(list(cont_cfg.keys()),locked=not ab_lock)
+    if not cont_lock:
+        cont_lock=not ab_lock
+    toggle_ab_locks(model,ab_cfg,ab_lock)
+    model.toggle_cont_lock(list(cont_cfg.keys()),locked=cont_lock)
+    print("-------locked=%s, cont_lock=%s------------"%(ab_lock, cont_lock))
+    for item in list(cont_cfg.keys()):
+        print(str(model.get_datum(item,tag="ContinuumPoint")))
     if locked_keys:
         model.toggle_locks(locked_keys, locked_params, True,'Absorber')
 
@@ -146,9 +153,11 @@ def perturb_absorbers(dct, model, **kwargs):
             model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,kwargs.get('gaussian',True)) 
 
 
-def perturb_values(model,ab_cfg,cont_cfg,**kwargs):
+def perturb_values(model,ab_cfg,**kwargs):
     perturb_absorbers(ab_cfg, model, **kwargs)  
-    perturb_continua(model, cont_cfg, **kwargs)
+    cont_cfg=kwargs.get('cont_cfg',None)
+    if cont_cfg:
+        perturb_continua(model, cont_cfg, **kwargs)
     model.write(model.xmlfile)
 
 def is_better(new_chi2,old_chi2,tol=4.): return new_chi2<old_chi2+tol
@@ -175,7 +184,6 @@ def vary_ab(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
     -------
     None
     """
-
     perturb_absorbers(ab_cfg, model, gaussian=True)
     toggle_ab_locks(model, ab_cfg, False,
                     locked_keys=locked_keys, 
@@ -191,8 +199,7 @@ def vary_ab(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
         model.read()          
         return [model.copy()]
 
-def vary_cont(model,ab_cfg,cont_cfg,
-              locked_keys=None, locked_params=None, **kwargs):
+def vary_cont(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
     """
     varies param values AND continuum level at specified points.
 
@@ -213,6 +220,7 @@ def vary_cont(model,ab_cfg,cont_cfg,
     None
     """
 
+    cont_cfg = kwargs.get('cont_cfg')
     def find_better_cont():
         toggle_cont_ab_locks(model,False,ab_cfg,cont_cfg,
                              locked_keys, locked_params)
@@ -227,7 +235,7 @@ def vary_cont(model,ab_cfg,cont_cfg,
 
 
     if kwargs.get('step',False):
-        perturb_values(model,ab_cfg,cont_cfg,**kwargs)
+        perturb_values(model,ab_cfg,**kwargs)
         buff=find_better_cont()
         return populate_database(abs_ids=list(ab_cfg.keys()),
                             path=os.path.split(model.xmlfile)[0],
@@ -237,7 +245,7 @@ def vary_cont(model,ab_cfg,cont_cfg,
         tol=kwargs.get('tol',4.)
         old_model=model.copy()
         prev, new_chi2=old_model.chi2, 0.
-        perturb_values(model,ab_cfg,cont_cfg,**kwargs) #initial perturbation  
+        perturb_values(model,ab_cfg,**kwargs) #initial perturbation  
         count=0
         while np.fabs(new_chi2-prev)>tol and count<3:
             #while chi2 hasn't improved or optimization hasn't stalled
@@ -273,9 +281,6 @@ def plt_sigmas(db,ax,x_attr,y_attr,xargs=[],yargs=[],**kwargs):
               yfact*np.array(db.get_attr_lst(y_attr,one_sig,*yargs)),
               'co'
            )  
-
-
-
 
 def perturb_continua(mod, dct, **kwargs): 
     """
@@ -316,7 +321,6 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
                 val=model.get_datum(iden,"Absorber",param_name)
                 if val==-1.:
                     return False 
-
                 if param_name == "b":
                     if val<0.1:
                         return False
@@ -325,11 +329,15 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
                                      #b-value: not likely.
                             return False
                 elif param_name == "N":
+                    
                     if val<7.0 or val>23.:  #this means dude tried to throw it out.
                                   #if you are running this, then you've already decided that 
                                   #this absorber was needed, so will this is a bad model
                         return False
-
+                    elif val>param_range[-1]+1.1 or val<param_range[0]-1.1:
+                        return False 
+                        #if model goes more than an order of magnitude 
+                        #outside your specified range
                 elif param_name == "z":
                     vel_range=[c*(val-param_range[0])/(1.+param_range[-1]),
                                c*(val-param_range[-1])/(1.+param_range[-1])]
@@ -347,6 +355,18 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
         return [item for item in models if _filter(item)]   
 
 
+def plt_N_vs_cont(all_abs,ab_cfg, cont_cfg):    
+    for cont_key in cont_cfg.keys():
+        for ab in ab_cfg.keys():
+            for attr in ['N']:
+                x=[model.get_datum(ab,tag="Absorber", param=attr) for model in all_abs]
+                y=[model.get_datum(cont_key,tag="ContinuumPoint", param="y") for item in all_abs]
+                plt.plot(x,y,'ko')
+                x_label=all_abs[0].get_datum(cont_key,tag="ContinuumPoint", param="x")
+                plt.xlabel(r"log N(%s)"%(ab))
+                plt.ylabel(r"cont level at $\lambda=$\ %5.1lf"%(x_label))
+                plt.show()
+
 def iterate_fn(fn,ab_cfg,n,kwargs):
     out_lst=[]
     for i in range(n):
@@ -361,7 +381,8 @@ def iterate_fn(fn,ab_cfg,n,kwargs):
                 if not 'z' in kwargs['locked_params']:
                     kwargs['locked_params'].append('z')
                 try:
-                    out_lst+=fn(**kwargs)
+                    out=fn(**kwargs)
+                    out_lst+=out if type(out) is list else [out]
                     sys.stdout.write('.')
                 except TimeoutExpired:
                     sys.stdout.write('_')
@@ -424,6 +445,8 @@ def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
     kwargs.update({'ab_cfg':ab_cfg,'cont_cfg':cont_cfg,'model':model})
     n=int(kwargs.pop('n',1))
     if glob['vary_continuum']:
+        print('varying continua')
+        model.lock_all_cont(tf=False)
         db.models+=iterate_fn(vary_cont,ab_cfg,n,kwargs)
     else:
         model.lock_all_cont()
@@ -453,7 +476,6 @@ def get_nsigma(db,n=1):
     """
     def delta(): return float(n**2)
     lst=sorted(db.models, key=lambda x: x.chi2)
-
     return [item for item in lst if item.chi2<lst[0].chi2+delta()]
 
 if __name__=="__main__":
@@ -471,13 +493,11 @@ if __name__=="__main__":
         else:
             print('loading %s'%name)
             all_db=ModelDB.load_models(name)
-        #all_db=filter_bad_models(all_db, ab_cfg)
+        all_db=filter_bad_models(all_db, ab_cfg)
     else:
         print('initializing new model db')
         all_db=ModelDB(models=[]) 
-        
 
-    """
     model=Model(xmlfile=glob['source'])
 
     all_db=random_sampling( all_db, model, ab_cfg, cont_cfg, **glob)
@@ -504,8 +524,9 @@ if __name__=="__main__":
 
     if len(all_db.models)==0:
         raise Exception("no surviving models...")
-    """
-    if glob['plot']:
+
+    if glob['plot']:    
+        plt_N_vs_cont(all_db,ab_cfg, cont_cfg)
         for key, val in ab_cfg.items():
             for attr in list(val.keys()):
                 plot_chi2(all_db, iden=key, attr=attr,
