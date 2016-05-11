@@ -7,7 +7,7 @@ import os
 
 datadir = os.path.join(os.path.realpath(__file__),'Data')
 datafiles = [(d, [os.path.join(d,f) for f in files])
-    for d, folders, files in os.walk(datadir)]
+             for d, folders, files in os.walk(datadir)]
 
 
 ext = Extension('dudeutils._spectrum', 

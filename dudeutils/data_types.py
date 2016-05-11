@@ -580,10 +580,10 @@ class Absorber(Data):
     
 
     def __init__(self,*args,**kwargs):
-        try:
-            kwargs['ionName']=kwargs['ionName'].replace(' ','')
-        except:
-            pass
+        #try:
+        #    kwargs['ionName']=kwargs['ionName'].replace(' ','')
+        #except:
+        #    pass
         super().__init__(*args,**kwargs)
 
     @classmethod

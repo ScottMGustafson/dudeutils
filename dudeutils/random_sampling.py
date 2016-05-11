@@ -98,9 +98,6 @@ def toggle_cont_ab_locks(model, ab_lock,ab_cfg,cont_cfg,
         cont_lock=not ab_lock
     toggle_ab_locks(model,ab_cfg,ab_lock)
     model.toggle_cont_lock(list(cont_cfg.keys()),locked=cont_lock)
-    print("-------locked=%s, cont_lock=%s------------"%(ab_lock, cont_lock))
-    for item in list(cont_cfg.keys()):
-        print(str(model.get_datum(item,tag="ContinuumPoint")))
     if locked_keys:
         model.toggle_locks(locked_keys, locked_params, True,'Absorber')
 
