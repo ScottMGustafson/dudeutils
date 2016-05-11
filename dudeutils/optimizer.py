@@ -1,10 +1,10 @@
 import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-import _spectrum
-from spec_parser import Spectrum
-from data_types import *
-from model import *
+import dudeutils._spectrum as _spectrum
+from dudeutils.spec_parser import Spectrum
+from dudeutils.data_types import *
+from dudeutils.model import *
 
 
 

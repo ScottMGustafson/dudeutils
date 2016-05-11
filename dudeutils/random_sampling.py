@@ -1,12 +1,12 @@
-from dudeutils import *
-from model import *
+from dudeutils.utilities import *
+from dudeutils.model import *
 import sys, os
-from plot_distribution import plot_chi2
+from dudeutils.plot_distribution import plot_chi2
 from configparser import ConfigParser
 from scipy.constants import c
 import numpy as np
 from subprocess import TimeoutExpired
-from get_data import get_data
+from dudeutils.get_data import get_data
 c*=0.001   #convert to km/s
 
 glob={}

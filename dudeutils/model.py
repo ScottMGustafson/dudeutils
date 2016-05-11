@@ -9,17 +9,16 @@ to access data here, we use Model.get(some id) where id is the key for our
 dict of stored objects:  data_types.ObjList._pool
 """
 
-import xmlutils
-import data_types
+import dudeutils.xmlutils as xmlutils
+import dudeutils.data_types as data_types
 import warnings
 import os.path
 import matplotlib.pyplot as plt
 import re
-from constraints import Constraint
+from dudeutils.constraints import Constraint
 from numpy.random import random_sample, randn
 import xml.etree.ElementTree as et
 import copy
-import observer
 import io
 import pickle
 

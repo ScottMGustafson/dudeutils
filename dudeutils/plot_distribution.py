@@ -1,8 +1,8 @@
 import numpy as np
-import histogram
+import dudeutils.histogram as histogram
 import matplotlib.pyplot as plt
-import dudeutils
-from model import ModelDB
+from dudeutils.utilities import load_from_db
+from dudeutils.model import ModelDB
 
 #constraints_1sig = {'D':{'b':(13.0,14.6), 'N':(12.826,12.852), 'shift':(-0.3,0.3)}, 
  #              'H2':{'b':(8.9,11.), 'shift':(-61.4,-60.3), 'N':(12.62,12.68)}, 

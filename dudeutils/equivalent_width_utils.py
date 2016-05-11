@@ -1,7 +1,7 @@
-from data_types import *
-from model import *
+from dudeutils.data_types import *
+from dudeutils.model import *
 import numpy as np
-import spec_parser
+import dudeutils.spec_parser as spec_parser
 from scipy.constants import pi,e,c,Planck,Boltzmann,epsilon_0,m_e
 
 def measured_area(mx,mn,fwhm,fwhm_inst=6.5):

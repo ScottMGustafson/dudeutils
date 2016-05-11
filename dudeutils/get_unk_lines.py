@@ -1,6 +1,6 @@
-from atomic import SpectralLine
-from dudeutils import newdb
-from model import Model
+from dudeutils.atomic import SpectralLine
+from dudeutils.dudeutils import newdb
+from dudeutils.model import Model
 from numpy import fabs, log10
 
 c=299792.458

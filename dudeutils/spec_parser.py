@@ -1,12 +1,12 @@
 import numpy as np
 from astropy.io import fits
-import wavelength
-from data_types import *
-from atomic import *
+import dudeutils.wavelength
+from dudeutils.data_types import *
+from dudeutils.atomic import *
 import sys
 import copy
-from model import Model
-import _spectrum
+from dudeutils.model import Model
+import dudeutils._spectrum as _spectrum
 
 class Spectrum(object):
     @staticmethod

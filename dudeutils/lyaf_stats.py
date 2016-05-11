@@ -2,9 +2,9 @@ import pickle, sys, os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import mlab
-import spec_parser
+import dudeutils.spec_parser as spec_parser
 from scipy.constants import c
-from lyaf_stats_dict import names
+from dudeutils.lyaf_stats_dict import names
 c/=1000.
 
 

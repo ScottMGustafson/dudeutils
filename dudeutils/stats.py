@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
-from dudeutils import *
+from dudeutils.utilities import *
 import corner
-from random_sampling import filter_bad_models, parse_config
+from dudeutils.random_sampling import filter_bad_models, parse_config
 
 #HIA  b<7(68%), N=20.583 (.62,.56) (68%)  (.52--.68 95%)
 #DIa  b=8.7(8.5-9.1 68%), N=14.92 (14.68--15.05,  14.56--15.15 (95%))

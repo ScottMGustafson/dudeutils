@@ -1,4 +1,4 @@
-from get_data import get_data
+from dudeutils.get_data import get_data
 
 class AtomicData(object):
     def __init__(self):

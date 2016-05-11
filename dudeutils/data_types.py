@@ -1,4 +1,4 @@
-import xmlutils
+import dudeutils.xmlutils as xmlutils
 import warnings
 import uuid
 import xml.etree.ElementTree as et
@@ -6,7 +6,7 @@ import collections
 import os
 import sys
 from scipy import constants
-from atomic import *
+from dudeutils.atomic import *
 
 tf = {"true":True, "false":False}
 c=constants.c/1000.  #speed of light in km/s

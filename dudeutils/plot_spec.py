@@ -1,9 +1,9 @@
 #import dudeutils
-from spec_parser import *
-from atomic import *
+from dudeutils.spec_parser import *
+from dudeutils.atomic import *
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from model import *
+from dudeutils.model import *
 import os
 import numpy as np
 import numpy.ma as ma
