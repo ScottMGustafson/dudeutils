@@ -35,13 +35,17 @@ def plot_distribution(db, dist_name="$D/H$",constraints=constraints):
     plt.tight_layout()
     plt.show()
 
-def plot_chi2(db, attr, xlabel="$N$", iden=None,  iden2=None, constraints=constraints):    
+def plot_chi2(db, attr, xlabel="$N$", iden=None,  iden2=None,
+              constraints=constraints, show=True, ax=None):    
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif', size=18)
     if type(db) is str:
         db = dudeutils.load_from_db(db)
     data = ModelDB.filter(db.models, constraints)
-    f, ax1 = plt.subplots(1, figsize=[6,5])
+    ax1=kwargs.get("ax", None)
+    if not ax:
+        f, ax1 = plt.subplots(1, figsize=[6,5])
+    
 
     if attr in ["N","b","z"]:
         x = [item.get_datum(iden=iden,tag="Absorber",param=attr) for item in data]
@@ -59,8 +63,11 @@ def plot_chi2(db, attr, xlabel="$N$", iden=None,  iden2=None, constraints=constr
     ax1.set_ylabel("$\chi^2$")
     ax1.minorticks_on()
     #plt.minorticks_on()
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax1
+    
 
 def chi2_xy(db, attr, xlabel="$N$", filename="out.txt",iden=None, iden2=None, constraints=constraints):    
     plt.rc('text', usetex=True)

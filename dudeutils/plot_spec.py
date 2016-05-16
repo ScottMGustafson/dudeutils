@@ -15,7 +15,6 @@ rc('text', usetex=True)
 def get_lines(model, dct):
     return [model.get_spectral_line(key, val) for key, val in dct.items()]
 
-
 def plot_line(spec, model, fig, line,**kwargs):
 
     velocity=kwargs.pop("velocity",True)
