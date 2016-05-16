@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
-from distutils.core import setup
-from distutils.extension import Extension
+from setuptools import setup, find_packages
+from setuptools.extension import Extension
 import os
 
 
@@ -10,23 +8,28 @@ datafiles = [(d, [os.path.join(d,f) for f in files])
              for d, folders, files in os.walk(datadir)]
 
 
-ext = Extension('dudeutils._spectrum', 
+ext = Extension('_spectrum', 
                  sources=['dudeutils/cext/_spectrum.c', 
                           'dudeutils/cext/spectrum.c', 
                           'dudeutils/cext/get_absorption.c', 
                           'dudeutils/cext/get_continuum.c',
                           'dudeutils/cext/voigt.c', 
-                          'dudeutils/cext/util.c'])
+                          'dudeutils/cext/util.c'],
+                 headers=['dudeutils/cext/spectrum.h']
+               )
  
 setup(name='dudeutils', 
     version='2.0', 
     description='utilities for dude', 
     ext_modules=[ext],
-    package_dir = {'dudeutils':os.path.join(os.path.realpath(__file__),'dudeutils')},
+    packages=find_packages(),
+    package_dir = {'dudeutils':'dudeutils/'},
     data_files=datafiles,
-    #test_suite='nose.collector',
-    #tests_require=['nose'],
-
-
-
+    scripts=['scripts/run_random_sampling']
+    #entry_points={
+    #    'console_scripts': [
+    #        'run_random_sampling=dudeutils.random_sampling:main',
+    #    ],
+    #},
     )
+

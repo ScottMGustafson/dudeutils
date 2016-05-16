@@ -139,18 +139,33 @@ class Model(object):
         except AttributeError:
             raise Exception("no availble D/H")
 
+    def toggle_locks(self, dct, locked,tag='Absorber'):
+        """ 
+        toggle locks in model
 
-    def toggle_locks(self,idens, params, locked,tag='Absorber'):
-        if not type(idens) is list:
-            idens=[idens]
-        if not type(params) is list:
-            params=[params]
-        for iden in idens:
+        inputs:
+        -------
+        dct:  dict of idens and params:  {key_name:param_to_toggle, ... }
+        locked: bool True to lock
+        tag: name of object class
+
+        output:
+        -------
+        None
+
+        raises:
+        -------
+        None
+        """
+        for iden, params in dct.items():
             for param in params:
-                self.set_val(iden,tag,**{param+"Locked":bool(locked)}) 
+                if not 'Locked' in param:
+                    param+='Locked'
+                self.set_val(iden,tag,**{param:bool(locked)}) 
 
-    def toggle_cont_lock(self,lst,param='y',locked=True):  
-        self.toggle_locks(lst,param,locked,tag='ContinuumPoint')
+    def toggle_cont_lock(self,lst,param='y',locked=True):
+        lst=dict(zip([item for item in lst],[param for item in lst]))  
+        self.toggle_locks(lst,locked,tag='ContinuumPoint')
 
     def lock_all_cont(self, tf=True):
         for item in Model.get(self.ContinuumPointList):
@@ -921,14 +936,16 @@ class ModelDB(object):
             fname+=".obj"
         if len(db.pool.keys())==0:
             raise data_type.MissingPoolKey("no data to dump from pool")
-        pickle.dump(db,open(fname, "wb"))
+        with open(fname, "wb") as f:
+            pickle.dump(db,f)
 
    
     @staticmethod
     def load_models(fname):
-        db = pickle.load(open(fname, "rb"))
+        with open(fname, "rb") as f:
+            db = pickle.load(f)
         data_types.ObjList._pool=db.pool
-
+        
 
         """if len(data_types.ObjList._pool.keys())==0:
             print("need to refresh pooled data.")
@@ -955,8 +972,8 @@ class ModelDB(object):
                     
         if verbose:
             print("writing %s with %d models"%(filename,len(self.models)))
-        f = open(filename,'w')
-        f.write(out)
+        with open(filename,'w') as f:
+            f.write(out)
         #tree = et.ElementTree(root)
         #tree.write(filename)
         #self.dbxml.write(filename,root)

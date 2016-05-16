@@ -9,9 +9,13 @@ from subprocess import TimeoutExpired
 from dudeutils.get_data import get_data
 c*=0.001   #convert to km/s
 
-glob={}
+class ModelFailed(BaseException):
+    def __init__(self,msg):
+        self.msg=msg
+    def __str__(self):
+        return self.msg
 
-def parse_config(config_file=get_data('random_sampling_config.two_comp.cfg')):
+def parse_config(config_file):
     """
     parse the config file to produce a dict of absorbers, parameters and 
     allowed ranges
@@ -30,6 +34,19 @@ def parse_config(config_file=get_data('random_sampling_config.two_comp.cfg')):
     None
 
     """
+    def set_config_defaults(dct):
+        
+        for key in "append step method gaussian vary_continuum to_buffer".split():
+            if not key in list(dct['config'].keys()):
+                dct['config'][key]=False
+
+        if not "n" in list(dct['config'].keys()):
+            dct['config']["n"]=2
+
+        if not "method" in list(dct['config'].keys()):
+            dct['config']["method"]="dude"
+        
+
     def tf(val):
         if val.lower()=='true':
             return True
@@ -79,27 +96,38 @@ def parse_config(config_file=get_data('random_sampling_config.two_comp.cfg')):
 
             
             if any(cond):
-                raise Exception("check your random sampling inputs")
+                raise ModelFailed("check your random sampling inputs")
+
+    set_config_defaults(dct)
     return dct
 
 #toggle lock controls  idens, params, locked,tag='Absorber'
-def toggle_ab_locks(model, ab_cfg, locked,locked_keys=None, locked_params=None):
+def toggle_ab_locks(model, ab_cfg, locked,locked_dct=None):
+
+    dct={}
     for key, val in ab_cfg.items():
         for attr in val.keys():
-             model.toggle_locks(key,attr,locked,'Absorber')
-    if locked_keys:
-        model.toggle_locks(locked_keys, locked_params, True, 'Absorber')
+            if key in dct.keys():
+                dct[key].append(attr)
+            else:
+                dct[key] =[attr]
+    model.toggle_locks(dct,locked,'Absorber')
+    if locked_dct:
+        model.toggle_locks(locked_dct, True, 'Absorber')
 
 
 def toggle_cont_ab_locks(model, ab_lock,ab_cfg,cont_cfg, 
-                         cont_lock=None, locked_keys=None, locked_params=None):
+                         cont_lock=None, locked_abs=None, locked_cont=None):
 
     if not cont_lock:
         cont_lock=not ab_lock
-    toggle_ab_locks(model,ab_cfg,ab_lock)
-    model.toggle_cont_lock(list(cont_cfg.keys()),locked=cont_lock)
-    if locked_keys:
-        model.toggle_locks(locked_keys, locked_params, True,'Absorber')
+    toggle_ab_locks(model,ab_cfg,ab_lock,locked_dct=locked_abs)
+    
+    if locked_cont:
+        cont_ids=[it for it in cont_cfg.keys() if not it in locked_cont.keys()]
+    else:
+        cont_ids=list(cont_cfg.keys())
+    model.toggle_cont_lock(cont_ids,'y',locked=cont_lock)
 
 def sort_by_z(model, idens):
     """
@@ -146,6 +174,8 @@ def perturb_absorbers(dct, model, **kwargs):
 
     for key, val in dct.items():
         if key in ['continuum', 'config']: continue
+        if not type(val) is dict:
+            raise Exception(str(val)+" should be a dict")
         for param, rng in val.items():
             model.monte_carlo_set(key,"Absorber",[ rng[0],rng[-1] ],param,kwargs.get('gaussian',True)) 
 
@@ -161,7 +191,7 @@ def is_better(new_chi2,old_chi2,tol=4.): return new_chi2<old_chi2+tol
 
 #the varying methods
 
-def vary_ab(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
+def vary_ab(model,ab_cfg,locked_dct=None, **kwargs):
     """
     varies param values.
 
@@ -183,8 +213,7 @@ def vary_ab(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
     """
     perturb_absorbers(ab_cfg, model, gaussian=True)
     toggle_ab_locks(model, ab_cfg, False,
-                    locked_keys=locked_keys, 
-                    locked_params=locked_params)
+                    locked_dct=locked_dct)
     model.write()
     if kwargs.get('step',False):
         buff=run_optimize(model.xmlfile,to_buffer=kwargs['to_buffer'],step=True,timeout=30)
@@ -196,7 +225,7 @@ def vary_ab(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
         model.read()          
         return [model.copy()]
 
-def vary_cont(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
+def vary_cont(model,ab_cfg,locked_abs=None, locked_cont=None, **kwargs):
     """
     varies param values AND continuum level at specified points.
 
@@ -220,12 +249,12 @@ def vary_cont(model,ab_cfg,locked_keys=None, locked_params=None, **kwargs):
     cont_cfg = kwargs.get('cont_cfg')
     def find_better_cont():
         toggle_cont_ab_locks(model,False,ab_cfg,cont_cfg,
-                             locked_keys, locked_params)
+                             locked_abs=locked_abs, locked_cont=locked_cont)
         model.write()
         run_optimize(model.xmlfile,timeout=30,**kwargs)
         model.read()
         toggle_cont_ab_locks(model,True,ab_cfg,cont_cfg,
-                            locked_keys, locked_params)
+                            locked_abs=locked_abs, locked_cont=locked_cont)
         model.write()
 
         return run_optimize(model.xmlfile,timeout=30,**kwargs)
@@ -307,6 +336,8 @@ def perturb_continua(mod, dct, **kwargs):
 
 
 def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
+    if len(models)==0:
+        return models
     min_chi2=min([float(item.chi2) for item in models])
     def _filter(model):
         if chi2pad:
@@ -351,13 +382,14 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
     else:
         return [item for item in models if _filter(item)]   
 
-
 def plt_N_vs_cont(all_abs,ab_cfg, cont_cfg):    
     for cont_key in cont_cfg.keys():
         for ab in ab_cfg.keys():
             for attr in ['N']:
-                x=[model.get_datum(ab,tag="Absorber", param=attr) for model in all_abs]
-                y=[model.get_datum(cont_key,tag="ContinuumPoint", param="y") for item in all_abs]
+                x=[mod.get_datum(ab,tag="Absorber", param=attr) 
+                    for mod in all_abs]
+                y=[mod.get_datum(cont_key,tag="ContinuumPoint", param="y") 
+                    for mod in all_abs]
                 plt.plot(x,y,'ko')
                 x_label=all_abs[0].get_datum(cont_key,tag="ContinuumPoint", param="x")
                 plt.xlabel(r"log N(%s)"%(ab))
@@ -367,8 +399,8 @@ def plt_N_vs_cont(all_abs,ab_cfg, cont_cfg):
 def iterate_fn(fn,ab_cfg,n,kwargs):
     out_lst=[]
     for i in range(n):
-        print('iteration %d'%(i))
-        
+        sys.stdout.write('iteration %d'%(i))
+        sys.stdout.flush()        
         for key in ab_cfg.keys():
             for attr in ab_cfg[key].keys():
                 kwargs['locked_keys']=[key]
@@ -381,14 +413,17 @@ def iterate_fn(fn,ab_cfg,n,kwargs):
                     out=fn(**kwargs)
                     out_lst+=out if type(out) is list else [out]
                     sys.stdout.write('.')
+                    sys.stdout.flush()
                 except TimeoutExpired:
                     sys.stdout.write('_')
+                    sys.stdout.flush()
                     continue
                 except KeyboardInterrupt:
                     return out_lst
                 except:
                     raise
-                sys.stdout.flush()
+        sys.stdout.write('\n')
+        sys.stdout.flush()
         out_lst=filter_bad_models(out_lst, ab_cfg, vel_pad=4.0,chi2pad=100.)
     return out_lst
 
@@ -441,7 +476,7 @@ def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
 
     kwargs.update({'ab_cfg':ab_cfg,'cont_cfg':cont_cfg,'model':model})
     n=int(kwargs.pop('n',1))
-    if glob['vary_continuum']:
+    if kwargs['vary_continuum']:
         print('varying continua')
         model.lock_all_cont(tf=False)
         db.models+=iterate_fn(vary_cont,ab_cfg,n,kwargs)
@@ -475,10 +510,14 @@ def get_nsigma(db,n=1):
     lst=sorted(db.models, key=lambda x: x.chi2)
     return [item for item in lst if item.chi2<lst[0].chi2+delta()]
 
-if __name__=="__main__":
-    ab_cfg=parse_config()
+def main(config_file):
+    #if not config_file:
+    #    config_file=get_data('random_sampling_config.two_comp.cfg')
+    ab_cfg=parse_config(config_file)
     cont_cfg=ab_cfg.pop('continuum',None)
     glob=ab_cfg.pop('config',None)
+    if not glob:
+        raise Exception
  
     if glob['append']:
         if type(glob['append']) is str:
@@ -489,7 +528,11 @@ if __name__=="__main__":
             all_db=ModelDB(name=name)
         else:
             print('loading %s'%name)
-            all_db=ModelDB.load_models(name)
+            try:
+                all_db=ModelDB.load_models(name)
+            except:
+                print('initializing empty DB')
+                all_db=ModelDB(models=[])
         all_db=filter_bad_models(all_db, ab_cfg)
     else:
         print('initializing new model db')
@@ -500,6 +543,8 @@ if __name__=="__main__":
     all_db=random_sampling( all_db, model, ab_cfg, cont_cfg, **glob)
     print("before filtering: %d"%len(all_db))
     all_db=filter_bad_models(all_db, ab_cfg, vel_pad=4.0,chi2pad=100.)
+    if len(all_db.models)==0:
+        raise ModelFailed("no surviving models...\ncheck input for %s"%(config_file))
 
     minchi2=min([item.chi2 for item in all_db.models if item.chi2>1.])
     for item in list(all_db.models):
@@ -512,22 +557,26 @@ if __name__=="__main__":
     else:
         name=glob['append']
     name=os.path.splitext(name)[0]
-    all_db.write(name+'.xml',True)
+    #all_db.write(name+'.xml',True)
+    print('writing %s'%(name+'.obj'))
     ModelDB.dump_models(all_db,name+'.obj')
     #models=get_nsigma(all_db,n=10)
     #for model in list(all_db.models):
     #    if not model in models:
     #        all_db.remove(model)
 
-    if len(all_db.models)==0:
-        raise Exception("no surviving models...")
+
 
     if glob['plot']:    
-        plt_N_vs_cont(all_db,ab_cfg, cont_cfg)
+        #plt_N_vs_cont(all_db,ab_cfg, cont_cfg)
         for key, val in ab_cfg.items():
             for attr in list(val.keys()):
                 plot_chi2(all_db, iden=key, attr=attr,
                           xlabel=r"$%s(%s)$"%(attr,key),
                           constraints={})
+
+if __name__=="__main__":
+    main()
+
 
 
