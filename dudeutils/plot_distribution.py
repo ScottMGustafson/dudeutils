@@ -41,10 +41,13 @@ def plot_chi2(db, attr, xlabel="$N$", iden=None,  iden2=None,
     plt.rc('font', family='serif', size=18)
     if type(db) is str:
         db = dudeutils.load_from_db(db)
-    data = ModelDB.filter(db.models, constraints)
-    ax1=kwargs.get("ax", None)
+    if not constraints=={}:
+        data = ModelDB.filter(db.models, constraints)
+    else:
+        data=db.models
+
     if not ax:
-        f, ax1 = plt.subplots(1, figsize=[6,5])
+        f, ax = plt.subplots(1, figsize=[6,5])
     
 
     if attr in ["N","b","z"]:
@@ -55,18 +58,18 @@ def plot_chi2(db, attr, xlabel="$N$", iden=None,  iden2=None,
         x = [getattr(item,attr) for item in data]
     y = [item.chi2 for item in data]
 
-    ax1.plot(x,y,'ro')
-    ax1.get_xaxis().get_major_formatter().set_useOffset(False)
-    ax1.get_yaxis().get_major_formatter().set_useOffset(False)
-    #for tl in ax1.get_yticklabels(): tl.set_visible(False)
-    ax1.set_xlabel(xlabel)
-    ax1.set_ylabel("$\chi^2$")
-    ax1.minorticks_on()
+    ax.plot(x,y,'ro')
+    ax.get_xaxis().get_major_formatter().set_useOffset(False)
+    ax.get_yaxis().get_major_formatter().set_useOffset(False)
+    #for tl in ax.get_yticklabels(): tl.set_visible(False)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("$\chi^2$")
+    ax.minorticks_on()
     #plt.minorticks_on()
     if show:
         plt.tight_layout()
         plt.show()
-    return ax1
+    return ax
     
 
 def chi2_xy(db, attr, xlabel="$N$", filename="out.txt",iden=None, iden2=None, constraints=constraints):    
