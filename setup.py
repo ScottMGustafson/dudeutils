@@ -3,7 +3,7 @@ from setuptools.extension import Extension
 import os
 
 
-datadir = os.path.join(os.path.realpath(__file__),'Data')
+datadir = os.path.join(os.path.realpath(__file__),'data')
 datafiles = [(d, [os.path.join(d,f) for f in files])
              for d, folders, files in os.walk(datadir)]
 
@@ -15,17 +15,17 @@ ext = Extension('_spectrum',
                           'dudeutils/cext/get_continuum.c',
                           'dudeutils/cext/voigt.c', 
                           'dudeutils/cext/util.c'],
-                 headers=['dudeutils/cext/spectrum.h']
                )
  
 setup(name='dudeutils', 
     version='2.0', 
     description='utilities for dude', 
-    ext_modules=[ext],
     packages=find_packages(),
-    package_dir = {'dudeutils':'dudeutils/'},
-    data_files=datafiles,
-    scripts=['scripts/run_random_sampling']
+    package_dir={'dudeutils': 'dudeutils', 'dudeutils.tests':'tests'},
+    ext_modules=[ext],
+
+    #data_files=datafiles,
+    #scripts=['scripts/run_random_sampling']
     #entry_points={
     #    'console_scripts': [
     #        'run_random_sampling=dudeutils.random_sampling:main',
