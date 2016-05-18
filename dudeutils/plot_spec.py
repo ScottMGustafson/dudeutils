@@ -9,6 +9,7 @@ import numpy as np
 import numpy.ma as ma
 import lineid_plot
 
+lineid_fontsize=16
 rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], 'size':16})
 rc('text', usetex=True)
 
@@ -24,7 +25,6 @@ def plot_line(spec, model, fig, line,**kwargs):
     topmost=kwargs.pop('topmost',False)
     ref=kwargs.pop('ref',None)
     ylabel=kwargs.pop('ylabel',None)
-
 
     wave_r, ind, ref = prep_data(spec,model,ref,**kwargs)
     absorbers=[item for item in line] if type(line) is list else [line]
@@ -80,7 +80,10 @@ def plot_line(spec, model, fig, line,**kwargs):
             obs_wave=Spectrum.convert_to_vel(line.obs_wave,ref)
             if np.amin(waves)<obs_wave<np.amax(waves):
                 x.append(obs_wave)
-                labels.append(line.ionName)
+                if hasattr(line,"custom_label"):
+                    labels.append(line.custom_label)
+                else:
+                    labels.append(line.ionName)
                 y.append(np.mean(cont))
 
                 
@@ -89,17 +92,20 @@ def plot_line(spec, model, fig, line,**kwargs):
         for i in range(len(x)):  
             ax.annotate(labels[i], xy=(x[i], y[i]),
             xytext=(box_loc[i][0],
-                    box_loc[i][1]),
+                    0.7*box_loc[i][1]),
             xycoords="data", textcoords="data",
             rotation=90, horizontalalignment="center",
             verticalalignment="center",
-            fontsize=12,
+            fontsize=lineid_fontsize,
             arrowprops=dict(arrowstyle="-",
                             relpos=(0.5, 0.0)),
             label=labels[i])
-    for i in range(len(x)): 
-        ax.axvline(x=x[i], ymin=0, ymax=y[i], linewidth=1, color='k',linestyle='--')
+            ax.axvline(x=x[i], ymin=0, ymax=0.05*y[i], linewidth=1,
+                        color='k',linestyle='--')
 
+    else:
+        for i in range(len(x)): 
+            ax.axvline(x=x[i], ymin=0, ymax=y[i], linewidth=1, color='k',linestyle='--')
     if xlabel:
         ax.set_xlabel(xlabel)
     else:
@@ -109,6 +115,7 @@ def plot_line(spec, model, fig, line,**kwargs):
     ax.set_ylim(kwargs.get("ylims"),None)
 
     if ylabel:
+        ax.yaxis.set_label_position("right")
         ax.set_ylabel(ylabel)
 
     return ax
