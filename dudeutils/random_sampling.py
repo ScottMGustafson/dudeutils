@@ -145,7 +145,7 @@ def sort_by_z(model, idens):
     None
 
     """
-    ab_lst = [model.get_datum(iden,'Absorber') for iden in idens]
+    ab_lst = [Model.get_datum(iden,'Absorber') for iden in idens]
     aborbers=sorted([ab for item in ab_lst], key=lambda x: x.z ) 
     if idens!=[ab.id for item in absorbers]:
         for i in range(len(idens)):
@@ -248,6 +248,10 @@ def vary_cont(model,ab_cfg,locked_abs=None, locked_cont=None, **kwargs):
 
     cont_cfg = kwargs.get('cont_cfg')
     def find_better_cont():
+        """
+        one iteration of our continuum varying procedure:
+        toggle between optimizing continua and absorbers until find min chi2
+        """
         toggle_cont_ab_locks(model,False,ab_cfg,cont_cfg,
                              locked_abs=locked_abs, locked_cont=locked_cont)
         model.write()
@@ -282,7 +286,10 @@ def vary_cont(model,ab_cfg,locked_abs=None, locked_cont=None, **kwargs):
             new_chi2=model.chi2
             if not is_better(new_chi2, prev,tol):
                 count+=1
+            else:
+                count=0
         return model.copy()
+
 
 
 def plt_sigmas(db,ax,x_attr,y_attr,xargs=[],yargs=[],**kwargs):
@@ -325,21 +332,32 @@ def perturb_continua(mod, dct, **kwargs):
     """     
     for key, val in dct.items():
         y=mod.get_datum(key,"ContinuumPoint",'y')
-        rng=(1.+float(val['ylim']))*y, (1.-float(val['ylim']))*y
-        mod.monte_carlo_set(key,"ContinuumPoint",[ rng[0],rng[-1] ],
+        rng= (1.-float(val['ylim']))*y, (1.+float(val['ylim']))*y
+        try:
+            rng= list(map(float, rng))
+        except:
+            raise TypeError("error parsing continuum points: rng="+str(rng))
+        mod.monte_carlo_set(key,"ContinuumPoint",rng,
                             'y',gaussian=kwargs.get('gaussian',True))
         if 'xlim' in val.keys():
             x=mod.get_datum(key,"ContinuumPoint",'x')
             rng=(1.+float(val['xlim']))*x, (1.-float(val['xlim']))*x
-            mod.monte_carlo_set(key,"ContinuumPoint",[ rng[0],rng[-1] ],
+            mod.monte_carlo_set(key,"ContinuumPoint",rng,
                                 'x',gaussian=kwargs.get('gaussian',True))
 
 
-def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
+def filter_bad_models(models, dct, vel_pad=10.0,chi2pad=150.):
     if len(models)==0:
         return models
     min_chi2=min([float(item.chi2) for item in models])
+
     def _filter(model):
+
+        for cnt in model.get(model.ContinuumPointList):
+            for param in ["x","y"]:
+                if str(getattr(cnt,param)).lower()=="nan":
+                    return False
+
         if chi2pad:
             if float(model.chi2)>min_chi2+chi2pad or float(model.chi2)==0.:
                 return False
@@ -347,7 +365,7 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
             if iden=='continuum':continue
             for param_name, param_range in params.items():
                 val=model.get_datum(iden,"Absorber",param_name)
-                if val==-1.:
+                if val==-1. or str(val).lower()=="nan":
                     return False 
                 if param_name == "b":
                     if val<0.1:
@@ -362,9 +380,9 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
                                   #if you are running this, then you've already decided that 
                                   #this absorber was needed, so will this is a bad model
                         return False
-                    elif val>param_range[-1]+1.1 or val<param_range[0]-1.1:
+                    elif val>param_range[-1]+2 or val<param_range[0]-2:
                         return False 
-                        #if model goes more than an order of magnitude 
+                        #if model goes more than about 100 times bigger or smaller 
                         #outside your specified range
                 elif param_name == "z":
                     vel_range=[c*(val-param_range[0])/(1.+param_range[-1]),
@@ -377,7 +395,8 @@ def filter_bad_models(models, dct, vel_pad=2.0,chi2pad=100.):
     if type(models) is ModelDB:
         for item in models.models:
             if not _filter(item):
-                models.remove(item)
+                models.remove(item) 
+        models.remove_unused()
         return models        
     else:
         return [item for item in models if _filter(item)]   
@@ -403,8 +422,18 @@ def iterate_fn(fn,ab_cfg,n,kwargs):
         sys.stdout.flush()        
         for key in ab_cfg.keys():
             for attr in ab_cfg[key].keys():
-                kwargs['locked_keys']=[key]
-                kwargs['locked_params']=[attr]
+                if kwargs.get('_rawtxt',False):
+                    model=kwargs["model"]
+                    with open(model.xmlfile, 'w') as f:
+                        f.writelines(kwargs.get('_rawtxt'))
+                    model.read()
+                    kwargs["model"]=model
+                if kwargs['vary_continuum']:
+                    kwargs['locked_keys']=list(ab_cfg[key].keys())
+                    kwargs['locked_params']=['z']
+                else:
+                    kwargs['locked_keys']=[key]
+                    kwargs['locked_params']=[attr]
                 
                 #a quick hack to ensure z cannot vary freely...ever.
                 if not 'z' in kwargs['locked_params']:
@@ -422,9 +451,10 @@ def iterate_fn(fn,ab_cfg,n,kwargs):
                     return out_lst
                 except:
                     raise
+                
         sys.stdout.write('\n')
         sys.stdout.flush()
-        out_lst=filter_bad_models(out_lst, ab_cfg, vel_pad=4.0,chi2pad=100.)
+        out_lst=filter_bad_models(out_lst, ab_cfg)
     return out_lst
 
 def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
@@ -473,6 +503,8 @@ def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
         param='z'
 
         return param, param_range
+
+
 
     kwargs.update({'ab_cfg':ab_cfg,'cont_cfg':cont_cfg,'model':model})
     n=int(kwargs.pop('n',1))
@@ -533,23 +565,22 @@ def main(config_file):
             except:
                 print('initializing empty DB')
                 all_db=ModelDB(models=[])
-        all_db=filter_bad_models(all_db, ab_cfg)
     else:
         print('initializing new model db')
         all_db=ModelDB(models=[]) 
 
-    model=Model(xmlfile=glob['source'])
+    
 
-    all_db=random_sampling( all_db, model, ab_cfg, cont_cfg, **glob)
+    model=Model(xmlfile=glob['source'])
+    txt=open(glob['source'],'r').readlines()
+
+    all_db=random_sampling( all_db, model, ab_cfg, cont_cfg, _rawtxt=txt, **glob)
     print("before filtering: %d"%len(all_db))
-    all_db=filter_bad_models(all_db, ab_cfg, vel_pad=4.0,chi2pad=100.)
+    all_db=filter_bad_models(all_db, ab_cfg, vel_pad=4.0,chi2pad=250.)
+
+    open(glob['source'],'w').writelines(txt)   #in the case of keyboard interrupt, writes correct file back
     if len(all_db.models)==0:
         raise ModelFailed("no surviving models...\ncheck input for %s"%(config_file))
-
-    minchi2=min([item.chi2 for item in all_db.models if item.chi2>1.])
-    for item in list(all_db.models):
-        if item.chi2<1. or item.chi2>minchi2+100.:
-            all_db.remove(item)
 
     print("after filtering: %d"%len(all_db))
     if type(glob['append']) is bool:
@@ -557,7 +588,7 @@ def main(config_file):
     else:
         name=glob['append']
     name=os.path.splitext(name)[0]
-    #all_db.write(name+'.xml',True)
+    all_db.write(name+'.xml',True)
     print('writing %s'%(name+'.obj'))
     ModelDB.dump_models(all_db,name+'.obj')
     #models=get_nsigma(all_db,n=10)

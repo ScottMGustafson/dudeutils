@@ -101,7 +101,7 @@ class Model(object):
         string = "-----------AbsorberList------------\n"
         for item in Model.get(self.AbsorberList):
             string+=str(item)+"\n"
-        string+="\nchi2=%lf pixels=%lf params=%lf dh=%lf\n\n"%(
+        string+="\nchi2=%lf pixels=%lf params=%lf\n\n"%(
                 float(self.chi2),float(self.pixels),float(self.params))
         return string
 
@@ -299,7 +299,7 @@ class Model(object):
     def check_vals(self):
         unphysical={"b":[1.0,50.],"N":[10.00,25.00]} 
 
-        abslist = self.get(self.AbsorberList)
+        abslist = Model.get(self.AbsorberList)
         for item in abslist:
             assert(isinstance(item,data_types.Absorber))
             for key, val in unphysical.items():
@@ -319,10 +319,9 @@ class Model(object):
         param: which param to alter?
 
         """
-        a=float(val_range[0])
-        b=float(val_range[1])
+        a,b=min(val_range), max(val_range)
         if gaussian:
-            twosigma=(val_range[1]-val_range[0])/2.
+            twosigma=(b-a)/2.
             sigma=twosigma/2.
             new = sigma*randn()+(a+b)/2.
         else:
@@ -617,8 +616,14 @@ class ModelDB(object):
         return x, y
             
     def remove_unused(self):
+        """
+        cleans unused entries from both the pool and modelDB.
+        """
+
+        #remove excess entries from pool
         lst=[]
-        for mod in self.models:
+        models=list(self.models)
+        for mod in models:
             for key in list(Model.model_classes.keys()):
                 try:
                     lst.append(getattr(mod,key))
@@ -626,6 +631,8 @@ class ModelDB(object):
                     pass
         data_types.ObjList.clean_pool(list(set(lst)))
 
+        #if model data not in pool, entire model.
+        models=list(self.models) #needs to be repeated in case len changes in previous loop
         for mod in list(self.models):
             for key in list(Model.model_classes.keys()):
                 try: #delete the entire model if not in _pool.  This breaks encapsulation
@@ -633,7 +640,7 @@ class ModelDB(object):
                         self.models.remove(mod)
                 except (AttributeError, ValueError):
                     pass
-
+        self.pool=data_types.ObjList._pool
         
 
     def remove(self, model):
@@ -666,7 +673,6 @@ class ModelDB(object):
                         pass
                 return out
 
-
             these_keys=get_keys(model)
             for mod in self.models:
                 if mod is model:
@@ -683,6 +689,7 @@ class ModelDB(object):
             data_types.ObjList.remove(key)
      
         self.models.remove(model)
+        self.remove_unused()
 
     def get_attr_lst(self,attr,cond_fn,*args):
         """ 
