@@ -5,12 +5,118 @@ from dudeutils.utilities import *
 import corner
 from dudeutils.random_sampling import filter_bad_models, parse_config
 
-#HIA  b<7(68%), N=20.583 (.62,.56) (68%)  (.52--.68 95%)
-#DIa  b=8.7(8.5-9.1 68%), N=14.92 (14.68--15.05,  14.56--15.15 (95%))
-#DIb  b=12.0 \pm0.7,  N=15.99\pm0.03 (68%),  \pm0.07 (95%)
-#HIB  b=7 +10 -4, N=19.9 -0.4 + 0.1 (68%)  19.3--20.2 (95%)
-#DIC  b=8.0 -2.2+0.9, N=15.02 -0.24+0.17
-#HIC: b=18,6+0.3-0.2,  N=20.15\pm0.08  19.86--20.34 (95%)
+def fit_power_law(x,y,ye, return_log=False):
+    """
+    if x is redshift, z, remember to enter arg as 1+z
+    """
+    x=np.log10(x)
+    y,ye=lin2log(y,ye)
+    m,b,r,p,stderr,db,dm=linear_regression(x,y,ye=ye)
+    if return_log:
+        def logfn(xx):
+            return m*xx+b, np.sqrt((dm*xx)**2.+db**2. )
+        return m,dm,b,db, logfn 
+    else:   
+
+        b,db=log2lin(b,db)
+        def linfn(xx):
+            return b*xx**m, np.sqrt( xx**(2.*m) * (db**2.+ (dm*np.log(xx))**2.))
+        return m,dm,b,db, linfn 
+
+def linear_regression(x,y,verbose=True,clip=True,xe=None, ye=None):
+    m, b, r, p, stderr = stats.linregress(x,y)
+    assert(len(list(x))==len(list(y)))
+    if not ye is None:
+        def f(x,m,b): return m*x+b
+        assert(len(list(x))==len(list(ye)))
+        
+        popt, pcov=optimize.curve_fit(f,x,y,sigma=ye,absolute_sigma=True)
+        m=popt[0]
+        b=popt[1]
+        dm=np.sqrt(pcov[0][0])
+        db=np.sqrt(pcov[1][1])
+        print(pcov)
+        return m,b,r,p,stderr,db,dm
+    else:
+        mx = np.mean(x)
+        sx2 = np.sum(((x-mx)**2))
+        db = np.sqrt(len(x))*stderr * np.sqrt(1./len(x) + mx*mx/sx2)
+        dm = np.sqrt(len(x))*stderr * np.sqrt(1./sx2)
+    return m,b,r,p,stderr,db,dm
+
+def mad(data, axis=None):
+    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
+
+
+def opt_bin_width(lst):
+    """
+    optimum bin width: freedman-diaconis rule
+    h=2*IQR*n**0.3333
+
+    input:
+    ------
+    lst:  list of floats
+    output: 
+    -------
+    bin width, num bins
+    """
+    lst=np.sort(lst)
+    q75, q25 = np.percentile(lst, [75 ,25])
+    iqr = q75 - q25
+    h=2.*iqr*np.array(lst).shape[0]**-0.33333
+    num_bins=(lst[-1]-lst[0])/h
+    return h, num_bins
+
+def get_hist(values,nbins=False,attr='b'):
+    """
+    make a histogram.
+
+    input:
+    ------
+    values: list of items.  
+    nbins: number of bins.
+    attr:  (optional.  default='b')  dudeutils.data_types.Absorber attribute
+
+    output:
+    -------
+    x: bin centers
+    hist: histogram value
+    """
+    if type(values[0]) is Absorber:
+        values=np.array([getattr(item,attr) for item in values])
+
+    if not nbins:
+        _,nbins=opt_bin_width(values)
+    hist, bin_edges=np.histogram(values,int(nbins))
+    hist=hist/len(list(values)) #normalize hist by shape
+    binsize=bin_edges[1]-bin_edges[0]
+    x=bin_edges[:-1]+0.5*binsize    
+    return x,hist
+
+def hui_rutledge(b, bsig):
+    """
+    returns number density per b: dN/db
+
+    see hui and rutledge, 1999, APJ 517:541-548
+
+    bsig is a parameter describing the data set's line widths.
+
+    bsig^4 := 2/<\delta''^2> where \delta'' is a second derivative
+    for the deviation of optical depth from the mean optical depth.
+    in other words, it characterizes the curvature of a line at the line center.
+    
+    """
+    b4=(bsig/b)**4.
+    return 4.*(b4/b)*np.exp(-1.*b4)
+    
+
+def log2lin(logb, dlogb):
+    b=10.**np.array(logb)
+    db= b*np.log(10.)*np.array(dlogb)
+    return b, db
+
+def lin2log(b, db):
+    return np.log10(b), np.array(db)/(np.array(b)*np.log(10.))
 
 def get_sigma(cov, x, mu,alpha=0.05):
     """
@@ -155,6 +261,10 @@ def grubbs(samp,alpha=0.05, attr=None,**kwargs):
         del(samp[0])
 
     return samp
+
+def weights(lst):
+    _tot = float(sum([1./item**2. for item in lst]))
+    return [(1/item**2.)/_tot for item in lst]
 
 def bootstrap(data):
     """
