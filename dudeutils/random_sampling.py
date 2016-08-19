@@ -87,12 +87,10 @@ def parse_config(config_file):
                         dct[ab]["N"][-1]<dct[ab]["N"][0]]
 
             if "b" in dct[ab].keys():
-                cond+=[ dct[ab]["b"][0]<0.,dct[ab]["b"][-1]>50.,
-                        dct[ab]["b"][-1]<dct[ab]["b"][0]]
+                cond+=[ dct[ab]["b"][0]<0.,dct[ab]["b"][-1]<dct[ab]["b"][0]]
 
             if "z" in dct[ab].keys():
-                cond+=[ dct[ab]["z"][0]<0.,dct[ab]["z"][-1]<0.,
-                        dct[ab]["z"][-1]<dct[ab]["z"][0]]
+                cond+=[ dct[ab]["z"][-1]<dct[ab]["z"][0]]
 
             
             if any(cond):
@@ -346,7 +344,7 @@ def perturb_continua(mod, dct, **kwargs):
                                 'x',gaussian=kwargs.get('gaussian',True))
 
 
-def filter_bad_models(models, dct, vel_pad=10.0,chi2pad=150.):
+def filter_bad_models(models, dct, vel_pad=10.0,chi2pad=21.):
     if len(models)==0:
         return models
     min_chi2=min([float(item.chi2) for item in models])
@@ -356,31 +354,38 @@ def filter_bad_models(models, dct, vel_pad=10.0,chi2pad=150.):
         for cnt in model.get(model.ContinuumPointList):
             for param in ["x","y"]:
                 if str(getattr(cnt,param)).lower()=="nan":
+                    sys.stdout.write('%s=nan'%(param))
                     return False
 
         if chi2pad:
             if float(model.chi2)>min_chi2+chi2pad or float(model.chi2)==0.:
+                sys.stdout.write('chi2=%6.1lf, chi2min=%6.1lf'%(model.chi2, float(min_chi2)))
                 return False
         for iden, params in dct.items():
             if iden=='continuum':continue
             for param_name, param_range in params.items():
                 val=model.get_datum(iden,"Absorber",param_name)
                 if val==-1. or str(val).lower()=="nan":
+                    sys.stdout.write('bad val')
                     return False 
                 if param_name == "b":
                     if val<0.1:
+                        sys.stdout.write('%s: b<0.1'%(iden))
                         return False
                     elif model.get_datum(iden,"Absorber","ionName")!="H I":
                         if val>60:   #a metal line with an extremely large 
                                      #b-value: not likely.
+                            sys.stdout.write('%s: b>60'%(iden))
                             return False
                 elif param_name == "N":
                     
                     if val<7.0 or val>23.:  #this means dude tried to throw it out.
                                   #if you are running this, then you've already decided that 
                                   #this absorber was needed, so will this is a bad model
+                        sys.stdout.write('%s: logN=%4.2lf'%(iden, float(val)))
                         return False
                     elif val>param_range[-1]+2 or val<param_range[0]-2:
+                        sys.stdout.write('%s: logN=%4.2lf'%(iden, float(val)))
                         return False 
                         #if model goes more than about 100 times bigger or smaller 
                         #outside your specified range
@@ -389,6 +394,7 @@ def filter_bad_models(models, dct, vel_pad=10.0,chi2pad=150.):
                                c*(val-param_range[-1])/(1.+param_range[-1])]
                     if (val>param_range[-1] and vel_range[-1]>vel_pad) or \
                        (val<param_range[0] and vel_range[0]<-1.*vel_pad):
+                        sys.stdout.write('%s: z=%4.2lf'%(iden, float(val)))
                         return False
         return True
 
@@ -429,8 +435,8 @@ def iterate_fn(fn,ab_cfg,n,kwargs):
                     model.read()
                     kwargs["model"]=model
                 if kwargs['vary_continuum']:
-                    kwargs['locked_keys']=list(ab_cfg[key].keys())
-                    kwargs['locked_params']=['z']
+                    kwargs['locked_keys']=[key]+list(ab_cfg[key].keys())
+                    kwargs['locked_params']=[attr]
                 else:
                     kwargs['locked_keys']=[key]
                     kwargs['locked_params']=[attr]
@@ -452,9 +458,11 @@ def iterate_fn(fn,ab_cfg,n,kwargs):
                 except:
                     raise
                 
+        sys.stdout.write(': %d'%(len(out_lst)))
+        out_lst=filter_bad_models(out_lst, ab_cfg)
+        sys.stdout.write('-->%d'%(len(out_lst)))
         sys.stdout.write('\n')
         sys.stdout.flush()
-        out_lst=filter_bad_models(out_lst, ab_cfg)
     return out_lst
 
 def random_sampling(db, model, ab_cfg, cont_cfg, **kwargs):
@@ -562,6 +570,7 @@ def main(config_file):
             print('loading %s'%name)
             try:
                 all_db=ModelDB.load_models(name)
+                
             except:
                 print('initializing empty DB')
                 all_db=ModelDB(models=[])
@@ -569,14 +578,13 @@ def main(config_file):
         print('initializing new model db')
         all_db=ModelDB(models=[]) 
 
-    
-
+   
     model=Model(xmlfile=glob['source'])
     txt=open(glob['source'],'r').readlines()
 
     all_db=random_sampling( all_db, model, ab_cfg, cont_cfg, _rawtxt=txt, **glob)
     print("before filtering: %d"%len(all_db))
-    all_db=filter_bad_models(all_db, ab_cfg, vel_pad=4.0,chi2pad=250.)
+    all_db=filter_bad_models(all_db, ab_cfg, vel_pad=4.0,chi2pad=21.)
 
     open(glob['source'],'w').writelines(txt)   #in the case of keyboard interrupt, writes correct file back
     if len(all_db.models)==0:
@@ -607,7 +615,9 @@ def main(config_file):
                           constraints={})
 
 if __name__=="__main__":
-    main()
+    import sys
+    main(sys.argv[1])
+
 
 
 

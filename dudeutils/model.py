@@ -54,6 +54,11 @@ class Model(object):
             self.read(buff=buff)
             
         else:
+            if self.xmlfile:
+                self.read()
+            else:
+                if not "AbsorberList" in kwargs.keys():
+                    raise
             for key, val in dict(kwargs).items():
                 setattr(self,key,val)  #data lists will be the id needed to fetch from the data pool
             if not self.xmlfile:
@@ -61,8 +66,6 @@ class Model(object):
                     self.xmlfile=Model.get(self.AbsorberList)[0].xmlfile.name
                 except:
                     raise Exception("must specify either xml filename or model data")
-            if not "AbsorberList" in kwargs.keys(): #no fitting data is specified in __init__, then read
-                self.read()
 
         for key, val in kwargs.items():
             setattr(self, key, val)
@@ -189,8 +192,6 @@ class Model(object):
         -------
         velocity in km/s
 
-        
-
         """
         z1 = float(self.get_datum(id1,'Absorber','z'))
         z2 = float(self.get_datum(id2,'Absorber','z'))
@@ -294,7 +295,13 @@ class Model(object):
 
     def get_lst(self,attr):
         """just an alias for:"""
-        return data_types.ObjList.get(getattr(self,attr))
+        try:
+            return data_types.ObjList.get(getattr(self,attr))
+        except:
+            if attr in "AbsorberList ContinuumPointList".split():
+                raise
+            else:
+                return []
 
     def check_vals(self):
         unphysical={"b":[1.0,50.],"N":[10.00,25.00]} 
@@ -350,9 +357,6 @@ class Model(object):
         elif not filename:
             filename=self.xmlfile
 
-            
-
-
         #read through the data:  
         #  if data is new, then create the new class instances and store data in
         #  ObjList._pool and point the model to the correct pool key. Otherwise,
@@ -366,8 +370,11 @@ class Model(object):
             except:
                 print(filename)
                 raise
-            if key=='AbsorberList': assert(len(lst)>0)
+            if key=='AbsorberList': 
+                assert(len(lst)>0)
+
             newobj = data_types.ObjList.factory(lst)
+
             if newobj:
                 setattr(self,key,newobj.id)
 
@@ -409,7 +416,7 @@ class Model(object):
         except:
             self.flux  = os.path.join(path,spectrum.get("spec"))
             self.error = self.flux
- 
+
         #read through all data in xml.  create relevant classes
         # enable this if you want each model to store its own data
 
@@ -923,6 +930,22 @@ class ModelDB(object):
         else:
             return ModelDB(models=model_list)
         
+    @staticmethod
+    def merge(db1,db2):
+        if not type(db1) is type(db2):
+            raise TypeError("conflicting types: got %s and %s"%(str(type(db1)), str(type(db2))))
+        if type(db1) is str:
+            db1, db2 = ModelDB.load_models(db1), ModelDB.load_models(db2)
+        elif not type(db1) is ModelDB:
+            msg="expected either string or ModelDB instance.  instead got "+\
+                 "type %s"%(str(type(db1)))
+            raise TypeError(msg)
+        else:
+            pass
+
+        db1.models+=db2.models
+
+        
 
     def set_val(self,model,**kwargs):
         """set the values of a given data element"""
@@ -951,16 +974,8 @@ class ModelDB(object):
     def load_models(fname):
         with open(fname, "rb") as f:
             db = pickle.load(f)
-        data_types.ObjList._pool=db.pool
-        
-
-        """if len(data_types.ObjList._pool.keys())==0:
-            print("need to refresh pooled data.")
-            try:
-                data_types.ObjList.refresh_list(fname.replace('.obj','.xml'))
-            except: 
-                data_types.ObjList.refresh_list(input('file to unpickle: '))
-        db.pool=data_types.ObjList._pool"""
+        data_types.ObjList.merge_to_pool(db.pool)
+        db.pool=data_types.ObjList._pool
         return db
 
     def write(self,filename=None,verbose=False):
@@ -1014,7 +1029,7 @@ def check_for_conflicts(root):
             #code
             pass
 
-    
+
 def prettify(elem):
     """Return a pretty-printed XML string for the Element.
     copied and modified from:

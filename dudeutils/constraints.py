@@ -28,6 +28,8 @@ class Constraint(object):
                 else:
                     self.abs.append(AbsConstraint(key,**val))
             elif key=='chi2':
+                if not type(val) in [list, tuple]:
+                    val=[0,float(val)]
                 self.chi2 = ParameterConstraint("chi2",val)
             else:  #pixel, param   
                 try: 
@@ -44,7 +46,7 @@ class Constraint(object):
                 if getattr(self,key)!=getattr(model,key):
                     return False
             elif key=='chi2':
-                if not getattr(model,key) in getattr(self,key):
+                if not float(getattr(model,key)) in getattr(self,key):
                     return False
             elif key=='continuum':
                 for cont_ in self.cont:

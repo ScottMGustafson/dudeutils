@@ -11,9 +11,6 @@ from dudeutils.atomic import *
 tf = {"true":True, "false":False}
 c=constants.c/1000.  #speed of light in km/s
 
-#TODO add functionality to directly change from absorber and have
-#that propagate to all relevant entities...basically an observer pattern
-
 class MissingPoolKey(Exception):
     """exception for when the pool is missing a key"""
     pass
@@ -52,6 +49,22 @@ class ObjList(object):
 
     def __neq__(self, other):
         return not self.__eq__(other)
+
+    @staticmethod
+    def merge_to_pool(d2):
+        d1=ObjList._pool
+        def merge_func(it1,it2):
+            """what to do on key collision?"""
+            if it1 and not it2: 
+                return it1
+            elif it2 and not it1:
+                return it2
+            elif it1==it2:
+                return it1
+            else:
+                return None
+        ObjList._pool= {key: merge_func(d1.get(key, None), d2.get(key, None)) 
+                        for key in set( list(d1.keys()) + list(d2.keys()))}
 
     @staticmethod
     def clean_pool(lst):
@@ -591,8 +604,8 @@ class Absorber(Data):
         return tag=="Absorber"
 
     def __str__(self):
-        return "%-5s id=%-6s N=%8.5lf b=%8.5lf z=%10.8lf"%(
-                    self.ionName,self.id,self.N,self.b,self.z)
+        return "%-5s N=%8.5lf b=%8.5lf z=%10.8lf"%(
+                    self.ionName,self.N,self.b,self.z)
 
 
 
@@ -623,6 +636,10 @@ class Absorber(Data):
         return list of SpectralLine instances containing relevant atomic data
         """
         lst=[]
+        if not self.ionName in atomic_data.keys():
+            print(self.ionName+": not in keys")
+            print("available keys are: \n"+str(atomic_data.keys()))
+            raise KeyError()
         for item in atomic_data[self.ionName]:
             kwargs={}
             for key in ['f','gamma']:

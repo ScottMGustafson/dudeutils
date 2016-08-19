@@ -121,31 +121,55 @@ def plt_corners(db,params,labels,title="",fname="corner.png"):
                           ha="center", va="top")
     figure.savefig(fname)
 
-def test_():
+def mad(data, axis=None):
+    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
 
-    db=load_models("gauss_db.obj")
+def grubbs(samp,alpha=0.05, attr=None,**kwargs):
+    """
+    from: 
+        Grubbs, Frank E. (1950). "Sample criteria for testing outlying
+        observations". Annals of Mathematical Statistics 21 (1): 27–58.
+        doi:10.1214/aoms/1177729885.
 
+    """
+    def G(sample,val):
+        return np.fabs((val-np.mean(sample)))/np.std(sample)
+    if attr:
+        samp=sorted(list(samp), key=lambda x: getattr(x,attr))
+        _samp=[getattr(it,attr) for it in samp]
+        Gmax=G(_samp,max(_samp))
+        Gmin=G(_samp,min(_samp))
+    else:
+        samp=sorted(list(samp))
+        Gmax=G(samp,max(samp))
+        Gmin=G(samp,min(samp))
+        
+    interval=stats.t.interval(alpha/float(2*len(samp)),len(samp)-2)
 
-    for iden1 in "HIA HIB HIC DIA DIB DIC".split():
-        for iden2 in "HIA HIB HIC DIA DIB DIC".split():
-            for attr1 in "N b".split():
-                for attr2 in "N b".split(): 
-                    if iden1==iden2 and attr1==attr2: 
-                        continue
-                    r,p=spearman(db,iden1, iden2, attr1, attr2)
-                    if p<0.1:
-                        print(iden1, attr1, iden2, attr2,r,p)
-                        plot_xy(db,iden1, iden2, attr1, attr2)
+    
+    if Gmax>interval[-1]:
+        print(samp[-1])
+        del(samp[-1])
+    if Gmax<interval[0]:
+        print(samp[0])
+        del(samp[0])
 
+    return samp
 
-if __name__ == "__main__":
-    db=load_models("J0744_cont.obj")
-    dct=parse_config()
-    del(dct['config'])
-    del(dct['continuum'])
+def bootstrap(data):
+    """
+    returns a resampling of the dataset with length of data
+    """
+    data=np.array(data)
+    indices = np.random.randint(len(data),size=len(data))
+    return data[indices]
 
-    db=filter_bad_models(db, dct)
-    labels="$N(D_A)$ $N(D_B)$ $N(D_C)$".split()
-    params=[{"DIA":"N"}, {"DIB":"N"}, {"DIC":"N"}]
-    plt_corners(db,params,labels,title="",fname="corner.png")
- 
+def bootstrap_resampling(data,stat=np.mean,samples=1000,attr=None,**kwargs):
+    bootstrap_dist = []
+    if attr:
+        data=[getattr(it,attr) for it in list(data)]
+    for i in range(samples):
+        shuffled = bootstrap(data)
+        bootstrap_dist.append(stat(shuffled))
+    return bootstrap_dist
+

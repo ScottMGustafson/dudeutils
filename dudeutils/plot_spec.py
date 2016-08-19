@@ -17,7 +17,6 @@ def get_lines(model, dct):
     return [model.get_spectral_line(key, val) for key, val in dct.items()]
 
 def plot_line(spec, model, fig, line,**kwargs):
-
     velocity=kwargs.pop("velocity",True)
     ax=kwargs.pop("ax",None)
     multiplier=kwargs.pop('multiplier',None)
@@ -25,13 +24,21 @@ def plot_line(spec, model, fig, line,**kwargs):
     topmost=kwargs.pop('topmost',False)
     ref=kwargs.pop('ref',None)
     ylabel=kwargs.pop('ylabel',None)
-
+    debug=kwargs.pop('debug',False)
+    if debug: print("prepping data")
     wave_r, ind, ref = prep_data(spec,model,ref,**kwargs)
     absorbers=[item for item in line] if type(line) is list else [line]
-    waves, flux, error, ab0, cont = get_ab(spec,model,ref, ind, absorbers[0],return_ab=False)
-    ab=[ab0]
-    if len(absorbers)>1:
-        ab+=list(get_ab(spec,model,ref, ind, absorbers[1:],return_ab=True))
+    if debug: 
+        print("getting ab")
+        print(spec, model.flux)
+    waves, flux, error, all_ab, cont = get_ab(spec, model, ref, ind, absorbers, 
+                        return_ab=False, all_ab=True)
+
+    ab=[all_ab]
+    if len(absorbers)>0:
+        if debug: 
+            print(spec, model.flux)
+        ab+=list(get_ab(spec,model,ref, ind, absorbers,return_ab=True,all_ab=False))
 
     if multiplier:
         def f(x): return multiplier*x
@@ -46,7 +53,7 @@ def plot_line(spec, model, fig, line,**kwargs):
     error=ma.masked_outside(error,-1.*tol,tol)
 
     assert(flux.shape[0]==ab[0].shape[0]==cont.shape[0]==waves.shape[0])
-
+    if debug: print("plotting")
     ax.plot(waves, flux, 'k', linestyle='steps-mid')
     ax.plot(waves, np.zeros(waves.shape[0]), 'k--')
     ax.plot(waves, cont, 'r--', linestyle='steps-mid')
@@ -128,27 +135,15 @@ def parse_spectrum(model):
     else:
         assert(type(model) is Model)
 
-    try:
-        spec, error =model.flux, model.error
-    except:
-        spec=model.flux
-    if not os.path.sep in spec:
-        pth, f_ = os.path.split(model.id)
-        assert(f_==spec)
-        spec=os.path.join(pth, spec)
-        error=os.path.join(pth, error)
-
-
-#TODO: error lies somewhere fit_absorption returns flux (and presumably also error)
-#very subtle bug.
-    spec=Spectrum.sniffer(spec, error=error)
-    spec=Spectrum.sniffer(spec.dump)
-
-    #if not hasattr(spec, 'abs')
+    spec=Spectrum.sniffer(model)
+    
     #    spec.cont, spec.abs, chi2 = Spectrum.fit_absorption(spec,model)
     return model, spec
 
 def prep_absorbers(spec, model, absorbers):
+    """
+    converts Absorber to list of SpectralLine instances
+    """
     if type(absorbers) is list:
         return [prep_absorbers(spec, model, ab) for ab in absorbers]
     if not absorbers:
@@ -200,20 +195,26 @@ def prep_data(spec,model,ref=None,wave_r=None, vel_r=None,**kwargs):
     return wave_r, ind, ref
 
 
-def get_ab(spec,model,ref, ind, absorbers, vel_r=True, return_ab=True):
-
-    if type(absorbers) is list:
-        return [get_ab(spec,model,ref, ind, ab, vel_r, return_ab) for ab in absorbers]
-
-
-    absorbers=prep_absorbers(spec, model, absorbers)
-    waves, flux, error, ab, cont, chi2= Spectrum.fit_absorption(spec,
-                                                        model,
-                                                        ab_to_plot=absorbers,
-                                                        indices=ind)  
+def get_ab(spec,model,ref, ind, absorbers, vel_r=True, return_ab=True, all_ab=False):
+    if all_ab:
+        absorbers=None
+    else:
+        if type(absorbers) is list:
+            return [get_ab(spec,model,ref, ind, ab, vel_r, return_ab) for ab in absorbers]
+        absorbers=prep_absorbers(spec, model, absorbers)
     if type(spec) is TextSpectrum:  
-        #needed because for some reason, fit_absorption is not giving right flux
-        waves, flux, error = spec.waves[ind], spec.flux[ind], spec.error[ind] 
+        waves, flux, error,ab, cont = spec.waves[ind], spec.flux[ind], spec.error[ind],spec.abs[ind], spec.cont[ind]
+        if not all_ab:
+            waves, flux, error, ab, cont, chi2= Spectrum.fit_absorption(spec,
+                                                            model,
+                                                            ab_to_plot=absorbers,
+                                                            indices=ind)  
+
+    else:
+        waves, flux, error, ab, cont, chi2= Spectrum.fit_absorption(spec,
+                                                            model,
+                                                            ab_to_plot=absorbers,
+                                                            indices=ind)  
 
     if vel_r:
         waves=Spectrum.convert_to_vel(waves, ref)
@@ -231,6 +232,52 @@ def label_lines(ax, x, y, label):
     return ax
 
     
+def plot_no_lines(center_wave,wave_range,exponent=14):
+    model, spec=parse_spectrum( Model(xmlfile="/home/scott/research/J0744+2059/DH_1comp.copy.xml") )
+    waves, flux, error, ab, cont, chi2= Spectrum.fit_absorption(spec,
+                                                        model)  
+    flux*=10**float(exponent)
+    x,y=[],[]
+    for i in range(0,waves.shape[0]):
+        if center_wave-np.fabs(wave_range[0])<waves[i]<center_wave+np.fabs(wave_range[-1]):
+            x.append(waves[i])
+            y.append(flux[i])
+    plt.plot(x,y,linestyle='steps', color='k')
+    plt.xlabel(r'\r{A}ngstroms')
+    plt.ylabel(r'$F_{\lambda}$ ($10^{%d}$ ergs s$^{-1}$ cm$^{-2}$ \r{A}$^{-1}$)'%(int(exponent)))
+    plt.show()
+
+def plot_continua(spec,db,fact=13,xlims=[4842,4860.],wavelength=4847.25):
+    indices=Spectrum.get_indices(spec.waves, xlims) 
+    
+    count, ind=0,0
+    for mod in db:
+        waves,flux,error, ab, cont, chi2=Spectrum.fit_absorption(spec, mod,indices=indices)
+        if count==0:
+            plt.plot(waves, flux*10.**fact, color='k',linestyle='steps')
+            ind = np.argmin(np.fabs(waves-wavelength))
+        assert(ind!=0)
+        mod.cont_level=cont[ind]
+        mod.ab_level=ab[ind]
+        if count==0: 
+            plt.axvline(x=wavelength, ymin=0., ymax=mod.cont_level, 
+                       linewidth=1, color='k',linestyle='--')
+
+
+        
+        plt.plot(waves,ab*10.**fact,'r-',alpha=0.1)
+        plt.plot(waves,cont*10.**fact,'b-',alpha=0.1)
+        count+=1
+    plt.axvline(x=wavelength, ymin=0., ymax=mod.cont_level, linewidth=1, color='k',linestyle='--')
+    plt.xlabel(r"Wavelength (\r{A})")
+    plt.ylabel(r"$F_{\lambda}$($10^{%d}$ erg s$^{-1}$ cm$^{-2}$ \r{A}$^{-1}$)"%(int(fact)))
+    plt.xlim(xlims)
+    plt.ylim([-0.05,10.])
+    plt.minorticks_on()
+    plt.show()
+
+   
+
 
 
 

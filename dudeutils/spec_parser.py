@@ -8,6 +8,8 @@ import copy
 from dudeutils.model import Model
 import _spectrum
 
+#import pdb
+
 class Spectrum(object):
     @staticmethod
     def sniffer(filename, *args, **kwargs):
@@ -18,7 +20,7 @@ class Spectrum(object):
             if filename.flux.endswith('.fits'):
                 return FitsSpectrum(filename.flux, *args, **kwargs)   
             else: 
-                return TextSpectrum(filename, *args, **kwargs)  
+                return TextSpectrum(filename.flux, *args, **kwargs)  
         
         elif filename.endswith('.fits'):
             return FitsSpectrum(filename, *args, **kwargs)
@@ -77,15 +79,14 @@ class Spectrum(object):
         return np.array(arr)
 
 
-
-
     @staticmethod
-    def fit_absorption(spec, model, ab_to_plot=None, indices=None):
+    def fit_absorption(spec, model, xregion=False, ab_to_plot=None, indices=None, xr=None):
         """
         Input:
         ------
         spec : specParser.Spectrum instance
         model : model.Model instance
+        ab_to_plot: included absorbers.  to include no absorbers, include as []
 
         Output:
         -------
@@ -108,6 +109,7 @@ class Spectrum(object):
                 return spec.waves[indices],spec.flux[indices],spec.error[indices]
             else:
                 return spec.waves,spec.flux,spec.error
+            
 
         wv,flux,e=truncate(indices)
 
@@ -120,7 +122,7 @@ class Spectrum(object):
 
         abslst=ab_to_plot if ab_to_plot else Model.get(model.AbsorberList) 
 
-        if type(abslst[0]) is  SpectralLine:
+        if type(abslst[0]) is SpectralLine:
             absorbers=abslst
         elif type(abslst[0]) is Absorber:
             if not abslst[0]:
@@ -132,12 +134,17 @@ class Spectrum(object):
 
         absorbers=[it for it in absorbers if wv[4]<it.get_obs(it.z)<wv[-4]]
 
-
-        regions= RegionList.consolidate_list( 
-                                  [ (item.start, item.end) 
-                                  for item in list(model.get_lst("RegionList"))
-                                  if item.start<wv[-1] and item.end>wv[0] ]
-                 )
+        if xregion:
+            if not xr:
+                regions= RegionList.consolidate_list( 
+                                      [ (item.start, item.end) 
+                                      for item in list(model.get_lst("RegionList"))
+                                      if item.start<wv[-1] and item.end>wv[0] ])
+            else:
+                regions=RegionList.consolidate_list([[xr[0],xr[-1]]])
+        else:
+            regions=RegionList.consolidate_list([[wv[0],wv[-1]]])
+            
 
         starts=np.array([item[0] for item in regions],dtype=np.float)
         ends=np.array([item[1] for item in regions],dtype=np.float)
@@ -149,7 +156,6 @@ class Spectrum(object):
         rest=np.array([item.wave for item in absorbers], dtype=np.float)
         gamma=np.array([item.gamma for item in absorbers], dtype=np.float)
         f=np.array([item.f for item in absorbers], dtype=np.float)
-
 
 
         cont, absorption, chi2= _spectrum.spectrum(  wv,flux,e,
@@ -172,13 +178,19 @@ class FitsSpectrum(Spectrum):
         self.dump=filename.replace('.fits','.dat')
             
 class TextSpectrum(Spectrum): 
-    def __init__(self,dumpfile,*lst):
-
+    attributes=["waves", "flux", "error", "abs", "cont"]
+    def __init__(self,dumpfile,*lst,**kwargs):
+        if len(lst)==0:
+            try:
+                lst=[kwargs[it] for it in attributes] 
+            except:
+                Exception("bad formatting:\n"+str(kwargs))        
         if len(lst)!=5:
             try:
                 lst = np.loadtxt(dumpfile,unpack=True)
             except:
-                raise Exception(dumpfile)
+                raise
+                #raise Exception(dumpfile)
             if len(lst)==6:
                 lst = np.delete(lst,0,0)  #first column is always a bunch of zeroes
             elif len(lst)==5:
@@ -244,18 +256,45 @@ class TextSpectrum(Spectrum):
 
 class LineDump(object):
     def __init__(self,fname=None):
-        self.fname=fname
         self.absorbers=[]
         if fname:
             self.parse(fname)
 
     def parse(self,fname):
-        for line in open(fname,'r').readlines():
-            ionName=line[0:6].replace(' ','')    
-            s=line[5:-1].strip().split()
-            self.absorbers.append(
-                Absorber(ionName=ionName, N=s[0], b=s[1], z=s[2])
-            )
+        """
+        parse a line dump and set absorbers attribute
+
+        input:
+        ------
+        fname:  string or model.Model instance
+
+        output:
+        -------
+        None
+        
+        raises:
+        -------
+        TypeError when fname is of incorrect type
+
+        """
+        if type(fname) is Model:
+            self.absorbers=Model.get(fname.AbsorberList)  
+            self.fname=fname.xmlfile
+        elif type(fname) is str:
+            self.fname=fname
+            if fname.endswith('.xml'):
+                mod=Model(fname)
+                self.absorbers=[ab for ab in Model.get(mod.AbsorberList) 
+                                if not ab in excluded_ions]
+            else:
+                for line in open(fname,'r').readlines():
+                    ionName=line[0:6].strip()#.replace(' ','')  
+                    s=line[5:-1].strip().split()
+                    self.absorbers.append(
+                        Absorber(ionName=ionName, N=s[0], b=s[1], z=s[2])
+                    )
+        else:
+            raise TypeError("expected str or model.Model instance.  Instead got type %s"%(str(type(fname))))
 
     def get_bin(self,rng):
         return [item for item in self.absorbers if rng[0]<=item.z<rng[-1] ]
@@ -268,7 +307,5 @@ class LineDump(object):
         copy.absorbers=[item for item in self.absorbers if item.ionName==ionName]
         self.absorbers=[item for item in self.absorbers if item.ionName!=ionName]
         return copy
-        
-        
-
+       
 

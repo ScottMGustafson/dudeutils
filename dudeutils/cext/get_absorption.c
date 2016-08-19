@@ -49,7 +49,7 @@ int sub_absorber(   const double waves[], double cont[],
         double wave_i = wave_low + i*delta_wave;
         double vbar = c/b * (wave_i/cwave - 1.0);
         tau_sum += factor*voigt(vbar, alpha);
-    }
+    } 
 
     tau = tau_sum / nsamp;
 
@@ -108,7 +108,6 @@ int sub_absorber(   const double waves[], double cont[],
         if (subFlag) cont[hpix] /= exp(tau);
         else         cont[hpix] *= exp(tau);
     }
-
     return 0;
 }
 
