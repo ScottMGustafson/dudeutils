@@ -2,7 +2,7 @@
 Implementation notes:
 
 all xml fit file data (AbsorberList, ContinuumPointList, RegionList, 
-SingleViewList, VelocityViewList) is written to the flyweight: 
+SingleViewList, VelocityViewList) is written to  
 data_types.ObjList._pool and will ONLY be accessed from there.
 
 to access data here, we use Model.get(some id) where id is the key for our 
