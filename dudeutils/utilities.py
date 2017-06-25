@@ -1,14 +1,13 @@
 from dudeutils.model import Model, ModelDB
 import os
-from os.path import split, isfile, join
+from os.path import split, join
 import subprocess
 import xml.etree.ElementTree as et
-from dudeutils.wavelength import c
-import dudeutils.spec_parser as spec_parser
 import io
 
-def run_optimize(fname,step=False, verbose=False, to_buffer=False, 
-                 method='dude',timeout=None,**kwargs):
+
+def run_optimize(fname, step=False, verbose=False, to_buffer=False,
+                 method='dude', timeout=None, **kwargs):
     """
     call dude and run commandline.OptimizeXML from the command line.
 
@@ -30,36 +29,38 @@ def run_optimize(fname,step=False, verbose=False, to_buffer=False,
     -------
     None
     """
-    if timeout: timeout=float(timeout)
-    if method=='dude':
-        #call dude from the command line and call its Levenberg-marquardt algo.
-        commands=["java","-cp",
-                  "/home/scott/programming/dude/jd/build", 
-                  "dude.commandline.OptimizeXML", 
-                  fname
-                  ]
+    if timeout: timeout = float(timeout)
+    if method == 'dude':
+        # call dude from the command line and call its Levenberg-marquardt algo.
+        commands = ["java", "-cp",
+                    "/home/scott/programming/dude/jd/build",
+                    "dude.commandline.OptimizeXML",
+                    fname
+                    ]
         if step:
             commands.append('step')
         if to_buffer:
             commands.append('to_buffer')
-        if verbose: 
-            print("running: %s"%(" ".join(commands)))
+        if verbose:
+            print("running: %s" % (" ".join(commands)))
 
-        #now run the optimizer
-        return subprocess.check_output(commands,timeout=timeout)
-    else: #use code from this project
+        # now run the optimizer
+        return subprocess.check_output(commands, timeout=timeout)
+    else:  # use code from this project
         raise Exception("doesn't yet work as of 2016-02-29")
-        model=Model(xmlfile=fname)
-        src_data=model.flux
+        model = Model(xmlfile=fname)
+        src_data = model.flux
         popt, pcov = optimizer.optimize(src_data, model)
-        return popt,pcov
+        return popt, pcov
 
-def newdb(xmlfile,dbfile=None,params=None,**kwargs):
+
+def newdb(xmlfile, dbfile=None, params=None, **kwargs):
     """get a model, append to new database"""
     model = Model(xmlfile=xmlfile)
-    return ModelDB(dbfile,[model],**kwargs)
+    return ModelDB(dbfile, [model], **kwargs)
 
-def get_model(xmlfile,chi2=0.,pixels=0.):
+
+def get_model(xmlfile, chi2=0., pixels=0.):
     """
     get a single model instance from an xmlfile.  This exists just to provide 
     multiple points of entry to get a model
@@ -75,11 +76,11 @@ def get_model(xmlfile,chi2=0.,pixels=0.):
     model.Model instance 
 
     """
-    return Model(xmlfile=xmlfile,chi2=chi2,pixels=pixels)
+    return Model(xmlfile=xmlfile, chi2=chi2, pixels=pixels)
 
 
 def populate_database(abs_ids=None, separator="\n\n", return_list=False,
-        path=None, db=None, constraints=None, buff=None):
+                      path=None, db=None, constraints=None, buff=None):
     """
     parse all xmlfiles in a given directory and returns a ModelDB instance
 
@@ -101,67 +102,72 @@ def populate_database(abs_ids=None, separator="\n\n", return_list=False,
     Exception
 
     """
-    if buff:  #passes buffer to Model.read(), then to data_types.read(), 
-              #then to xml.etree.ElementTree.parse() as io.BytesIO
+    if buff:  # passes buffer to Model.read(), then to data_types.read(),
+        # then to xml.etree.ElementTree.parse() as io.BytesIO
 
-        strlst=buff.decode().strip(separator).split(separator)
-        buff=[io.BytesIO(item.replace("\n","").encode()) for item in strlst]
+        strlst = buff.decode().strip(separator).split(separator)
+        buff = [io.BytesIO(item.replace("\n", "").encode()) for item in strlst]
         models = [Model(buff=item) for item in buff]
 
     else:
-        #read files on disk
-        files=[]
+        # read files on disk
+        files = []
         if not path:
-            path=os.getcwd()
+            path = os.getcwd()
         for f in os.listdir(path):
             if split(f)[-1].startswith('iteration') and split(f)[-1].endswith(".xml"):
                 files.append(f)
 
-        if len(files)==0 and not db:
+        if len(files) == 0 and not db:
             raise Exception("too few files")
-        models=[]
+        models = []
         for f in files:
             try:
-                models.append(Model( xmlfile=join(path,f), abs_ids=abs_ids ))                
+                models.append(Model(xmlfile=join(path, f), abs_ids=abs_ids))
             except:
-                print(join(path,f)," failed to parse")
+                print(join(path, f), " failed to parse")
         for f in files:
-            os.remove(join(path,f))
+            os.remove(join(path, f))
     if return_list:
         return models
-    elif db: #if None or []
+    elif db:  # if None or []
         if type(db) is str:
-            db=load_from_db(db)
-        db.append_lst(models,constraints=constraints)
+            db = load_from_db(db)
+        db.append_lst(models, constraints=constraints)
         return db
     else:
-        return ModelDB(models=models,constraints=constraints)
+        return ModelDB(models=models, constraints=constraints)
 
 
-
-def append_db(db,abs_ids,keep=False,path=None,constraints=None):
+def append_db(db, abs_ids, keep=False, path=None, constraints=None):
     """populate existing database"""
-    populate_database(abs_ids,keep=keep,path=path,db=db,constraints=constraints)
+    populate_database(abs_ids, keep=keep, path=path, db=db, constraints=constraints)
 
-def dump_models(db,fname=None):
+
+def dump_models(db, fname=None):
     """alias to ModelDB.dump_models"""
-    ModelDB.dump_models(db,fname)
+    ModelDB.dump_models(db, fname)
+
+
 def load_models(fname):
     """alias to ModelDB.load_models"""
     return ModelDB.load_models(fname)
+
 
 def load_from_db(dbxml):
     """alias to load an xml database"""
     return ModelDB.read(dbxml)
 
+
 def get_db(dbfile):
     """alias to load an xml database"""
     return ModelDB.read(dbfile)
 
+
 def parse(filename, ab_ids, path='/home/scott/research/J0744+2059/'):
     """clear a db file of all absorbers not in ab_ids"""
 
-    tree = et.parse(join(path,filename))
+    tree = et.parse(join(path, filename))
 
     root = tree.getroot()
     parent = root.find('AbsorberLists')
@@ -171,15 +177,10 @@ def parse(filename, ab_ids, path='/home/scott/research/J0744+2059/'):
         for ab in ablist.findall('Absorber'):
             if ab.get('id') not in ab_ids:
                 ablist.remove(ab)
-        if len(list(ablist))==0:
+        if len(list(ablist)) == 0:
             parent.remove(ablist)
-    tree.write(join(path,filename))
+    tree.write(join(path, filename))
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     pass
-
-        
-    
-    
-    
