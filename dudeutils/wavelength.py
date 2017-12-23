@@ -1,8 +1,5 @@
 import astropy.io.fits as fits
 import numpy as np
-from operator import attrgetter
-import sys
-import math
 
 c = 299792.458  # speed of light in km/s
 
@@ -15,27 +12,6 @@ class WaveUtils1D(object):
         self.crdelt = float(cdelt)
         self.loglin = bool(loglin)
 
-    def iterate(self, i, f):
-        curr = self.get_wave(i)
-        if i < f:
-            while i < f:
-                if self.loglin:
-                    curr *= 10. ** self.cdelt
-                else:
-                    curr += self.cdelt
-                yield curr
-                i += 1
-        elif i > f:
-            while i > f:
-                if self.loglin:
-                    curr /= 10. ** self.cdelt
-                else:
-                    curr -= self.cdelt
-                yield curr
-                i -= 1
-        else:
-            raise StopIteration
-
     def get_wave(self, i):
         return WaveUtils1D.wave(self.crval, self.crpix,
                                 self.cdelt, i, self.loglin)
@@ -43,27 +19,24 @@ class WaveUtils1D(object):
     @staticmethod
     def wave(crval1, crpix1, cdelt1, i, loglin=True, angstroms=True):
         """get wavelength of individual pixel"""
-        crval1, crpix1, cdelt1 = tuple(map(float, (crval1, crpix1, cdelt1)))
+        crval1, crpix1, cdelt1 = tuple(map(np.float64, (crval1, crpix1, cdelt1)))
         if type(i) is np.ndarray:
-            i = i.astype(np.float32)
+            i = i.astype(np.float64)
         elif type(i) is int:
             i = float(i)
         else:
-            pass
+            raise Exception("unsupported index type: %s" % (str(type(i))))
 
-        if angstroms:
-            crval1 *= 1.E3
+        # if angstroms:
+        #     crval1 *= 1.E3
 
-        if not loglin:
-            return crval1 + cdelt1 * (i - crpix1)
-        else:
-            return crval1 * 10. ** (cdelt1 * (i - crpix1))
+        wv = crval1 + cdelt1 * (i + 1 - crpix1)
+        return 10. ** wv if loglin else wv
 
     @staticmethod
     def is_loglin(head):
         if not head["CTYPE1"] == "LINEAR":
-            raise Exception("only linear and loglinear wavescales accepted.")
-
+            raise NotImplementedError("only linear and log-linear wavescales accepted.")
         return True if head['DC-FLAG'] == 1 else False
 
 
@@ -94,7 +67,7 @@ class Wavelength(object):
             except:
                 shift = float(self.shift)
             if self.hdu[0].header['CRVAL1'] < 1000.:
-                shift /= 1000.  # sometimes CRVAL not in angstroms
+                shift /= 1000.  # sometimes CRVAL not in angstroms.  why?
             if self.loglin:
                 if make_permanent:
                     self.hdu[0].header['CRVAL1'] *= (1. + shift / c)
@@ -106,11 +79,13 @@ class Wavelength(object):
                 if make_permanent:
                     self.hdu[0].header['CRVAL1'] += shift
                     self.hdu.writeto(output, output_verify='fix', clobber=True)
-                return WaveUtils1D.wave(float(self.crval1) + shift, self.crpix1,
+                else:
+                    self.crval1 = self.hdu[0].header['CRVAL1'] + shift
+                return WaveUtils1D.wave(self.crval1, self.crpix1,
                                         self.cdelt1, np.arange(0, self.size),
                                         self.loglin)
         else:
-            return WaveUtils1D.wave(float(self.crval1), self.crpix1,
+            return WaveUtils1D.wave(self.crval1, self.crpix1,
                                     self.cdelt1, np.arange(0, self.size),
                                     self.loglin)
 
@@ -118,8 +93,10 @@ class Wavelength(object):
         for key in ['CTYPE1', 'CDELT1', 'CRPIX1', 'CRVAL1']:
             setattr(self, key.lower(), self.head[key])
 
-    def xy(self, shift=None, make_permanent=False):
-        x = self.shift_wave(make_permanent=make_permanent, shift=shift)
+    def xy(self):
+        x = WaveUtils1D.wave(self.crval1, self.crpix1,
+                             self.cdelt1, np.arange(0, self.size),
+                             self.loglin)
         return x, self.data
 
     def shiftCoeffs(self):
@@ -146,12 +123,12 @@ class Wavelength(object):
 
 # aliases
 def get_waves(filename):
-    return Wavelength.get_wave(filename)
+    return Wavelength(filename=filename).xy()[0]
 
 
-def xy(filename, shift=None, make_permanent=False):
+def xy(filename):
     inst = Wavelength(filename)
-    x, y = inst.xy(shift, make_permanent=make_permanent)
+    x, y = inst.xy()
     inst.hdu.close()
     return x, y
 

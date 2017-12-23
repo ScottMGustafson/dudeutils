@@ -1,11 +1,13 @@
-import pickle, sys, os
-import numpy as np
+import os
+import sys
+
 import matplotlib.pyplot as plt
-from matplotlib import mlab
-from dudeutils.spec_parser import Spectrum, LineDump, TextSpectrum, FitsSpectrum
-from scipy.constants import c
-from dudeutils.model import Model
+import numpy as np
 import numpy.ma as ma
+from scipy.constants import c
+
+from dudeutils.model import Model
+from dudeutils.spec_parser import Spectrum, LineDump, TextSpectrum
 
 lya = 1216.668  # lyman alpha wavelength (A)
 c /= 1000.  # speed of light in km/s

@@ -1,9 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy import stats
-from dudeutils.utilities import *
 import corner
-from dudeutils.random_sampling import filter_bad_models, parse_config
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+import numpy as np
+from scipy import stats
+from dudeutils.data_types import Absorber
 
 
 def fit_power_law(x, y, ye, return_log=False):
@@ -37,7 +37,7 @@ def linear_regression(x, y, verbose=True, clip=True, xe=None, ye=None):
 
         assert (len(list(x)) == len(list(ye)))
 
-        popt, pcov = optimize.curve_fit(f, x, y, sigma=ye, absolute_sigma=True)
+        popt, pcov = curve_fit(f, x, y, sigma=ye, absolute_sigma=True)
         m = popt[0]
         b = popt[1]
         dm = np.sqrt(pcov[0][0])
@@ -243,10 +243,6 @@ def plt_corners(db, params, labels, title="", fname="corner.png"):
                           xytext=(0, -5), textcoords="offset points",
                           ha="center", va="top")
     figure.savefig(fname)
-
-
-def mad(data, axis=None):
-    return np.mean(np.absolute(data - np.mean(data, axis)), axis)
 
 
 def grubbs(samp, alpha=0.05, attr=None, **kwargs):

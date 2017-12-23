@@ -1,3 +1,6 @@
+from scipy.constants import alpha, m_e, h, c
+
+from dudeutils.config import Config
 from dudeutils.get_data import get_data
 
 
@@ -76,6 +79,18 @@ class SpectralLine(object):
         for key, val in kwargs.items():
             setattr(self, key, val)
         self.rest_wave = self.wave  # set an alias for this, since I always forget the name
+
+    def get_equiv_width(self, logN, z, pixels=True):
+        const = alpha * h / (2. * m_e * c)
+        lam = self.rest_wave * 10 ** -10  # convert to meters
+        N = 10 ** logN * 100. ** 2.  # convert to per meter squared
+        f = self.f
+        val = 10. ** 10 * const * lam ** 2. * f * N  # 10e10 in front converts final answer back to angstroms
+        if pixels:
+            return val / ((1. + z) * self.rest_wave) * (0.001 * c / Config.vdisp)
+        else:
+            return val
+
 
     def get_obs(self, z=None):
         try:

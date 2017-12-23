@@ -1,28 +1,23 @@
-import dudeutils.xmlutils as xmlutils
-import warnings
-import uuid
 import xml.etree.ElementTree as et
-import collections
-import os
-import sys
+
+import numpy as np
 from scipy import constants
+
+import dudeutils.xmlutils as xmlutils
 from dudeutils.atomic import *
 
 tf = {"true": True, "false": False}
 c = constants.c / 1000.  # speed of light in km/s
 
 
-class MissingPoolKey(Exception):
-    """exception for when the pool is missing a key"""
-    pass
-
-
-class ObjList(object):
-    _pool = dict()  # stores objects already initialized
+class ObjList(list):
+    """
+    A container class inheriting from list.
+    """
 
     def __init__(self, objlist, *args, **kwargs):
+        super(ObjList, self).__init__()
         self.objlist = objlist
-        self._id = kwargs.pop("id", None)
         for key, val in kwargs.items():
             try:
                 assert (type(val) in [str, float, int])
@@ -31,6 +26,25 @@ class ObjList(object):
                     str(type(val)), str(val)))
             setattr(self, key, val)
 
+    def __str__(self):
+        msg = "%s id:%s\n %s" % (str(type(self)), str(id(self)), str([str(it) for it in self.objlist]))
+        return msg
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)) or len(self.objlist) != len(other.objlist):
+            return False
+        for i in range(len(other.objlist)):
+            if other.objlist[i] != self.objlist[i]:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __add__(self, rhs):
+        self.objlist = self.objlist + rhs.objlist
+        return self
+
     def __iter__(self):
         for i in range(len(self.objlist)):
             yield self.objlist[i]
@@ -38,53 +52,34 @@ class ObjList(object):
     def __getitem__(self, i):
         return self.objlist[i]
 
+    def __delitem__(self, i):
+        del self.objlist[i]
+
+    def __contains__(self, item):
+        return item in self.objlist
+
+    def __setitem__(self, i, value):
+        self.objlist[i] = value
+
     def __len__(self):
         return len(self.objlist)
 
-    def __eq__(self, other):
-        """doensn't matter whether or not other is list or ObjList"""
-        for item in other:
-            if not item in self.objlist:
-                return False
-        return len(other) == len(self.objlist)
-
-    def __neq__(self, other):
-        return not self.__eq__(other)
-
     @staticmethod
-    def merge_to_pool(d2):
-        d1 = ObjList._pool
+    def split_types(obj_list):
+        types = set([type(it) for it in obj_list])
 
-        def merge_func(it1, it2):
-            """what to do on key collision?"""
-            if it1 and not it2:
-                return it1
-            elif it2 and not it1:
-                return it2
-            elif it1 == it2:
-                return it1
-            else:
-                return None
+        ret_lst = []
+        for typ in types:
+            _lst = [it for it in obj_list if isinstance(it, typ)]
+            _new = ObjList.factory(objlist=_lst)
+            assert len(_new.objlist) > 0 and _new.objlist != []
 
-        ObjList._pool = {key: merge_func(d1.get(key, None), d2.get(key, None))
-                         for key in set(list(d1.keys()) + list(d2.keys()))}
+            ret_lst.append(_new)
 
-    @staticmethod
-    def clean_pool(lst):
-        ObjList._pool = {k: v for (k, v) in ObjList._pool.items() if k in lst}
-
-    @staticmethod
-    def generate_id():
-        iden = str(uuid.uuid4())
-        while iden in list(ObjList._pool.keys()):
-            iden = str(uuid.uuid4())
-
-            # ObjList.taken_names.append(iden)
-        return iden
-
-    @staticmethod
-    def remove(iden):
-        del (ObjList._pool[iden])
+        for item in ret_lst:
+            assert len(item.objlist) > 0
+            assert item.objlist != [], str(type(item)) + 'len = ' + str(len(item.objlist)) + ' ' + str(item.objlist)
+        return ret_lst
 
     def get_item(self, iden):
         """get element from objlist.
@@ -105,73 +100,14 @@ class ObjList(object):
                 return item
 
     @staticmethod
-    def get(theID):
-        """retrieve from _pool
-        input:
-        ------
-        theID:  the objList's assigned ID
-
-        output:
-        -------
-        Objlist or subclass of Objlist instance 
-
-        raises:
-        -------
-        MissingPoolKey: when theID isn't recognized
-
-        """
-        try:
-            return ObjList._pool[theID]
-        except KeyError:
-            msg = "\n  key not found: %s" % (str(theID))
-            msg += "\n\n  available keys are:\n%s\n" % (str(sorted(ObjList._pool.keys())))
-            raise MissingPoolKey(msg)
-            # print("\n  key not found: %s"%(str(theID)))
-
-    @staticmethod
-    def set(value):
-        ObjList._pool[value.id] = value
-
-    @property
-    def id(self):
-        return self._id
-
-    @id.setter
-    def id(self, value):
-        """when setting a new id, changes should also be reflected in _pool"""
-        if value in list(ObjList._pool.keys()):
-            raise KeyError(str(value) + " already in pool")
-        try:
-            old = self._id
-            assert (old in list(ObjList._pool.keys()))
-        except AttributeError:
-            raise Exception("trying to change id of data not yet registered in pool")
-        except AssertionError:
-            raise KeyError("attempting to access data not registered in pool")
-
-        self._id = str(value)
-        ObjList._pool[self._id] = ObjList._pool.pop(old)
-
-    @staticmethod
     def factory(objlist=None, **kwargs):
         """
-        factory method to produce instances of the chidren of ObjList.  If user 
-        provides id=some value alread in _pool, then just return that data.
-        new data will be registered in _pool
+        factory method to produce instances of the chidren of ObjList.  
 
         Input:
         ------
         objlist : a list of data.  elements should be instances of some derived 
                   class of Data
-
-        keyword args:
-        -------------
-
-        id : (default None) if specified, _pool will be searched for the 
-             relevant data.  If not present, id will be set to specified value
-             and a new instance will be created
-
-        other entries will be suitable for any Data subclasses
 
         Output:
         -------
@@ -184,21 +120,13 @@ class ObjList(object):
         """
         if objlist == None or objlist == []:
             return None
-        for key, value in ObjList._pool.items():
-            if objlist == value:
-                return value
+
+        if len(set([type(it) for it in objlist])) > 1:
+            raise Exception('Mixed types in objlist')
 
         for cls in ObjList.__subclasses__():
             if cls.registrar_for(ObjList.classname(objlist[0].__class__)):
-                iden = kwargs.pop('id', ObjList.generate_id())
-                obj = cls(objlist, id=iden, **kwargs)
-
-                # register data into the pool
-                if not obj.id in list(ObjList._pool.keys()):
-                    ObjList._pool[obj.id] = obj
-                    return obj
-                else:
-                    return ObjList._pool[obj.id]
+                return cls(objlist, **kwargs)
         raise TypeError("invalid type: " + ObjList.classname(objlist[0].__class__))
 
     @staticmethod
@@ -207,25 +135,13 @@ class ObjList(object):
 
     def xml_rep(self, parent):
         """return the list of all relevant nodes in xml"""
-        try:
-            assert (type(parent) in [str, unicode])
-            parent = str(parent)
-        except:
+        if not isinstance(parent, str):
             parent = ObjList.classname(
                 parent.__class__)  # if a class is given instead of class name, just get the class name
             parent = parent.split('.')[-1]
         current = et.SubElement(parent, ObjList.classname(self.__class__), {"id": self.id})
         current.extend([item.node for item in self.objlist])
         return current
-
-    @staticmethod
-    def _xml_read(parent):
-        """read from and ModelDb xml file"""
-        for sublist in parent.findall(theTag):  # find all of one sub-type of objlist
-            # make list of allelements (all individual absorbers for example)
-            theID = sublist.get("id")
-            objlist = [data_types.Data.factory(**{"node": item}) for item in sublist]
-            yield cls(objlist, id=theID)
 
     @staticmethod
     def get_class(node):
@@ -265,7 +181,7 @@ class ObjList(object):
         """
         if verbose:
             print(len(list(node)))
-        objlist = [Data.factory(**{"node": item}) for item in list(node)]  # each item should be xml node
+        objlist = [Data.factory(node=item) for item in list(node)]  # each item should be xml node
         return ObjList.factory(objlist, id=node.get("id"))
 
     @staticmethod
@@ -276,8 +192,7 @@ class ObjList(object):
     @staticmethod
     def get_from_xml(id, parent):
         """
-        returns ObjList object instance from a given parent.  When _read_node 
-        is called, data is automatically entered into ObjList._pool.  
+        returns ObjList object instance from a given parent.  
 
         Input:
         ------
@@ -298,10 +213,8 @@ class ObjList(object):
     def append_datum(self, tag, **kwargs):
         node = et.Element(tag, **kwargs)
         self.objlist.append(Data.factory(node=node))
-        # will automatically be written also to _pool
 
     def refresh_list(xmlfile):
-        ObjList._pool = {}
         tree = et.parse(xmlfile)
         root = tree.getroot()
         for tag in "AbsorberLists ContinuumPointLists RegionLists SingleViewLists VelocityViewLists".split():
@@ -312,8 +225,7 @@ class ObjList(object):
     @staticmethod
     def list_from_xml(parent, verbose=False):
         """
-        returns a list of ObjList objects from a given parent.  When _read_node 
-        is called, data is automatically entered into ObjList._pool.  
+        returns a list of ObjList objects from a given parent. 
 
         Input:
         ------
@@ -328,21 +240,21 @@ class ObjList(object):
             print(len(parent), ' elements')
         return [ObjList._read_node(item, False) for item in parent]
 
-    @staticmethod
-    def get_all_instances(subclass):
-        lst = []
-        if not type(subclass) is str:
-            raise Exception("subclass input should be a string")
-        for val in dict(ObjList._pool).values():
-            if ObjList.classname(val.__class__) == subclass:
-                lst.append(val)
-        return lst
-
 
 class AbsorberList(ObjList):
     @classmethod
     def registrar_for(cls, tag):
         return tag == "Absorber"
+
+    def patch_list(self, lst):
+        """suppose you have some list with some absorbers to replace..  then use this function, my friend."""
+        while len(lst) > 0:
+            new_val = lst.pop(0)
+            if not new_val.id:
+                continue
+            for i in range(len(self.objlist)):
+                if self.objlist[i].id == new_val.id:
+                    self.objlist[i] = new_val
 
 
 class ContinuumPointList(ObjList):
@@ -350,11 +262,27 @@ class ContinuumPointList(ObjList):
     def registrar_for(cls, tag):
         return tag == "ContinuumPoint"
 
+    def patch_list(self, lst):
+        """suppose you have some list with some absorbers to replace..  then use this function, my friend."""
+        while len(lst) > 0:
+            new_val = lst.pop(0)
+            if not new_val.id:
+                continue
+            for i in range(len(self.objlist)):
+                if self.objlist[i].id == new_val.id:
+                    self.objlist[i] = new_val
+
 
 class RegionList(ObjList):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.consolidate_regions()
+
+    def in_regions(self, val):
+        for reg in self.objlist:
+            if reg.start <= val <= reg.end:
+                return True
+        return False
 
     @classmethod
     def registrar_for(cls, tag):
@@ -378,6 +306,10 @@ class RegionList(ObjList):
         None
 
         """
+        try:
+            assert isinstance(ranges, list)
+        except:
+            raise TypeError('argument should be list-like.  Instead got %s' % str(type(ranges)))
         result = []
         current_start = -1
         current_stop = -1
@@ -413,6 +345,14 @@ class RegionList(ObjList):
         while len(self.objlist) > len(ranges):
             del (self.objlist[-1])
 
+    def get_indices(self, waves):
+        indices = []
+        for region in self.objlist:
+            ind1 = np.where(waves < region.end)[0]
+            ind2 = np.where(waves > region.start)[0]
+            indices += list(set(ind1).intersection(ind2))
+        return sorted(list(set(indices)))
+
 
 class SingleViewList(ObjList):
     @classmethod
@@ -430,26 +370,38 @@ class Data(object):
     node_attrib = []
 
     def __init__(self, *args, **kwargs):
-        #
         tag = kwargs.get('tag', False)
         if not tag:
             self.tag = self.__class__.__name__
-        for key, val in kwargs.items():
-            try:
-                setattr(self, key, float(val))
-            except:
-                setattr(self, key, val)
+        self.node = kwargs.pop('node', None)
+        if self.node:
+            self.parse_node()
+        else:
+            for key, val in kwargs.items():
+                try:
+                    setattr(self, key, float(val))
+                except (ValueError, TypeError) as e:
+                    if val in ['true', 'false']:
+                        val = True if val == 'true' else False
+                    setattr(self, key, val)
+
+                    # self.get_mock_node()
+
+    def get_mock_node(self):
+        attrs = [attr for attr in dir(self) if not attr.startswith('__') and attr not in ['tag', 'node']]
+        attrib = {str(k): str(getattr(self, k)) for k in attrs}
+        self.node = type('mock_node', (), {"tag": 'Absorber', 'attrib': attrib})
+
+    def validate_init(self):
+        pass
 
     def __eq__(self, other):
         if type(self) != type(other):
             return False
         return self.node.attrib == other.node.attrib
 
-    def __neq__(self, other):
+    def __ne__(self, other):
         return not self.__eq__(other)
-
-    def __hash__(self):
-        return id(self)
 
     @staticmethod
     def factory(**kwargs):
@@ -457,7 +409,7 @@ class Data(object):
         if not tag:
             try:
                 tag = kwargs.get("node").tag
-                assert (tag != None)
+                assert tag is not None, 'no tag found.  Is this a valid xml node? %s' % str(kwargs.get("node", None))
             except:
                 raise Exception("need to specify either tag and id or node")
 
@@ -468,22 +420,18 @@ class Data(object):
                 elif "xmlfile" in kwargs.keys():
                     inst = cls.from_file(**kwargs)
                 else:
-                    # if no xml data associated with it, will instantiate without.
-                    # xml data will be created on model.write()
                     return cls(**kwargs)
 
-                inst.keys = list(inst.node.attrib.keys())
-                inst.parse_node()
-                # inst.set_data(**kwargs)
+                # inst.keys = list(inst.node.attrib.keys())
+                # inst.parse_node()
                 try:  # if an additional constructor is specified, run it
                     inst.alt_init(**kwargs)
                 except:
                     pass
                 return inst
-        raise ValueError(
-            "\n%s not a valid data type.  \nValid types are \n  %s" % (
-                str(tag), str(Data.__subclasses__())
-            ))
+
+        raise ValueError("\n%s not a valid data type.  \n"
+                         "Valid types are \n  %s" % (str(tag), str(Data.__subclasses__())))
 
     @classmethod
     def from_file(cls, **kwargs):
@@ -491,7 +439,6 @@ class Data(object):
         tag = kwargs.pop("tag")
         id = kwargs.pop("id")
         xmlfile = kwargs.pop("xmlfile")
-        # node = xmlfile.get_node(id=id, tag=tag)
 
         root = et.parse(xmlfile).getroot()
         node = xmlutils.get_node(root.find('CompositeSpectrum'), tag, id)
@@ -502,11 +449,11 @@ class Data(object):
     def from_node(cls, **kwargs):
         """constructor from node"""
         node = kwargs.get("node")
-        try:
-            tag = kwargs.pop("tag")
-        except:
-            tag = node.tag
-        return cls(tag, **kwargs)
+        inst = cls(**kwargs)
+        inst.parse_node()
+        inst.validate_init()
+
+        return inst
 
     @staticmethod
     def get_node_attrib(cls, kwargs):
@@ -517,41 +464,52 @@ class Data(object):
         return _kwargs
 
     @staticmethod
-    def read(filename, tag='Absorber', ids=None):
+    def read(xml_data, tag=None, ids=None):
 
         """
         read the data.
-        filename: input filename
+        xml_data: input xml_data, either file-like object, filename or string of xml data
         tag (default='Absorber'): the specified data type
         ids: which ids to read.  if None, then read all available.
         """
 
-        if not type(filename) is str:
-            filename.seek(0)
+        if xml_data.endswith('.xml'):
+            the_tree = et.parse(xml_data)
+        else:
+            assert isinstance(xml_data, str)
+            the_tree = et.ElementTree(et.fromstring(xml_data))
 
-        etree = et.parse(filename)
-        duderoot = etree.getroot()  ##should be SpecTool
+        duderoot = the_tree.getroot()  # should be SpecTool
 
         dudespec = duderoot.find("CompositeSpectrum")
         if dudespec is None:
-            raise Exception("error reading fit file.  check %s to verify." % (filename))
-        spectrum = dudespec.find("Spectrum")
+            raise Exception("error reading fit file.  check %s to verify." % (xml_data))
+        # spectrum = dudespec.find("Spectrum")
         lst = []
-        specdata = list(dudespec) + list(duderoot)
+        specdata = list(dudespec) + list(duderoot)  # + list(the_tree.findall('Region'))
 
         if ids is None:
             for item in specdata:
-                if item.tag == tag:
-                    lst.append(Data.factory(node=item))
+                if item in lst:
+                    continue
+                if tag:
+                    if item.tag == tag:
+                        lst.append(Data.factory(node=item))
+                else:
+                    if item.tag in "Region Absorber ContinuumPoint".split(" "):
+                        lst.append(Data.factory(node=item))
+
         else:
             try:
-                if len(ids) == 0: raise Exception('need at least one id specified')
+                if len(ids) == 0:
+                    raise Exception('need at least one id specified')
             except:
                 raise Exception("type of ids needs to be list of str")
             for item in specdata:
+                if item in lst:
+                    continue
                 if item.tag == tag and item.get('id') in ids:
                     lst.append(Data.factory(node=item))
-
         return lst
 
     def locked(self, param):
@@ -564,8 +522,10 @@ class Data(object):
 
         data = node.attrib
         for key, val in data.items():
+            assert isinstance(key, str), 'got: %s' % str(key)
             if "Locked" in key:
-                setattr(self, key, tf[val.lower()])
+                if isinstance(val, str):
+                    setattr(self, key, tf[val.lower()])
             else:
                 try:
                     setattr(self, str(key), float(val))
@@ -582,8 +542,8 @@ class Data(object):
         for key, val in list(kwargs.items()):
             if "Locked" in key:
                 if not type(val) is bool:
-                    assert (type(val) in [str, unicode])
-                    assert (val in tf.keys())
+                    assert isinstance(val, str)
+                    assert val in tf.keys()
                 self.node.set(key, str(val).lower())
             setattr(self, key, val)
             self.node.set(key, str(val))
@@ -596,19 +556,49 @@ class Absorber(Data):
                    "z", "zLocked", "zError"]
 
     def __init__(self, *args, **kwargs):
-        # try:
-        #    kwargs['ionName']=kwargs['ionName'].replace(' ','')
-        # except:
-        #    pass
         super().__init__(*args, **kwargs)
+        self.defaults()
+
+    def __eq__(self, other):
+        if not isinstance(other, Absorber):
+            return False
+        for attr in "id ionName N b z".split(" "):
+            if getattr(self, attr) != getattr(other, attr):
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def validate_init(self):
+        for attr in Absorber.node_attrib:
+            if not hasattr(self, attr):
+                if attr in "NLocked bLocked zLocked".split(' '):
+                    setattr(self, attr, True)
+                elif attr == 'id':
+                    setattr(self, attr, '')
+                elif attr in "NError bError zError".split(' '):
+                    setattr(self, attr, 0.0)
+                else:
+                    raise Exception("Absorber instance requires setting of ionName, N,b,z")
+
+    def defaults(self):
+        for attr in Absorber.node_attrib:
+            if not hasattr(self, attr):
+                if attr in "NLocked bLocked zLocked":
+                    setattr(self, attr, True)
+                elif attr == 'id':
+                    setattr(self, attr, '')
+                elif attr in "NError bError zError":
+                    setattr(self, attr, 0.0)
 
     @classmethod
     def registrar_for(cls, tag):
         return tag == "Absorber"
 
     def __str__(self):
-        return "%-5s N=%8.5lf b=%8.5lf z=%10.8lf" % (
-            self.ionName, self.N, self.b, self.z)
+        return "%-5s N=%8.5lf b=%8.5lf z=%10.8lf, NLocked=%s, bLocked=%s, zLocked=%s" % (
+            self.ionName, self.N, self.b, self.z, str(self.NLocked), str(self.bLocked), str(self.zLocked))
 
     def getShift(self, z):
         return (float(self.z) - z) * c / (1. + z)
@@ -655,17 +645,17 @@ class Absorber(Data):
             lst.append(SpectralLine(**kwargs))
         return lst
 
-    @staticmethod
-    def get_lyman_limit_tau(wave, z, N):
-        """get tau for lyman limit systems"""
-        lambda_l = 911.8
-        if wave > lambda_l - 0.1:
-            wave = lambda_l - 0.1;
-
-        acotz = np.atan(1. / z)
-        t2 = np.exp(-4. * z * acotz) / (1. - np.exp(-2. * np.pi * z))
-        gaunt = 8. * np.pi * np.sqrt(3.) * (wave / lambda_l) * t2;
-        return np.pow(10., N) * ((wave / lambda_l) ** 3.) * 7.91e-18 * gaunt;
+    # @staticmethod
+    # def get_lyman_limit_tau(wave, z, N):
+    #     """get tau for lyman limit systems"""
+    #     lambda_l = 911.8
+    #     if wave > lambda_l - 0.1:
+    #         wave = lambda_l - 0.1;
+    #
+    #     acotz = np.atan(1. / z)
+    #     t2 = np.exp(-4. * z * acotz) / (1. - np.exp(-2. * np.pi * z))
+    #     gaunt = 8. * np.pi * np.sqrt(3.) * (wave / lambda_l) * t2;
+    #     return np.pow(10., N) * ((wave / lambda_l) ** 3.) * 7.91e-18 * gaunt;
 
     def locked(self, param):
         param_lock = {'N': 'NLocked', 'b': 'bLocked', 'z': 'zLocked'}
@@ -683,15 +673,9 @@ class Absorber(Data):
         detects whether of not CENTER of line is in a optimization region.
         only needs to be in one region to pass
         """
-        try:
-            lines = self.obs
-        except AttributeError:
-            warnings.warn("\n\n  \'alt_init\' wasn\'t called for \'Absorber\'\n\n")
-            self.alt_init()
-            lines = self.obs
         for region in regions:
-            for line in lines:
-                if line in region:
+            for line in self.get_lines():
+                if line.get_obs(z=line.z) in region and line.get_equiv_width(line.N, line.z, pixels=True) > 0.29:
                     return True
         return False
 
@@ -701,6 +685,39 @@ class ContinuumPoint(Data):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # self.validate_init()
+        self.defaults()
+
+    def __eq__(self, other):
+        if not isinstance(other, ContinuumPoint):
+            return False
+        for attr in ContinuumPoint.node_attrib:
+            if getattr(self, attr) != getattr(other, attr):
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def validate_init(self):
+        for attr in ContinuumPoint.node_attrib:
+            if not hasattr(self, attr):
+                if 'Locked' in attr:
+                    setattr(self, attr, True)
+                elif attr == 'id':
+                    setattr(self, attr, 'null')
+                elif 'Error' in attr:
+                    setattr(self, attr, 0.0)
+
+    def defaults(self):
+        for attr in ContinuumPoint.node_attrib:
+            if not hasattr(self, attr):
+                if attr in "xLocked yLocked":
+                    setattr(self, attr, True)
+                elif attr == 'id':
+                    setattr(self, attr, 'null')
+                elif attr in "xError yError":
+                    setattr(self, attr, 0.0)
 
     def __str__(self):
         return "id=%10s x=%7.2lf y=%10.8E xLocked=%s yLocked=%s" % (
@@ -710,15 +727,51 @@ class ContinuumPoint(Data):
     def registrar_for(cls, tag):
         return tag == "ContinuumPoint"
 
+    def in_region(self, regions):
+        for region in regions:
+            if self.x in region:
+                return True
+        return False
+
 
 class Region(Data):
     node_attrib = ["start", "end"]
 
     def __init__(self, *args, **kwargs):
+        self.start = kwargs.get('start')
+        self.end = kwargs.get('end')
         super().__init__(*args, **kwargs)
 
-    def __contains__(self, key):
-        return self.start <= float(key) <= self.end
+    def validate_init(self):
+        for attr in Region.node_attrib:
+            if not hasattr(self, attr):
+                raise Exception("Region instance requires setting of start, end")
+
+    def __eq__(self, other):
+        if not isinstance(other, Region):
+            return False
+        return self.start == other.start and self.end == other.end
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __contains__(self, val):
+        return self.start <= float(val) <= self.end
+
+    def __gt__(self, other):
+        return self.end > other.end
+
+    def __lt__(self, other):
+        return self.start < other.start
+
+    def __ge__(self, other):
+        return self.end >= other.end
+
+    def __le__(self, other):
+        return self.start <= other.start
+
+    def __str__(self):
+        return "start=%lf, end=%lf" % (self.start, self.end)
 
     @classmethod
     def registrar_for(cls, tag):
@@ -748,13 +801,6 @@ class VelocityView(Data):
     def registrar_for(cls, tag):
         return tag == "VelocityView"
 
-
-# class Singleton(type):
-#    _instances = {}
-#    def __call__(cls, *args, **kwargs):
-#        if cls not in cls._instances:
-#            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-#        return cls._instances[cls]
 
 class Param(object):
     """
@@ -796,3 +842,16 @@ class Param(object):
             self.name, self.value,
             self.name, self.error,
             self.name, str(self.locked).lower())
+
+
+if __name__ == '__main__':
+    print('instantiating an ab')
+    ab = Absorber(id='id', ionName='C IV',
+                  N=13.45, NLocked=True, NError=0,
+                  b=13.45, bLocked=True, bError=0,
+                  z=3.45)
+    print('cool.  instantiating another with a node.')
+    attrib_dct = {'ionName': 'C IV', 'N': float(11.2), 'b': float(2.02), 'z': float(1.92), 'NError': 0, 'bError': 0,
+                  'zError': 0.0, 'NLocked': False, 'bLocked': False, 'zLocked': False, 'id': ""}
+    test_node = type('testnode', (), {"tag": 'Absorber', 'attrib': attrib_dct})
+    ab = Absorber(node=test_node)
