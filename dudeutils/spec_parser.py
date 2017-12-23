@@ -1,30 +1,40 @@
-import numpy as np
-from astropy.io import fits
+import gc
+
+import _spectrum
+from scipy.signal import convolve
+
 import dudeutils.wavelength as wavelength
 from dudeutils.data_types import *
-from dudeutils.atomic import *
-import sys
-import copy
 from dudeutils.model import Model
-import _spectrum
 
-
-# import pdb
 
 class Spectrum(object):
     @staticmethod
     def sniffer(filename, *args, **kwargs):
-        """detects raw text format, returns correct spectrum class instance"""
+        """
+        detects raw text format, returns correct spectrum class instance
+
+        Parameters
+        ----------
+        filename
+        args
+        kwargs
+
+        Returns
+        -------
+        Model or Spectrum subclass
+        """
         if type(filename) in [FitsSpectrum, TextSpectrum]:
             return filename
         elif type(filename) is Model:
             if filename.flux.endswith('.fits'):
-                return FitsSpectrum(filename.flux, *args, **kwargs)
+                return FitsSpectrum(filename.flux, error=filename.error)
             else:
                 return TextSpectrum(filename.flux, *args, **kwargs)
 
         elif filename.endswith('.fits'):
-            return FitsSpectrum(filename, *args, **kwargs)
+            error = kwargs.pop('error', filename.replace('.fits', '_e.fits'))
+            return FitsSpectrum(filename, error=error)
         elif filename.endswith('.xml'):
             return Model(xmlfile=filename)
         with open(filename) as f:
@@ -36,7 +46,7 @@ class Spectrum(object):
                 return TextSpectrum(filename, *args, **kwargs)
             elif cols in [7, 8, 10, 11]:
                 # 7, 10 columns for line dump.  cols+1 if ionName has a space in it
-                return LineDump(filename, *args, **kwargs)
+                return LineDump(filename)
 
             else:
                 raise Exception(
@@ -80,13 +90,48 @@ class Spectrum(object):
         return np.array(arr)
 
     @staticmethod
-    def fit_absorption(spec, model, xregion=False, ab_to_plot=None, indices=None, xr=None):
+    def get_regions(model, xr, wv, xregion):
+        if xregion:
+            if not xr:
+                regions = RegionList.consolidate_list([(item.start, item.end)
+                                                       for item in list(model.region_list)
+                                                       if item.start < wv[-1] and item.end > wv[0]])
+            else:
+                regions = RegionList.consolidate_list([[xr[0], xr[-1]]])
+        else:
+            regions = RegionList.consolidate_list([[wv[0], wv[-1]]])
+        return regions
+
+    @staticmethod
+    def get_chi2(flux, absorption, e, ind):
+        tmp = (flux[ind] - absorption[ind]) / e[ind]
+        tmp = tmp[~np.isnan(tmp)]
+        tmp = tmp[~np.isinf(tmp)]
+        return np.sum(tmp * tmp)
+
+    @staticmethod
+    def truncate(spec, indices=None):
+        try:
+            assert (spec.error.shape[0] == spec.waves.shape[0])
+        except:
+            spec.error = np.zeros(spec.waves.shape[0])
+        if indices is not None:
+            return spec.waves[indices], spec.flux[indices], spec.error[indices]
+        else:
+            return spec.waves, spec.flux, spec.error
+
+    # from memory_profiler import profile
+    # @staticmethod
+    # @profile
+    @staticmethod
+    def fit_absorption(spec, model, vsig=3.4, vdisp=2.14,
+                       ab_to_fit=None, cont_to_fit=None, get_all=False):
         """
         Input:
         ------
         spec : specParser.Spectrum instance
         model : model.Model instance
-        ab_to_plot: included absorbers.  to include no absorbers, include as []
+        ab_to_fit: included absorbers.  to include no absorbers, include as []
 
         Output:
         -------
@@ -100,80 +145,71 @@ class Spectrum(object):
         AssertionError
 
         """
+        try:
+            vdisp, vsig = float(vdisp), float(vsig)
+        except:
+            print(vdisp, vsig)
+            raise Exception()
+        wv, flux, e = spec.waves, spec.flux, spec.error
 
-        def truncate(indices=None):
-            try:
-                assert (spec.error.shape[0] == spec.waves.shape[0])
-            except:
-                spec.error = np.zeros(spec.waves.shape[0])
-            if indices:
-                return spec.waves[indices], spec.flux[indices], spec.error[indices]
-            else:
-                return spec.waves, spec.flux, spec.error
-
-        wv, flux, e = truncate(indices)
-
-        cont_points = model.get_lst("ContinuumPointList")
+        # wv, flux, e = Spectrum.truncate(spec, indices)
+        abslst = ab_to_fit if ab_to_fit else model.absorber_list
+        cont_points = cont_to_fit if cont_to_fit else model.cont_point_list
         cont_points = sorted(cont_points, key=lambda pt: pt.x)
         x = np.array([float(item.x) for item in cont_points])
         y = np.array([float(item.y) for item in cont_points])
 
-        absorbers = []
-
-        abslst = ab_to_plot if ab_to_plot else Model.get(model.AbsorberList)
+        spec_lines = []
 
         if type(abslst[0]) is SpectralLine:
-            absorbers = abslst
+            spec_lines = abslst
         elif type(abslst[0]) is Absorber:
             if not abslst[0]:
                 raise Exception("no absorbers specified")
             for item in abslst:
-                absorbers += item.get_lines()
+                spec_lines += item.get_lines()
         else:
-            raise Exception("type of ab_to_plot must either be list of SpectralLine instances or Absorber instances ")
+            raise Exception("type of ab_to_fit must either be list of SpectralLine instances or Absorber instances ")
 
-        absorbers = [it for it in absorbers if wv[4] < it.get_obs(it.z) < wv[-4]]
-
-        if xregion:
-            if not xr:
-                regions = RegionList.consolidate_list(
-                    [(item.start, item.end)
-                     for item in list(model.get_lst("RegionList"))
-                     if item.start < wv[-1] and item.end > wv[0]])
-            else:
-                regions = RegionList.consolidate_list([[xr[0], xr[-1]]])
-        else:
-            regions = RegionList.consolidate_list([[wv[0], wv[-1]]])
-
-        starts = np.array([item[0] for item in regions], dtype=np.float)
-        ends = np.array([item[1] for item in regions], dtype=np.float)
+        spec_lines = [it for it in spec_lines if
+                      wv[4] < it.get_obs(it.z) < wv[-4] and it.get_equiv_width(it.N, it.z, pixels=True) > 0.29]
 
         # convert into numpy array for c extension use
-        N = np.array([item.N for item in absorbers], dtype=np.float)
-        b = np.array([item.b for item in absorbers], dtype=np.float)
-        z = np.array([item.z for item in absorbers], dtype=np.float)
-        rest = np.array([item.wave for item in absorbers], dtype=np.float)
-        gamma = np.array([item.gamma for item in absorbers], dtype=np.float)
-        f = np.array([item.f for item in absorbers], dtype=np.float)
+        N = np.array([item.N for item in spec_lines], dtype=np.float)
+        b = np.array([item.b for item in spec_lines], dtype=np.float)
+        z = np.array([item.z for item in spec_lines], dtype=np.float)
+        rest = np.array([item.wave for item in spec_lines], dtype=np.float)
+        gamma = np.array([item.gamma for item in spec_lines], dtype=np.float)
+        f = np.array([item.f for item in spec_lines], dtype=np.float)
 
-        cont, absorption, chi2 = _spectrum.spectrum(wv, flux, e,
-                                                    x, y,
-                                                    N, b, z, rest, gamma, f,
-                                                    starts, ends)
+        cont, absorption = _spectrum.spectrum(wv,
+                                              x, y,
+                                              N, b, z, rest, gamma, f)
 
-        return wv, flux, e, absorption, cont, chi2
+        ind = model.get_indices()
+        width = int((6.0 * float(vsig) / float(vdisp))) + 1
+        # kernel = 1.0 / (vsig * np.sqrt(2.0 * np.pi))
+        kernel = np.exp(-0.5 * ((np.arange(width) * vdisp) / vsig) ** 2.)
+        kernel /= np.sum(kernel)
+        absorption = convolve(absorption, kernel, mode='same')
+        absorption = np.concatenate((np.zeros(3), absorption[:-3]))  # looks like the convolve offsets abs by 5 or so
+
+        model.update_dof()
+        # ind = model.get_indices()
+
+        chi2 = Spectrum.get_chi2(flux, absorption, e, ind)
+        gc.collect()
+
+        return absorption, cont, chi2
 
 
 class FitsSpectrum(Spectrum):
     def __init__(self, filename, error=None):
-        self.hdu = fits.open(filename)
-        if self.hdu[0].header['NAXIS'] != 1:
-            raise Exception("multidim spec not yet supported")
         self.waves, self.flux = wavelength.xy(filename)
         if error:
             _, self.error = wavelength.xy(error)
         else:
-            self.error = None
+            raise Exception('error is None.  flux file is %s' % (filename))
         self.dump = filename.replace('.fits', '.dat')
 
 
@@ -183,7 +219,7 @@ class TextSpectrum(Spectrum):
     def __init__(self, dumpfile, *lst, **kwargs):
         if len(lst) == 0:
             try:
-                lst = [kwargs[it] for it in attributes]
+                lst = [kwargs[it] for it in TextSpectrum.attributes]
             except:
                 Exception("bad formatting:\n" + str(kwargs))
         if len(lst) != 5:
@@ -212,7 +248,7 @@ class TextSpectrum(Spectrum):
 
     @staticmethod
     def get_ind(waves, beg, end):
-        if beg > end:  # swap if entered in wrong order
+        if beg > end:
             beg, end = end, beg
         ind1 = np.where(waves < end)[0]
         ind2 = np.where(waves > beg)[0]
@@ -261,11 +297,11 @@ class LineDump(object):
         if fname:
             self.parse(fname)
 
-    def parse(self, fname):
+    def parse(self, fname, excluded_ions=[]):
         """
         parse a line dump and set absorbers attribute
 
-        input:
+        input: 
         ------
         fname:  string or model.Model instance
 
@@ -284,7 +320,7 @@ class LineDump(object):
         elif type(fname) is str:
             self.fname = fname
             if fname.endswith('.xml'):
-                mod = Model(fname)
+                mod = Model(xmlfile=fname)
                 self.absorbers = [ab for ab in Model.get(mod.AbsorberList)
                                   if not ab in excluded_ions]
             else:
@@ -304,7 +340,21 @@ class LineDump(object):
         return [item for item in self.absorbers if item.ionName == ionName]
 
     def split(self, ionName):
-        copy = copy.deepcopy(self)
-        copy.absorbers = [item for item in self.absorbers if item.ionName == ionName]
+        from copy import deepcopy
+        cpy = deepcopy(self)
+        cpy.absorbers = [item for item in self.absorbers if item.ionName == ionName]
         self.absorbers = [item for item in self.absorbers if item.ionName != ionName]
-        return copy
+        return cpy
+
+
+if __name__ == '__main__':
+    xmlfile = '/home/scott/J0744/J0744+2059.xml'
+    config = '/home/scott/J0744/config.cfg'
+
+    model = Model(xmlfile=xmlfile)
+    model.update_dof()
+    Config.configure('/home/scott/J0744/config.cfg')
+    model = Model(xmlfile=Config.glob['source'])
+    model.update_dof()
+    spec = Spectrum.sniffer(model)
+    vals = Spectrum.fit_absorption(spec, model)
