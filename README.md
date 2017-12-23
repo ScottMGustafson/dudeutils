@@ -1,8 +1,8 @@
-#Dudeutils
+ # Dudeutils
 
 A framework for dude spectrum models and .fits data
 
-##Important data structures
+## Important data structures
 `dudeutils.data_types.Data`:  Parent class for `Absorber`, `ContinuumPoint`, `SingleView`, `VelocityView` and `Region` classes.
 
 `dudeutils.data_types.ObjList`: container for `data_types.Data` subclasses.  Elements are stored in `ObjList._pool`, which you as a user should never directly use, unless absolutely necessary.
@@ -14,7 +14,7 @@ A framework for dude spectrum models and .fits data
 `dudeutils.spec_parser.Spectrum`: parent class for `TextSpectrum` and `FitsSpectrum`.  Provides utilities for interfacing with data and fitting model data.   
 
 
-##example usage
+## example usage
 For more detailed usage, see the 'Software' chapter in my PhD Thesis
 
 ```python
@@ -47,10 +47,23 @@ new_vals = {'N':21.5,'b':17.2,'z':1.23,'bLocked':True,'zLocked':False,'ionName':
 model.set('old_id','Absorber',**new_vals)
 ```
 
-##Random sampling of models
-More later...
+## Random sampling of models
+run from random_sampling module:
+```python
+from dudeutils.random_sampling import run
+from dudeutils.model_csv_io import ModelIO
 
-####be sure to write all of your changes back to file if you want them to take effect:
+run('/path/to/config.cfg')
+```
+
+If you need to tie two absorbers' parameters (i.e. redshift), use the `tie` parameter:
+
+```python
+run('/path/to/config.cfg', tie=('H_z', 'D_z'))
+```
+Models will be written as a csv with headers following the format:  {absorber id}_{absorber parameter}, i.e. the redshift of an absorber named "abc" will be `abc_z`
+
+#### be sure to write all of your changes back to file if you want them to take effect:
 
 write the model back to the original xml
 
@@ -71,10 +84,10 @@ ModelDB.dump_models(db,'name.obj')
 db=ModelDB.load_models('name.obj')
 ```
 
-####XML formats
+#### XML formats
 A large portion of this software boils down to parsing and storing xml data according to a few specific formats using xml.etree.
 
-#####fit database formats:
+##### fit database formats:
 each distinct data type will be stored separately with a unique id as an identifier.
 
 for example:
@@ -90,7 +103,7 @@ for example:
 </ModelDB>
 ```
 
-#####an individual fit's xml file
+##### an individual fit's xml file
 This should be the standard dude xml output.  If you have no idea whe this means, then you don't have dude and this entire repository is probably not for you
     
     
