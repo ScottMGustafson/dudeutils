@@ -104,6 +104,6 @@ for example:
 ```
 
 ##### an individual fit's xml file
-This should be the standard dude xml output.  If you have no idea whe this means, then you don't have dude and this entire repository is probably not for you
+This should be the standard dude xml output.  
     
     
